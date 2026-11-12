@@ -585,27 +585,44 @@ heap per open file (stock ProDOS: 1K per file).
 - T files track a 16-bit logical position, used to write over the
   terminator after reading to the end. Positioning in T files beyond
   64K is not supported in this increment.
+- **Zero page:** the read/write path may change `ptr1`–`ptr3`, as the
+  stock path does, but must preserve `ptr4`. cc65's `fgets` keeps its
+  destination pointer in `ptr4` across `fgetc` → `read`, and the stock
+  read path never touches it. The first run on DOS 3.3 failed the `fgets`
+  check because `rwcommon` used `ptr4` for the control block without
+  saving it, so `fgets` stored characters into the control block. Fixed
+  by saving `ptr4` on entry to `rwcommon` and restoring it on every exit.
+  A search of cc65's `libsrc/common` found no other stdio routine that
+  relies on a zero-page register surviving a call into the file layer
+  (`vfscanf` uses `ptr3`, but only after its calls return).
 - T-file reads and raw-file reads go byte by byte, because a range READ
   that runs into the end of the data doesn't report how many bytes it
   transferred. B-file reads use range READs clipped to the recorded
   length.
 
-### 10.2 To confirm on real DOS 3.3
+### 10.2 Confirmed on DOS 3.3
 
-These follow the sources but have not been run yet. Each is isolated so
-it can be corrected in one place.
+The first run of `test/filetest.c` under stock DOS 3.3 in ReplicApple2Plus
+passed every T-file, B-file, `open`-flag and name check, confirming the
+assumptions below, which had been taken from the sources. Each remains
+isolated so it can be corrected in one place if real hardware disagrees.
+The one failure (`fgets`) was a defect in this library, not in these
+assumptions; see the zero-page note in 10.1.
 
-- **Range WRITE length:** *Beneath Apple DOS* says a range WRITE takes
-  the count minus one. Implemented as `FM_WRITE_ADJUST` in `fm.inc`.
-- **New sectors are zero-filled:** T files rely on a `$00` following the
-  last byte written. If the File Manager doesn't clear new data sectors,
-  the end of a T file would be lost.
-- **OPEN output type byte:** assumed to use File Manager type codes, with
-  bit 7 as the lock flag (masked off).
-- **POSITION offsets:** assumed to be whole-file byte offsets when the
-  record number is 0 and the file was opened with record length 0.
-- **Language Card banking:** the File Manager is called with ROM banked
-  in and LC bank 2 restored afterward, the same pattern `rdkey.s` uses.
+- **Range WRITE length:** a range WRITE takes the count minus one, as
+  *Beneath Apple DOS* says (`FM_WRITE_ADJUST` in `fm.inc`). Confirmed by
+  the exact B-file lengths.
+- **New sectors are zero-filled:** a `$00` follows the last byte written
+  to a T file. Confirmed by the T read-at-end and append checks.
+- **OPEN output type byte:** uses File Manager type codes, with bit 7 as
+  the lock flag (masked off). Confirmed by T and B files being classified
+  correctly when reopened.
+- **POSITION offsets:** whole-file byte offsets when the record number
+  is 0 and the file was opened with record length 0. Confirmed by append
+  and by the B header's length being rewritten on close.
+- **Language Card banking:** calling the File Manager with ROM banked in
+  and LC bank 2 restored afterward works, the same pattern `rdkey.s`
+  uses.
 
 ### 10.3 Next increments
 

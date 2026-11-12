@@ -20,6 +20,10 @@
 ; at the length it records, and writes extend it (rewritten on close).
 ; Other files are transferred raw.
 ;
+; Zero page: like the stock rwcommon, this may change ptr1-ptr3, but it
+; preserves ptr4, which it uses for the control block. cc65's fgets keeps
+; its destination pointer in ptr4 across fgetc -> read (DESIGN.md 10.1).
+;
 
         .export         rwprolog, rwcommon, rwepilog
         .import         popax, popptr1
@@ -50,6 +54,14 @@ rwprolog:
         jmp     getfd           ; Returns A, Y and C
 
 rwcommon:
+        ; Save the caller's ptr4
+        pha
+        lda     ptr4
+        sta     saveptr4
+        lda     ptr4+1
+        sta     saveptr4+1
+        pla
+
         ; Find the control block from REF_NUM
         and     #$3F
         tax
@@ -165,7 +177,7 @@ hwrite: ldy     #FCB::POS
         sta     tmp4
         bcc     :+
         lda     #ENOSPC
-        jmp     ___directerrno
+        jmp     direrr
 
 :       jsr     whole
         lda     #FMC_WRITE
@@ -279,7 +291,7 @@ twr:    ldy     #$00
         jeq     ok              ; Branch always
 
 reject: lda     #EINVAL
-        jmp     ___directerrno
+        jmp     direrr
 
 ; ------------------------------------------------------------------------
 ; Common exits
@@ -287,13 +299,17 @@ reject: lda     #EINVAL
 rdend:  cmp     #FMR_ENDDATA    ; End of data ends a read
         jeq     ok
 fmerr:  jsr     fm_maperr
+        jsr     restore
         jmp     ___mappederrno
+direrr: jsr     restore
+        jmp     ___directerrno
 
 setall: lda     ptr2            ; Whole count transferred
         sta     COUNT
         lda     ptr2+1
         sta     COUNT+1
-ok:     lda     #$00
+ok:     jsr     restore
+        lda     #$00
 
 rwepilog:
         ; Return success
@@ -304,6 +320,17 @@ rwepilog:
 
 ; ------------------------------------------------------------------------
 ; Helpers
+
+; restore: restore the caller's ptr4. Preserves A.
+
+restore:
+        pha
+        lda     saveptr4
+        sta     ptr4
+        lda     saveptr4+1
+        sta     ptr4+1
+        pla
+        rts
 
 ; whole: set up fm_rangeio for the whole request (ptr1, ptr2).
 
@@ -351,3 +378,5 @@ swapnl: cmp     #$0A
         .bss
 
 op:     .res    1
+saveptr4:
+        .res    2

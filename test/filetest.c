@@ -2,8 +2,11 @@
 ** DOS 3.3 file layer tests (DESIGN.md section 5).
 **
 ** Run from a DOS 3.3 disk with a writable disk in the default drive.
-** Prints one line per check and a summary; the screen text is meant to be
-** compared by an emulator test fixture (DESIGN.md section 8).
+** Output fits a 40x24 screen: one line per group with its pass count,
+** failed checks indented beneath it (at most MAX_SHOWN in total), and a
+** summary. Lines stay under 40 characters, since a full 40-character line
+** makes the Apple II wrap and insert a blank line. The screen text is
+** meant to be compared by an emulator test fixture (DESIGN.md section 8).
 */
 
 #include <stdio.h>
@@ -12,15 +15,46 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <apple2.h>
+#include <conio.h>
 
-static unsigned char failures;
+/* Failure lines shown: 24 rows less the BRUN line, the title, 6 groups,
+** the overflow line, the summary and the prompt after exit. */
+#define MAX_SHOWN   13
+#define MAX_GROUP   10          /* Most checks in one group */
+
+static unsigned char passed, total;         /* All groups */
+static unsigned char gpassed, gtotal;       /* Current group */
+static const char* gfailed[MAX_GROUP];      /* Current group's failures */
+static unsigned char ngfailed;
+static unsigned char shown, hidden;         /* Failure lines */
 
 static void check (const char* what, int ok)
 {
-    printf ("%s %s\n", ok ? "PASS" : "FAIL", what);
-    if (!ok) {
-        ++failures;
+    ++gtotal;
+    if (ok) {
+        ++gpassed;
+    } else if (ngfailed < MAX_GROUP) {
+        gfailed[ngfailed++] = what;
     }
+}
+
+/* Print the group's line and its failures, then start a new group */
+static void group (const char* name)
+{
+    unsigned char i;
+
+    printf ("%-32s%2u/%u\n", name, gpassed, gtotal);
+    for (i = 0; i < ngfailed; ++i) {
+        if (shown < MAX_SHOWN) {
+            printf ("  FAIL %s\n", gfailed[i]);
+            ++shown;
+        } else {
+            ++hidden;
+        }
+    }
+    passed += gpassed;
+    total += gtotal;
+    gpassed = gtotal = ngfailed = 0;
 }
 
 static unsigned char buf[64];
@@ -155,24 +189,42 @@ static void stdio_layer (void)
     _filetype = PRODOS_T_TXT;
     f = fopen ("T.STDIO", "w");
     check ("fopen w", f != NULL);
-    fprintf (f, "LINE %d\n", 42);
-    fclose (f);
+    if (f) {
+        fprintf (f, "LINE %d\n", 42);
+        fclose (f);
+    }
 
     f = fopen ("T.STDIO", "r");
     check ("fopen r", f != NULL);
-    check ("fgets", fgets ((char*) buf, sizeof (buf), f) != NULL
+    check ("fgets", f != NULL
+                    && fgets ((char*) buf, sizeof (buf), f) != NULL
                     && strcmp ((char*) buf, "LINE 42\n") == 0);
-    fclose (f);
+    if (f) {
+        fclose (f);
+    }
 }
 
 int main (void)
 {
-    text_roundtrip ();
-    text_reject ();
-    text_append_truncate ();
-    binary_header ();
-    open_flags_names ();
-    stdio_layer ();
-    printf ("%s: %u FAILED\n", failures ? "DONE" : "ALL PASSED", failures);
+    /* After a DOS command such as BRUN, the cursor can still be at the end
+    ** of the command line; start on a new line so the title doesn't wrap. */
+    if (wherex () != 0) {
+        putchar ('\n');
+    }
+    printf ("A2LIB DOS 3.3 FILE TESTS\n");
+    text_roundtrip ();          group ("T FILE ROUND TRIP");
+    text_reject ();             group ("T FILE 8-BIT REJECTION");
+    text_append_truncate ();    group ("T FILE APPEND, TRUNCATE");
+    binary_header ();           group ("B FILE HEADER");
+    open_flags_names ();        group ("OPEN FLAGS, NAMES");
+    stdio_layer ();             group ("STDIO");
+    if (hidden) {
+        printf ("  (%u MORE FAILURES)\n", hidden);
+    }
+    if (passed == total) {
+        printf ("ALL %u PASSED\n", total);
+    } else {
+        printf ("%u OF %u FAILED\n", total - passed, total);
+    }
     return 0;
 }
