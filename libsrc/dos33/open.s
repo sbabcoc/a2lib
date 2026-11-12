@@ -22,6 +22,8 @@
         .import         _malloc, _free
         .import         addysp, popax
 
+        .macpack        longbranch
+
         .include        "zeropage.inc"
         .include        "errno.inc"
         .include        "fcntl.inc"
@@ -143,13 +145,15 @@ exists: lda     flags
         ; Set up the control block from the type of the file opened
 opened: ldy     #FM_TYPE
         lda     (ptr3),y
+        ldy     #FCB::TYPE      ; Keep the lock bit for stat
+        sta     (ptr4),y
         and     #$7F            ; Lock bit
         sta     type
         jsr     classify
 
         ; "A call to POSITION should follow every OPEN"
         jsr     rewind
-        bcs     errclosefm
+        jcs     errclosefm
 
         lda     created
         bne     newfile
@@ -169,6 +173,9 @@ oldfile:
         bcc     :+
         cmp     #FMR_ENDDATA    ; Empty file: header written on close
         bne     errclosefm
+        lda     #$00            ; No load address
+        sta     hdrbuf
+        sta     hdrbuf+1
         ldy     #FCB::STATE
         lda     #FCBS_DIRTY
         sta     (ptr4),y
@@ -199,8 +206,20 @@ newfile:
         jsr     fm_rangeio
         bcs     errclosefm
 
+        ; B files: keep the load address for stat
+done:   ldy     #FCB::HDRLEN
+        lda     (ptr4),y
+        cmp     #4
+        bne     :+
+        ldy     #FCB::ADDR
+        lda     hdrbuf
+        sta     (ptr4),y
+        iny
+        lda     hdrbuf+1
+        sta     (ptr4),y
+
         ; Fill in the fdtab slot and return the handle
-done:   ldy     slot
+:       ldy     slot
         lda     flags
         sta     fdtab + FD::FLAGS,y
         tya

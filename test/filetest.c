@@ -16,10 +16,11 @@
 #include <unistd.h>
 #include <apple2.h>
 #include <conio.h>
+#include <sys/stat.h>
 
-/* Failure lines shown: 24 rows less the BRUN line, the title, 6 groups,
+/* Failure lines shown: 24 rows less the BRUN line, the title, 9 groups,
 ** the overflow line, the summary and the prompt after exit. */
-#define MAX_SHOWN   13
+#define MAX_SHOWN   10
 #define MAX_GROUP   10          /* Most checks in one group */
 
 static unsigned char passed, total;         /* All groups */
@@ -181,6 +182,110 @@ static void open_flags_names (void)
     close (fd);
 }
 
+/* Write a file of the current _filetype with the given contents */
+static void make_file (const char* name, const void* data, unsigned len)
+{
+    int fd = open (name, O_WRONLY | O_CREAT | O_TRUNC);
+
+    write (fd, data, len);
+    close (fd);
+}
+
+/* Read one byte at the current position; -1 at the end */
+static int byte_at (int fd)
+{
+    unsigned char c;
+
+    return read (fd, &c, 1) == 1 ? c : -1;
+}
+
+/* lseek (DESIGN.md 5.7) */
+static void seek_tests (void)
+{
+    static const unsigned char bdata[] = { 1, 2, 3, 4, 5 };
+    int fd;
+
+    /* T files: each whence; any position; 16-bit limit */
+    _filetype = PRODOS_T_TXT;
+    make_file ("T.SEEK", "ABCDEFG", 7);
+    fd = open ("T.SEEK", O_RDWR);
+    check ("T seek end", lseek (fd, 0, SEEK_END) == 7);
+    check ("T seek set", lseek (fd, 2, SEEK_SET) == 2 && byte_at (fd) == 'C');
+    check ("T seek cur", lseek (fd, -1, SEEK_CUR) == 2 && byte_at (fd) == 'C');
+    check ("T seek past end", lseek (fd, 10, SEEK_SET) == 10);
+    errno = 0;
+    check ("negative position", lseek (fd, -1, SEEK_SET) == -1 && errno == EINVAL);
+    errno = 0;
+    check ("16-bit limit", lseek (fd, 0x10000L, SEEK_SET) == -1 && errno == EINVAL);
+    lseek (fd, 1, SEEK_SET);
+    write (fd, "X", 1);
+    lseek (fd, 0, SEEK_SET);
+    check ("T overwrite", read (fd, buf, sizeof (buf)) == 7
+                          && memcmp (buf, "AXCDEFG", 7) == 0);
+    close (fd);
+
+    /* T files: records of a random-access file (DESIGN.md 5.2) */
+    fd = open ("T.RECORDS", O_RDWR | O_CREAT | O_TRUNC);
+    write (fd, "R0", 2);
+    lseek (fd, 10, SEEK_SET);
+    write (fd, "R1", 2);
+    lseek (fd, 10, SEEK_SET);
+    check ("T record read", read (fd, buf, sizeof (buf)) == 2
+                            && memcmp (buf, "R1", 2) == 0);
+    close (fd);
+
+    /* B files: not past the recorded length */
+    _filetype = PRODOS_T_BIN;
+    make_file ("B.SEEK", bdata, sizeof (bdata));
+    fd = open ("B.SEEK", O_RDONLY);
+    check ("B seek", lseek (fd, 3, SEEK_SET) == 3 && byte_at (fd) == 4);
+    errno = 0;
+    check ("B past end", lseek (fd, 6, SEEK_SET) == -1 && errno == ESPIPE);
+    close (fd);
+}
+
+/* remove and rename (DESIGN.md 5.5) */
+static void remove_rename (void)
+{
+    int fd;
+
+    _filetype = PRODOS_T_TXT;
+    make_file ("T.GONE", "X", 1);
+    check ("remove", remove ("T.GONE") == 0
+                     && open ("T.GONE", O_RDONLY) == -1 && errno == ENOENT);
+    errno = 0;
+    check ("remove missing", remove ("T.GONE") == -1 && errno == ENOENT);
+
+    remove ("T.NEW");           /* Left over from an earlier run */
+    make_file ("T.OLD", "X", 1);
+    check ("rename", rename ("T.OLD", "T.NEW") == 0);
+    fd = open ("T.NEW", O_RDONLY);
+    check ("renamed file", fd >= 0 && open ("T.OLD", O_RDONLY) == -1);
+    close (fd);
+    errno = 0;
+    check ("rename onto existing", rename ("T.TEST", "T.NEW") == -1 && errno == EEXIST);
+    errno = 0;
+    check ("rename new suffix", rename ("T.NEW", "T.X,D1") == -1 && errno == EINVAL);
+    errno = 0;
+    check ("rename missing", rename ("T.OLD", "T.Y") == -1 && errno == ENOENT);
+}
+
+/* stat (DESIGN.md 5.8) */
+static void stat_tests (void)
+{
+    static struct stat st;
+
+    check ("stat T", stat ("T.TEST", &st) == 0);
+    check ("stat T fields", st.st_mode == S_IFREG && st.st_type == PRODOS_T_TXT
+                            && st.st_access == 0xC3);
+    check ("stat T size", st.st_size == 7);
+    check ("stat B", stat ("B.TEST", &st) == 0 && st.st_type == PRODOS_T_BIN);
+    check ("stat B load address", st.st_auxtype == 0x2000);
+    check ("stat B size", st.st_size == 6);
+    errno = 0;
+    check ("stat missing", stat ("NO.SUCH.FILE", &st) == -1 && errno == ENOENT);
+}
+
 /* stdio on top of the POSIX layer */
 static void stdio_layer (void)
 {
@@ -218,6 +323,9 @@ int main (void)
     binary_header ();           group ("B FILE HEADER");
     open_flags_names ();        group ("OPEN FLAGS, NAMES");
     stdio_layer ();             group ("STDIO");
+    seek_tests ();              group ("LSEEK");
+    remove_rename ();           group ("REMOVE, RENAME");
+    stat_tests ();              group ("STAT");
     if (hidden) {
         printf ("  (%u MORE FAILURES)\n", hidden);
     }

@@ -32,9 +32,9 @@ fm_name:
         sta     volume
         sta     given
         lda     DOS_DRIVE
-        sta     drive
+        sta     fm_drive
         lda     DOS_SLOT
-        sta     slot
+        sta     fm_slot
 
         ; Blank the name buffer
         ldx     #30-1
@@ -96,7 +96,7 @@ is_s:   lda     tmp3
         beq     bad
         cmp     #8
         bcs     bad
-        sta     slot
+        sta     fm_slot
         lda     given
         ora     #GIVEN_S
         bne     setgiven        ; Branch always
@@ -106,7 +106,7 @@ is_d:   lda     tmp3
         beq     bad
         cmp     #3
         bcs     bad
-        sta     drive
+        sta     fm_drive
         lda     given
         ora     #GIVEN_D
 setgiven:
@@ -136,24 +136,24 @@ store:  ldy     #FM_NAME
         lda     volume
         sta     (ptr3),y
         iny
-        lda     drive
+        lda     fm_drive
         sta     (ptr3),y
         iny
-        lda     slot
+        lda     fm_slot
         sta     (ptr3),y
 
         ; Explicit S and D become DOS's defaults
         lda     given
         and     #GIVEN_S
         beq     :+
-        lda     slot
+        lda     fm_slot
         sta     DOS_SLOT
         lda     #$00
         sta     DOS_SLOT+1
 :       lda     given
         and     #GIVEN_D
         beq     :+
-        lda     drive
+        lda     fm_drive
         sta     DOS_DRIVE
         lda     #$00
         sta     DOS_DRIVE+1
@@ -212,6 +212,6 @@ GIVEN_D = $02
 
 fm_namebuf:     .res    30
 volume:         .res    1
-drive:          .res    1
-slot:           .res    1
+fm_drive:       .res    1       ; Slot and drive of the last name parsed
+fm_slot:        .res    1
 given:          .res    1

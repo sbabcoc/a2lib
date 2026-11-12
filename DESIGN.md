@@ -58,7 +58,30 @@ the header variant.
 | Add-on library + `-D __APPLE2_DOS33__` | No change to cc65 | Linking the library without the define silently mismatches the `dirent` layout |
 
 **Decision:** develop as an add-on library with the define, and plan to
-propose a separate target upstream. As a guard during development, the
+propose a separate target upstream.
+
+**The add-on library is a complete library (decision, from the first run
+of increment 2):** `lib/apple2-dos33.lib` is a copy of the installed
+cc65's `apple2.lib` with the DOS 3.3 modules replacing the stock modules
+of the same name (`ar65 r`) and the new modules added. A library holding
+only the replacement modules is not enough, because ld65 scans each
+library once, in command-line order, and pulls in only modules that
+satisfy references open at that moment. A stock module reached through
+another stock module is then resolved inside `apple2.lib`:
+
+- `remove()` is only in `apple2.lib`, so `remove.o` is pulled from there,
+  and its reference to `__sysremove` resolves to the stock module. The
+  first run of the increment 2 tests failed every remove/rename check
+  this way (stock `__sysremove` returns `ENOSYS` under DOS 3.3).
+- The same applies to `fopen` → `open`: a program using only stdio got
+  stock `open.o` and `close.o` (confirmed with a link map).
+
+With the complete library listed first, every symbol resolves inside it,
+and cc65's own `apple2.lib`, which `cl65` still appends, contributes
+nothing. The link command is unchanged. Because the library embeds the
+stock modules of the cc65 it was built with, **it must be rebuilt after
+updating cc65**; the Makefile locates the installed `apple2.lib` through
+`cl65 --print-target-path`. As a guard during development, the
 header (under the define) references a symbol that exists only in the
 DOS 3.3 library, so a mismatched build fails to link instead of failing
 at run time.
@@ -450,6 +473,27 @@ some mechanism is required. **Decision:** use DOS 3.3's own syntax.
   default, as it does for DOS commands. `V` is not sticky; DOS resets it
   to 0 for every command (ch. 8, `A0D1`).
 
+### 5.5a remove and rename
+
+- `remove` uses the File Manager's DELETE. A locked file fails with
+  `EACCES`, as under ProDOS.
+- `rename` uses RENAME. The old name may carry suffixes; **the new name
+  may not**, since the file stays where it is. A new name with a suffix
+  fails with `EINVAL`, so the location is never ambiguous.
+- DOS's RENAME doesn't check whether the new name is already in use and
+  would leave two files with the same name. **As under ProDOS, an
+  existing new name fails with `EEXIST`**: `rename` first tries to OPEN
+  the new name without allocating it.
+- Both need the File Manager's work area and buffers even without an
+  open file, so they allocate a temporary control block (557 bytes).
+  If that fails, they return ProDOS code `$25`, which maps to `ENOMEM`;
+  the ProDOS table has no closer code, because stock cc65 allocates
+  nothing for these calls.
+- **Known difference (open):** ProDOS refuses to delete or rename an open
+  file (`$50`, `EINVAL`). DOS 3.3 doesn't check, and this layer doesn't
+  yet record names in the control block to detect it. Deleting or
+  renaming a file that is open is therefore not detected.
+
 ### 5.6 Error mapping
 
 **Decision (made during implementation):** File Manager return codes are
@@ -472,6 +516,51 @@ principle. No DOS 3.3 message table is needed.
 | `09` | Disk full | `ENOSPC` | `$48` |
 | `0A` | File locked | `EACCES` | `$4E` |
 
+
+### 5.7 lseek
+
+Same interface as stock cc65 (`SEEK_CUR` 0, `SEEK_END` 1, `SEEK_SET` 2;
+result in `sreg:X:A`). ProDOS rules are followed where DOS 3.3 allows:
+
+| File | End (`SEEK_END`) | Past the end |
+|---|---|---|
+| A, I, B | The header's length | Fails with `ESPIPE`, as `SET_MARK` past EOF does under ProDOS |
+| T | The first `$00`, scanning from the start | **Allowed** |
+| Raw | The end of the data, as for reads | Allowed |
+
+- **T files may be positioned past the end** because DESIGN.md 5.2
+  promises `lseek(fd, r * L, SEEK_SET)` for records of random-access
+  files, and every record after the first lies beyond the first record's
+  zero padding. Reading at such a position returns the record's bytes up
+  to its padding; writing there extends the file, as DOS does.
+- **Positions are limited to 16 bits.** The File Manager's POSITION takes
+  a whole-file byte offset only when the record number is 0, and that
+  offset is 16-bit (*Beneath Apple DOS* ch. 6). Larger or negative
+  positions fail with `EINVAL`, the code ProDOS uses for positions out of
+  its own 24-bit range. For header files, the File Manager offset
+  (header length + position) must also fit 16 bits.
+- `SEEK_END` on T and raw files scans byte by byte from the start, so it
+  costs time proportional to the file's size.
+- `O_APPEND` on T files (`seekend`) scans from the current position, not
+  the start, so that repeated appends stop at once. After seeking past a
+  T file's end, an appending write goes to the next `$00` after the
+  current position.
+
+### 5.8 stat
+
+`stat` opens the file with this library's `open` and takes the size from
+`lseek(fd, 0, SEEK_END)`, so the size follows the same rules as reads and
+seeks.
+
+| Field | DOS 3.3 value |
+|---|---|
+| `st_dev` | `slot \| (drive - 1) << 3`, the encoding stock `stat` derives from ProDOS's unit number |
+| `st_mode` | `S_IFREG` (DOS 3.3 has no directories) |
+| `st_size` | T: bytes before the first `$00`; A, I, B: the header's length; others: bytes to the end of the data |
+| `st_access` | `$01` (read only) if locked, else `$C3` (cc65's default for new ProDOS files) |
+| `st_type` | ProDOS equivalent: T `$04`, B `$06`, A `$FC`, I `$FA`, R `$FE`; others `$00` |
+| `st_auxtype` | B: the load address; others 0 |
+| others | 0. DOS 3.3 keeps no dates. The sector count is only in the catalog; it can be filled in once the directory increment reads the catalog. |
 
 ---
 
@@ -561,8 +650,9 @@ Files (repository root):
 | `test/filetest.c` | Tests for every decision in section 5 |
 | `Makefile` | Builds `lib/apple2-dos33.lib` and the tests |
 
-Programs link the library before cc65's own:
-`cl65 -t apple2 -o prog prog.c lib/apple2-dos33.lib`.
+Programs link with
+`cl65 -t apple2 -o prog prog.c lib/apple2-dos33.lib`; the library is a
+complete replacement for cc65's `apple2.lib` (section 2).
 
 **Verified by building:** all modules assemble, and the test program
 links with `open.o`, `rwcommon.o` and `write.o` from this library and
@@ -624,9 +714,33 @@ assumptions; see the zero-page note in 10.1.
   and LC bank 2 restored afterward works, the same pattern `rdkey.s`
   uses.
 
-### 10.3 Next increments
+### 10.3 Increment 2: lseek, remove, rename, stat
 
-- `lseek`, `remove`, `rename`, `stat`
+| File | Role |
+|---|---|
+| `libsrc/dos33/lseek.s` | Replaces stock `lseek.s` (5.7) |
+| `libsrc/dos33/sysremove.s` | Replaces stock `sysremove.s` (5.5a) |
+| `libsrc/dos33/sysrename.s` | Replaces stock `sysrename.s` (5.5a) |
+| `libsrc/dos33/stat.s` | Replaces stock `stat.s` (5.8) |
+| `libsrc/dos33/fmtemp.s` | Temporary control block for DELETE and RENAME |
+
+Changes to increment 1: the control block also keeps OPEN's type byte
+(with the lock bit) and a B file's load address, for `stat`; the name
+parser exports the slot and drive it resolved (`fm_slot`, `fm_drive`),
+for `st_dev`.
+
+`test/filetest.c` gains three groups (LSEEK, REMOVE/RENAME, STAT), for 50
+checks in nine groups; the on-screen failure list is capped at 10 lines
+so the worst case still fits 40×24.
+
+**First run on DOS 3.3:** LSEEK and STAT passed; every REMOVE/RENAME
+check failed because the linker took the stock `__sysremove` and
+`__sysrename` (section 2). Fixed by building the complete library.
+
+**Second run on DOS 3.3:** all 50 checks in nine groups passed.
+
+### 10.4 Next increments
+
 - Directories: `opendir`/`readdir` via RWTS, the DOS 3.3 `struct dirent`,
   and the link guard (section 2)
 - DOS 3.3 interrupts (section 6)

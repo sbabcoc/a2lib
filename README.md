@@ -18,13 +18,13 @@ for the Uthernet II.
 
 ## Status
 
-Increment 1 of the DOS 3.3 file layer is complete: `open`, `close`,
-`read` and `write`, including `O_APPEND`, `O_TRUNC` and `O_EXCL`, for T, B,
-A and I files. It builds and links against current cc65 but **has not yet
-been run on DOS 3.3**; [DESIGN.md](DESIGN.md) section 10.2 lists the
-assumptions to confirm on the first run.
+- **Increment 1** of the DOS 3.3 file layer passes all its tests under
+  DOS 3.3: `open`, `close`, `read` and `write`, including `O_APPEND`,
+  `O_TRUNC` and `O_EXCL`, for T, B, A and I files, plus stdio on top.
+- **Increment 2** adds `lseek`, `remove`, `rename` and `stat`, and also
+  passes all its tests under DOS 3.3.
 
-Next: `lseek`, `remove`, `rename`, `stat` and directories.
+Next: directories (`opendir`/`readdir`).
 
 ## Building
 
@@ -43,12 +43,16 @@ make test     # also build/test/filetest
 
 ## Using the DOS 3.3 file layer
 
-List the library **before** cc65's own, so its modules replace the stock
-ones:
+`lib/apple2-dos33.lib` is a complete replacement for cc65's `apple2.lib`,
+built from the installed cc65's library with the DOS 3.3 modules swapped
+in. Link with:
 
 ```sh
 cl65 -t apple2 -o prog prog.c lib/apple2-dos33.lib
 ```
+
+Rebuild a2lib after updating cc65, so the stock modules it contains match
+your toolchain.
 
 Programs run on a 48K II+ under stock DOS 3.3 (ProDOS builds need 64K).
 Behavior matches cc65 under ProDOS wherever DOS 3.3 can represent it, and
@@ -60,6 +64,8 @@ fails visibly where it can't:
 | New files | Type from `_filetype` (default binary, as in cc65): `PRODOS_T_TXT` → T, `PRODOS_T_BIN` → B, `PRODOS_T_BAS` → A, `PRODOS_T_INT` → I. |
 | T files | Stored as DOS 3.3 text (high bit set, CR line endings) and read back byte-for-byte as written. Bytes `$80`–`$FF` are rejected with `EINVAL`; use B files for 8-bit data. |
 | B files | The 4-byte address/length header is hidden. `_auxtype` sets the load address; the length is exact. Files still `BLOAD` and `BRUN`. |
+| Seeking | As under ProDOS, except that T files can be positioned past their end, to reach records of random-access files. Positions are limited to 16 bits. |
+| Rename | The new name takes no suffixes, and an existing new name fails with `EEXIST`, as under ProDOS. |
 | Errors | Reported with the same `errno` and `_oserror` values as under ProDOS. |
 
 ## Testing

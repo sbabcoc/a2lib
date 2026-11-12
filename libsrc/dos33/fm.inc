@@ -44,6 +44,7 @@ FMC_CLOSE       = $02
 FMC_READ        = $03
 FMC_WRITE       = $04
 FMC_DELETE      = $05
+FMC_RENAME      = $09
 FMC_POSITION    = $0A
 
 ; Sub-call types for READ / WRITE
@@ -80,6 +81,8 @@ FMT_RELOC       = $08
         STATE   .byte           ; See FCBS_* below
         LEN     .word           ; Header files: logical length (from header)
         POS     .word           ; Logical position (bytes after the header)
+        TYPE    .byte           ; OPEN's type byte, including the lock bit
+        ADDR    .word           ; B files: load address (from the header)
         WORK    .res 45         ; File Manager work area
         TSL     .res 256        ; File Manager T/S list buffer
         DATA    .res 256        ; File Manager data sector buffer
@@ -97,4 +100,5 @@ FCB_TEXT        = $80           ; FCB::KIND value for T files
         .global         fm_position, fm_readbyte, fm_writebyte
         .global         fm_rangeio, fm_rio_addr, fm_rio_count
         .global         fm_incpos
-        .global         fm_name, fm_namebuf
+        .global         fm_name, fm_namebuf, fm_slot, fm_drive
+        .global         fm_tempfcb, fm_freefcb
