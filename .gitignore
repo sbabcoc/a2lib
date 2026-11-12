@@ -1,0 +1,19 @@
+# cc65 build output
+/build/
+/lib/
+*.o
+*.lib
+*.map
+*.lst
+*.dbg
+*.lbl
+
+# macOS
+.DS_Store
+._*
+
+# Editors
+*~
+*.swp
+.vscode/
+.idea/
