@@ -17,10 +17,11 @@
 #include <apple2.h>
 #include <conio.h>
 #include <sys/stat.h>
+#include <dirent.h>             /* a2lib's DOS 3.3 dirent.h (-I include) */
 
-/* Failure lines shown: 24 rows less the BRUN line, the title, 9 groups,
+/* Failure lines shown: 24 rows less the BRUN line, the title, 10 groups,
 ** the overflow line, the summary and the prompt after exit. */
-#define MAX_SHOWN   10
+#define MAX_SHOWN   9
 #define MAX_GROUP   10          /* Most checks in one group */
 
 static unsigned char passed, total;         /* All groups */
@@ -286,6 +287,55 @@ static void stat_tests (void)
     check ("stat missing", stat ("NO.SUCH.FILE", &st) == -1 && errno == ENOENT);
 }
 
+/* Directories (DESIGN.md 5.9) */
+static void dir_tests (void)
+{
+    static struct stat st;
+    static char first[31];
+    DIR* d;
+    struct dirent* e;
+    unsigned char entries = 0, found_t = 0, found_b = 0, gone = 0;
+    unsigned t_blocks = 0;
+
+    d = opendir ("");
+    check ("opendir", d != NULL);
+    if (d == NULL) {
+        return;
+    }
+    while ((e = readdir (d)) != NULL) {
+        if (entries++ == 0) {
+            strcpy (first, e->d_name);
+        }
+        if (strcmp (e->d_name, "T.TEST") == 0) {
+            found_t = e->d_type == PRODOS_T_TXT && e->d_dostype == 0x00
+                      && e->d_access == 0xC3 && e->d_sectors > 0
+                      && e->d_blocks == (e->d_sectors + 1) / 2;
+            t_blocks = e->d_blocks;
+        } else if (strcmp (e->d_name, "B.TEST") == 0) {
+            found_b = e->d_type == PRODOS_T_BIN && e->d_dostype == 0x04;
+        } else if (strcmp (e->d_name, "T.GONE") == 0) {
+            gone = 1;
+        }
+    }
+    check ("readdir T entry", found_t);
+    check ("readdir B entry", found_b);
+    check ("removed file not listed", !gone);
+    rewinddir (d);
+    e = readdir (d);
+    check ("rewinddir", e != NULL && strcmp (e->d_name, first) == 0);
+    check ("closedir", closedir (d) == 0);
+
+    d = opendir (",V0");
+    check ("opendir suffix", d != NULL);
+    if (d) {
+        closedir (d);
+    }
+    errno = 0;
+    check ("opendir bad location", opendir ("X") == NULL && errno == EINVAL);
+    check ("stat blocks = d_blocks", stat ("T.TEST", &st) == 0
+                                     && t_blocks > 0 && st.st_blocks == t_blocks);
+}
+
 /* stdio on top of the POSIX layer */
 static void stdio_layer (void)
 {
@@ -326,6 +376,7 @@ int main (void)
     seek_tests ();              group ("LSEEK");
     remove_rename ();           group ("REMOVE, RENAME");
     stat_tests ();              group ("STAT");
+    dir_tests ();               group ("DIRECTORY");
     if (hidden) {
         printf ("  (%u MORE FAILURES)\n", hidden);
     }

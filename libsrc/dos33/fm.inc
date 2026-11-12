@@ -17,6 +17,38 @@ FM_ENTRY        := $03D6        ; File Manager entry; X=0 allocates on OPEN
 DOS_DRIVE       := $AA68        ; 2 bytes
 DOS_SLOT        := $AA6A        ; 2 bytes
 
+; RWTS ("Beneath Apple DOS" ch. 6): JSR $3E3 returns DOS's IOB address in
+; Y (lo), A (hi); JSR $3D9 calls RWTS with the IOB address in Y and A.
+
+RWTS_LOCATE     := $03E3
+RWTS_ENTRY      := $03D9
+
+IOB_TYPE        = $00           ; Table type, must be $01
+IOB_SLOT        = $01           ; Slot * 16
+IOB_DRIVE       = $02           ; Drive (1 or 2)
+IOB_VOLUME      = $03           ; Volume expected (0 = any)
+IOB_TRACK       = $04
+IOB_SECTOR      = $05
+IOB_BUF         = $08           ; Address of 256-byte buffer (2)
+IOB_COUNT       = $0B           ; Byte count ($00 = 256)
+IOB_CMD         = $0C           ; Command ($01 = READ)
+IOB_RC          = $0D           ; Return code
+
+; DOS 3.3 disk layout ("Beneath Apple DOS" ch. 4)
+VTOC_TRACK      = $11           ; VTOC: track 17, sector 0
+VTOC_CATTRACK   = $01           ; First catalog sector: track, sector
+VTOC_TSPAIRS    = $27           ; T/S pairs per T/S list sector (122)
+VTOC_SECTORS    = $35           ; Sectors per track (16)
+CAT_NEXT        = $01           ; Catalog sector: next track, sector
+CAT_ENTRIES     = $0B           ; Catalog sector: first file entry
+CAT_ENTRYLEN    = 35            ; Bytes per file entry
+CAT_PERSECTOR   = 7             ; File entries per catalog sector
+ENT_TRACK       = $00           ; Entry: T/S list track ($00 unused, $FF deleted)
+ENT_SECTOR      = $01
+ENT_TYPE        = $02           ; Type in catalog coding; bit 7 = locked
+ENT_NAME        = $03           ; 30 bytes
+ENT_LENGTH      = $21           ; Length in sectors (2)
+
 ; ------------------------------------------------------------------------
 ; Parameter list offsets
 
@@ -100,5 +132,37 @@ FCB_TEXT        = $80           ; FCB::KIND value for T files
         .global         fm_position, fm_readbyte, fm_writebyte
         .global         fm_rangeio, fm_rio_addr, fm_rio_count
         .global         fm_incpos
-        .global         fm_name, fm_namebuf, fm_slot, fm_drive
+        .global         fm_name, fm_location, fm_namebuf
+        .global         fm_slot, fm_drive, fm_volume
+        .global         dir_at
+        .global         rwts_read, rwts_maperr
+        .global         rwts_slot, rwts_drive, rwts_volume
+        .global         rwts_track, rwts_sector, rwts_buf
         .global         fm_tempfcb, fm_freefcb
+
+; ------------------------------------------------------------------------
+; Directories. DIRENT must match struct dirent in include/dirent.h.
+
+.struct DIRENT
+        NAME    .res 31         ; 30 characters + NUL
+        INO     .word           ; T/S list track * 256 + sector
+        BLOCKS  .word           ; 512-byte blocks
+        TYPE    .byte           ; ProDOS-equivalent type
+        ACCESS  .byte           ; $01 locked, $C3 otherwise
+        SECTORS .word           ; Length in sectors
+        DOSTYPE .byte           ; Catalog type without the lock bit
+.endstruct
+
+.struct DIR
+        SLOT    .byte           ; Location from opendir
+        DRIVE   .byte
+        VOLUME  .byte
+        FIRSTT  .byte           ; First catalog sector (from the VTOC)
+        FIRSTS  .byte
+        NEXTT   .byte           ; Next catalog sector to read
+        NEXTS   .byte
+        INDEX   .byte           ; Next entry in BUF; CAT_PERSECTOR = read next
+        DONE    .byte           ; End of the catalog reached
+        ENT     .tag DIRENT     ; Entry returned by readdir
+        BUF     .res 256        ; VTOC, then the current catalog sector
+.endstruct

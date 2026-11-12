@@ -57,8 +57,30 @@ the header variant.
 | Separate target (`-t apple2dos33`) | One switch selects both header and library; they can't get out of sync | Adding a target to cc65 itself |
 | Add-on library + `-D __APPLE2_DOS33__` | No change to cc65 | Linking the library without the define silently mismatches the `dirent` layout |
 
-**Decision:** develop as an add-on library with the define, and plan to
-propose a separate target upstream.
+**Decision:** develop as an add-on library, and plan to propose a
+separate target upstream.
+
+**Header selection (revised in increment 3):** instead of a
+`-D __APPLE2_DOS33__` define, a2lib ships `include/dirent.h`, which
+shadows cc65's when a2lib's include directory is passed with `-I`
+(verified: for `#include <dirent.h>`, a header in a `-I` directory takes
+precedence over cc65's). Passing `-I include` is then the single switch
+that selects the DOS 3.3 header; there is no separate define to keep in
+sync with it. The header is needed only by programs that use the
+directory functions.
+
+**Link guard:** the header maps `opendir`, `readdir`, `closedir` and
+`rewinddir` to `_dos33_*` symbols that exist only in `apple2-dos33.lib`.
+
+- Header without the library: the link fails (verified: ld65 reports
+  `__dos33_opendir` as unresolved).
+- Library without the header: the program uses cc65's stock directory
+  modules, which are still in the library under their stock names. They
+  fail visibly with `EINVAL`, because this layer's `open` rejects the
+  ProDOS pathnames they pass.
+
+Either way, the DOS 3.3 `struct dirent` is never mixed with the ProDOS
+implementation.
 
 **The add-on library is a complete library (decision, from the first run
 of increment 2):** `lib/apple2-dos33.lib` is a copy of the installed
@@ -81,10 +103,7 @@ and cc65's own `apple2.lib`, which `cl65` still appends, contributes
 nothing. The link command is unchanged. Because the library embeds the
 stock modules of the cc65 it was built with, **it must be rebuilt after
 updating cc65**; the Makefile locates the installed `apple2.lib` through
-`cl65 --print-target-path`. As a guard during development, the
-header (under the define) references a symbol that exists only in the
-DOS 3.3 library, so a mismatched build fails to link instead of failing
-at run time.
+`cl65 --print-target-path`.
 
 ---
 
@@ -301,10 +320,16 @@ emulating an entire OS interface.
 
 ### 4.3 `struct dirent`
 
-The DOS 3.3 build has its own layout: `d_name[31]`, `d_type` holding the
-DOS file type. This is the one public-header change (see section 2).
+The DOS 3.3 build has its own layout (`include/dirent.h`; section 5.9
+gives the fields). This is the one public-header change (see section 2).
 It's the change most likely to need discussion upstream; it goes to the
 cc65 maintainers together with working code (section 9).
+
+**Revised in increment 3:** the first draft had `d_type` hold the DOS
+file type. Following the guiding principle, `d_type` instead holds the
+ProDOS-equivalent type, as `stat`'s `st_type` does, so code that tests
+file types works under both DOSes; the DOS type is in a separate
+`d_dostype` field.
 
 ### 4.4 File Manager facts (verified, *Beneath Apple DOS* ch. 5–6)
 
@@ -560,7 +585,62 @@ seeks.
 | `st_access` | `$01` (read only) if locked, else `$C3` (cc65's default for new ProDOS files) |
 | `st_type` | ProDOS equivalent: T `$04`, B `$06`, A `$FC`, I `$FA`, R `$FE`; others `$00` |
 | `st_auxtype` | B: the load address; others 0 |
-| others | 0. DOS 3.3 keeps no dates. The sector count is only in the catalog; it can be filled in once the directory increment reads the catalog. |
+| `st_blocks` | 512-byte blocks, `(sectors + 1) / 2`, from the file's catalog entry: the same value `readdir` gives in `d_blocks` (5.9) |
+| others | 0. DOS 3.3 keeps no dates. |
+
+Filling `st_blocks` means `stat` reads the catalog (through the same
+code as `readdir`), so `stat` pulls in the directory module: about 650
+bytes more in programs that use `stat` (increment 3).
+
+### 5.9 Directories
+
+DOS 3.3 has no subdirectories, so a "directory" is a disk's catalog.
+`opendir` takes a **location instead of a path**: `""` or `"."` for the
+last-used slot and drive, optionally followed by suffixes as at the DOS
+prompt (`",D2"`, `".,S6,D2"`, `",V254"`). An explicit S or D becomes
+DOS's default, as for file names (5.5). Anything else fails with `EINVAL`.
+
+**Reading the catalog.** The File Manager's CATALOG call only prints, so
+the catalog is read directly through RWTS (*Beneath Apple DOS* ch. 4, 6):
+
+- `opendir` reads the VTOC (track 17, sector 0) and checks that it is a
+  DOS 3.3 VTOC: 16 sectors per track, 122 track/sector pairs per list
+  sector, and a first catalog sector on the disk. Otherwise it fails
+  with ProDOS code `$52`, which maps to `ENODEV`, so a disk that isn't
+  DOS 3.3 fails at `opendir` instead of producing garbage entries.
+- `readdir` follows the catalog chain one sector at a time (seven entries
+  per sector). As in DOS's own search (ch. 8, `B1C9`), deleted entries
+  (`$FF`) are skipped and the first never-used entry (`$00`) ends the
+  catalog. At the end it returns `NULL` without changing `errno`; on a
+  read error it returns `NULL` with `errno` set.
+- `rewinddir` restarts at the first catalog sector; `closedir` frees the
+  `DIR`. Each open `DIR` holds a 256-byte sector buffer (about 305 bytes
+  in all).
+- RWTS is called through DOS's own IOB (from `$3E3`), so the device
+  characteristics table and last-access fields that DOS maintains stay
+  valid, and with ROM banked in, as the File Manager is. RWTS return
+  codes are translated to ProDOS codes (`rwts_maperr`): write protect →
+  `EACCES`, volume mismatch → `ENOENT`, drive or read errors → `EIO`.
+
+**`struct dirent`** (`include/dirent.h`):
+
+| Field | Value |
+|---|---|
+| `d_name[31]` | Up to 30 characters; bit 7 cleared, trailing blanks removed |
+| `d_ino` | T/S list location, track × 256 + sector (unique on the disk) |
+| `d_blocks` | 512-byte blocks, `(d_sectors + 1) / 2`: the unit of POSIX and ProDOS |
+| `d_type` | ProDOS-equivalent type, as `st_type`: T `$04`, B `$06`, A `$FC`, I `$FA`, R `$FE`; others `$00` |
+| `d_access` | `$01` (read only) if locked, else `$C3`, as `st_access` |
+| `d_sectors` | Length in sectors, as CATALOG shows (the DOS idiom) |
+| `d_dostype` | DOS type in catalog coding, without the lock bit |
+
+**Fields left out (decision).** cc65's ProDOS `struct dirent` also has
+`d_size`, `d_ctime`, `d_mtime` and `d_auxtype`. The catalog has no byte
+size, no dates and no load address; a byte size would take opening each
+file (and, for T files, scanning it). Rather than fill them with zeros,
+the DOS 3.3 struct leaves them out, so **code that relies on them fails
+to compile** instead of silently reading wrong values. `stat` gives a
+file's exact size and load address.
 
 ---
 
@@ -739,20 +819,47 @@ check failed because the linker took the stock `__sysremove` and
 
 **Second run on DOS 3.3:** all 50 checks in nine groups passed.
 
-### 10.4 Next increments
+### 10.4 Increment 3: directories
 
-- Directories: `opendir`/`readdir` via RWTS, the DOS 3.3 `struct dirent`,
-  and the link guard (section 2)
+| File | Role |
+|---|---|
+| `include/dirent.h` | DOS 3.3 `struct dirent`; maps the directory functions to `_dos33_*` (section 2, 5.9) |
+| `libsrc/dos33/dir.s` | `opendir`, `readdir`, `closedir`, `rewinddir` over the catalog (5.9) |
+| `libsrc/dos33/rwts.s` | RWTS sector reads and error translation |
+
+Changes to earlier increments: the name parser gains `fm_location` (for
+`opendir`) and exports the volume it resolved; `stat` fills `st_blocks`
+from the catalog (5.8).
+
+Sizes: `dir.s` 542 bytes, `rwts.s` 112 bytes; `stat` grows to 362 bytes
+and pulls in both.
+
+`test/filetest.c` gains a DIRECTORY group, for 59 checks in ten groups,
+and is compiled with `-I include`; the on-screen failure list is capped
+at 9 lines.
+
+**Verified by building:** the link guard was checked both ways (header
+without library fails to link; with the library it links).
+
+**First run on DOS 3.3:** all 59 checks in ten groups passed, including
+the directory checks and `st_blocks` agreeing with `d_blocks`.
+
+### 10.5 Next increments
+
 - DOS 3.3 interrupts (section 6)
 - Display backends (section 3)
 - Emulator test fixture (section 8)
+- Detect deleting or renaming an open file, as ProDOS does (5.5a)
 
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,
   `read.s`, `write.s`, `rwcommon.s`, `lseek.s`, `mli.s`, `oserror.s`,
-  `opendir.s`, `readdir.s`, `filename.s`, `diocommon.s`, `irq.s`,
-  `crt0.s`, `cout.s`, `detect80cols.s`), `include/dirent.h`,
+  `opendir.s`, `readdir.s`, `closedir.s`, `rewinddir.s`, `dir.inc`,
+  `filename.s`, `diocommon.s`, `irq.s`, `crt0.s`, `cout.s`,
+  `detect80cols.s`, `lseek.s`, `stat.s`, `sysremove.s`, `sysrename.s`),
+  `libsrc/common/` (`fgets.s`, `fgetc.s`, `vfscanf.s`, `remove.s`),
+  `include/dirent.h`, `include/sys/stat.h`, `asminc/stat.inc`,
   `cfg/apple2.cfg`, `doc/apple2.sgml`
 - IP65: `drivers/uthernet2.s`, `drivers/w5100.s`
 - *Beneath Apple DOS*, chapters 4, 5, 6, 8 (transcribed text,

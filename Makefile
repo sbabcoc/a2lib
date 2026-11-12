@@ -5,8 +5,10 @@
 #
 # lib/apple2-dos33.lib is a complete replacement for cc65's apple2.lib:
 # a copy of the installed one with the DOS 3.3 modules in place of the
-# stock modules of the same name. Link a program for DOS 3.3 with:
-#   cl65 -t apple2 -o prog prog.c lib/apple2-dos33.lib
+# stock modules of the same name. Build a program for DOS 3.3 with:
+#   cl65 -t apple2 -I include -o prog prog.c lib/apple2-dos33.lib
+# (-I include selects the DOS 3.3 dirent.h; it's needed only for
+# directory functions.)
 #
 # A library of only the replacement modules isn't enough: ld65 scans each
 # library once, so a stock module reached through another stock module
@@ -44,7 +46,7 @@ test: build/test/filetest
 
 build/test/filetest: test/filetest.c $(DOS33_LIB)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -m $@.map -o $@ $< $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
 
 clean:
 	rm -rf build lib

@@ -14,7 +14,12 @@
 ; own command parser fills its name buffer. As with DOS commands, an
 ; explicit S or D becomes the new default.
 ;
-; Returns carry clear on success, or carry set with A = $40 (ProDOS
+; fm_location: parse a location only, for opendir: "" or "." for the
+; last-used slot and drive, optionally followed by suffixes (",D2",
+; ".,S6,D2"). Sets fm_slot, fm_drive and fm_volume, but no parameter
+; list fields, so it doesn't need fm_begin.
+;
+; Both return carry clear on success, or carry set with A = $40 (ProDOS
 ; "Invalid pathname", which maps to EINVAL). Uses ptr1, tmp1-tmp4.
 ;
 
@@ -23,18 +28,25 @@
 
         .code
 
+fm_location:
+        sta     ptr1
+        stx     ptr1+1
+        lda     #LOCATION
+        sta     mode
+        jsr     defaults
+        ldy     #$00
+        lda     (ptr1),y
+        cmp     #'.'
+        bne     :+
+        iny
+:       jmp     next
+
 fm_name:
         sta     ptr1
         stx     ptr1+1
-
-        ; Defaults: any volume, last-used drive and slot
         lda     #$00
-        sta     volume
-        sta     given
-        lda     DOS_DRIVE
-        sta     fm_drive
-        lda     DOS_SLOT
-        sta     fm_slot
+        sta     mode
+        jsr     defaults
 
         ; Blank the name buffer
         ldx     #30-1
@@ -88,7 +100,7 @@ suffix: iny                     ; Skip the comma
         lda     tmp3
         cmp     #255
         bcs     bad
-        sta     volume
+        sta     fm_volume
         bcc     next            ; Branch always
 
         ; S: 1 to 7
@@ -122,8 +134,10 @@ bad:    lda     #$40            ; ProDOS "Invalid pathname"
         sec
         rts
 
-        ; Set the parameter list fields
-store:  ldy     #FM_NAME
+        ; Set the parameter list fields (names only)
+store:  bit     mode
+        bmi     sticky
+        ldy     #FM_NAME
         lda     #<fm_namebuf
         sta     (ptr3),y
         iny
@@ -133,7 +147,7 @@ store:  ldy     #FM_NAME
         .assert FM_DRIVE = FM_VOLUME + 1, error
         .assert FM_SLOT = FM_DRIVE + 1, error
         ldy     #FM_VOLUME
-        lda     volume
+        lda     fm_volume
         sta     (ptr3),y
         iny
         lda     fm_drive
@@ -143,7 +157,7 @@ store:  ldy     #FM_NAME
         sta     (ptr3),y
 
         ; Explicit S and D become DOS's defaults
-        lda     given
+sticky: lda     given
         and     #GIVEN_S
         beq     :+
         lda     fm_slot
@@ -158,6 +172,19 @@ store:  ldy     #FM_NAME
         lda     #$00
         sta     DOS_DRIVE+1
 :       clc
+        rts
+
+; ------------------------------------------------------------------------
+; defaults: any volume, last-used drive and slot, no suffixes given.
+
+defaults:
+        lda     #$00
+        sta     fm_volume
+        sta     given
+        lda     DOS_DRIVE
+        sta     fm_drive
+        lda     DOS_SLOT
+        sta     fm_slot
         rts
 
 ; ------------------------------------------------------------------------
@@ -205,13 +232,15 @@ upcase: cmp     #'a'
         and     #$DF
 :       rts
 
-GIVEN_S = $01
-GIVEN_D = $02
+GIVEN_S  = $01
+GIVEN_D  = $02
+LOCATION = $80                  ; mode: fm_location
 
         .bss
 
 fm_namebuf:     .res    30
-volume:         .res    1
-fm_drive:       .res    1       ; Slot and drive of the last name parsed
+fm_volume:      .res    1       ; Volume, slot and drive of the last name parsed
+fm_drive:       .res    1
 fm_slot:        .res    1
 given:          .res    1
+mode:           .res    1

@@ -23,8 +23,11 @@ for the Uthernet II.
   `O_TRUNC` and `O_EXCL`, for T, B, A and I files, plus stdio on top.
 - **Increment 2** adds `lseek`, `remove`, `rename` and `stat`, and also
   passes all its tests under DOS 3.3.
+- **Increment 3** adds directories (`opendir`, `readdir`, `closedir`,
+  `rewinddir`) over the DOS 3.3 catalog, and `st_blocks` in `stat`, and
+  also passes all its tests under DOS 3.3.
 
-Next: directories (`opendir`/`readdir`).
+Next: DOS 3.3 interrupts and the display backends.
 
 ## Building
 
@@ -45,11 +48,15 @@ make test     # also build/test/filetest
 
 `lib/apple2-dos33.lib` is a complete replacement for cc65's `apple2.lib`,
 built from the installed cc65's library with the DOS 3.3 modules swapped
-in. Link with:
+in. Build with:
 
 ```sh
-cl65 -t apple2 -o prog prog.c lib/apple2-dos33.lib
+cl65 -t apple2 -I include -o prog prog.c lib/apple2-dos33.lib
 ```
+
+`-I include` selects a2lib's DOS 3.3 `dirent.h`, which programs that use
+the directory functions need. Compiling with it but linking without the
+library fails at link time, so the two can't be mixed up silently.
 
 Rebuild a2lib after updating cc65, so the stock modules it contains match
 your toolchain.
@@ -66,6 +73,7 @@ fails visibly where it can't:
 | B files | The 4-byte address/length header is hidden. `_auxtype` sets the load address; the length is exact. Files still `BLOAD` and `BRUN`. |
 | Seeking | As under ProDOS, except that T files can be positioned past their end, to reach records of random-access files. Positions are limited to 16 bits. |
 | Rename | The new name takes no suffixes, and an existing new name fails with `EEXIST`, as under ProDOS. |
+| Directories | `opendir` takes a location, not a path: `""` or `"."` for the default drive, optionally with suffixes (`",D2"`). `struct dirent` has the name, ProDOS-equivalent type, access and size in blocks and sectors; it omits the byte size, dates and aux type, which the catalog doesn't record (use `stat`). |
 | Errors | Reported with the same `errno` and `_oserror` values as under ProDOS. |
 
 ## Testing
