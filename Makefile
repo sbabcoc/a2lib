@@ -88,7 +88,7 @@ $(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o $(DOS33_LIB)
 	cp $(DOS33_LIB) $@
 	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ)
 
-test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest
+test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest
 
 build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -101,6 +101,14 @@ build/test/vttest: test/vttest.c $(VT_LIB)
 build/test/wintest: test/vttest.c $(VTWIN_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(VTWIN_LIB)
+
+build/test/cswtest: test/cswtest.c test/cswcout.s $(VT_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/cswtest.c test/cswcout.s $(VT_LIB)
+
+build/test/cswwtest: test/cswtest.c test/cswcout.s $(VTWIN_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ test/cswtest.c test/cswcout.s $(VTWIN_LIB)
 
 build/test/timertest: test/timertest.c test/timerzp.s $(DOS33_LIB)
 	@mkdir -p $(@D)

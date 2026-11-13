@@ -364,6 +364,22 @@ modification; on a stock card, characters in the alternate set display
 garbage. Selecting the alternate set for `revers` could be added later as
 an opt-in for cards that have the ROM.
 
+**Installing the output routine under DOS 3.3 (revised after a test).**
+DOS 3.3 keeps its video intercept (`$9EBD`) in `CSW` and the true output
+routine at `$AA53`, and on every character through its intercepts
+copies the true handlers into the hooks and reinstalls its intercepts
+(the mechanism in 6.3). The backends first stored their routines in
+`CSW` directly, so the first stdio input dropped them. `test/cswtest.c`
+confirmed it on the VideoTerm: `CSW` held the backend's routine at the
+start and DOS's intercept after input, with DOS's saved hook still the
+ROM's `COUT1` (`$FDF0`), and a character written through the monitor's
+`COUT` (`$FDED`) after input never reached the card. cc65's own output
+was unaffected, since `cout.s` calls the backend directly rather than
+through `CSW`. Now, when DOS's intercept is in `CSW` (`CSW` equals the
+address DOS keeps at `$9D04`), `vt.s` and `win.s` install their routines
+as DOS's true output routine at `$AA53`, and DOS calls them; otherwise
+they go into `CSW` directly. Exit restores whichever hook was changed.
+
 **Exit.** `vtdone` restores `CSW`. If DOS's reconnect routine (`A851`)
 moved the backend's hook into its saved true hook (`$AA53`) while the
 program ran, it restores that too; otherwise BASIC's output would go to
@@ -1243,17 +1259,7 @@ passed only because the offset was 0). They now test the loop end with
 
 ## 9. Open items
 
-- **DOS 3.3 and the display backends' `CSW` hook (from the timer's
-  input finding, 6.3; not yet confirmed by a test).** `vt.s` and `win.s`
-  store their output routines in `CSW` directly, the way the timer first
-  stored its input routine in `KSW`. By the same DOS mechanism, stdio
-  input through DOS's keyboard intercept would restore the original
-  `CSW`. cc65's own output is unaffected, because the backends' `cout.s`
-  call them directly, not through `CSW`; but code that calls the
-  monitor's `COUT` (`$FDED`) directly after stdio input would write to
-  the 40-column screen instead of the VideoTerm or window. The likely
-  fix is the timer's: install as DOS's true output routine at `$AA53`
-  when DOS's intercept is in `CSW`. To confirm with a test first.
+- None at present.
 
 **Resolved since the first draft:**
 
@@ -1497,6 +1503,19 @@ DOS's true input routine when DOS's intercept is in `KSW`.
 
 **Second run on DOS 3.3:** `timertest` passed all 19 checks, including
 callbacks and counted time during stdio input.
+
+**DOS and `CSW` (after increment 7):** `test/cswtest.c`, built as
+`cswtest` (VideoTerm library) and `cswwtest` (window library), checks
+that output through the monitor's `COUT` reaches the backend before and
+after stdio input. The first run (VideoTerm) failed after input, as the
+mechanism predicted; `vt.s` and `win.s` now install as DOS's true output
+routine (3.5).
+
+**Second run, in ReplicApple2Plus under DOS 3.3:** `cswtest` with the
+VideoTerm and `cswwtest` without it both passed, with DOS's intercept
+staying in `CSW` (`$9EBD`) and the backend's routine as DOS's true output
+handler before and after input. As regression checks, `vttest` (with the
+card, 16 checks) and `wintest` (without it, 22 checks) passed too.
 
 ### 10.9 Next increments
 

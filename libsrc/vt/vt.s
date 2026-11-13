@@ -25,6 +25,8 @@
         .destructor     vtdone
         .import         __dos_type, uppercasemask
 
+        .macpack        longbranch
+
         .include        "vt.inc"
 
         .segment        "ONCE"
@@ -34,16 +36,16 @@ vtinit:
         bit     CLRROM
         lda     VT_ID0
         cmp     #$38
-        bne     none
+        jne     none
         lda     VT_ID1
         cmp     #$18
-        bne     none
+        jne     none
         lda     VT_ID2
         cmp     #$01
-        bne     none
+        jne     none
         lda     VT_ID3
         cmp     #$82
-        bne     none
+        jne     none
 
         ; Was output already going to the card (PR#3 before the program)?
         ; Either CSW points into its slot ROM, or DOS's intercept is in CSW
@@ -86,11 +88,33 @@ was80:  lda     #$80
         lda     #$FF
         sta     uppercasemask
 
-        ; COUT to the card
+        ; COUT to the card.
+        ; Under DOS 3.3 with DOS's video intercept in CSW, become DOS's
+        ; true output routine instead: on every character through its
+        ; intercepts (stdio input included), DOS copies the true handlers
+        ; into CSW and KSW and reinstalls its intercepts on the way out
+        ; ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a
+        ; routine stored in CSW directly (DESIGN.md 3.5).
+        lda     __dos_type
+        bne     direct
+        lda     CSWL
+        cmp     DOS_VINT
+        bne     direct
+        lda     CSWL+1
+        cmp     DOS_VINT+1
+        bne     direct
         lda     #<vt_write
+        sta     DOS_CSW
+        lda     #>vt_write
+        sta     DOS_CSW+1
+        lda     #$80
+        sta     viados
+        bne     hooked          ; Branch always
+direct: lda     #<vt_write
         sta     CSWL
         lda     #>vt_write
         sta     CSWL+1
+hooked:
 
         lda     #$80
         sta     vt_active
@@ -103,9 +127,17 @@ vtdone:
         bit     vt_active
         bpl     done
 
-        ; Restore the output hooks. DOS's reconnect routine ($A851) may
-        ; have moved our hook into its saved true hook; put that back too.
-        lda     savecsw
+        ; Restore the output hooks: DOS's saved true hook if we were
+        ; installed there; otherwise CSW, and DOS's saved hook too if its
+        ; reconnect routine ($A851) moved ours into it.
+        bit     viados
+        bpl     :+
+        lda     savedos
+        sta     DOS_CSW
+        lda     savedos+1
+        sta     DOS_CSW+1
+        jmp     mode
+:       lda     savecsw
         sta     CSWL
         lda     savecsw+1
         sta     CSWL+1
@@ -123,7 +155,8 @@ vtdone:
         sta     DOS_CSW+1
 
         ; Back to 40 columns, unless output went to the card before
-:       bit     prior80
+:
+mode:   bit     prior80
         bmi     :+
         sta     VT_AN0OFF
         rts
@@ -187,5 +220,6 @@ vt_write:
 
 vt_active:      .byte   $00
 prior80:        .byte   $00
+viados:         .byte   $00     ; Bit 7: installed as DOS's true output routine
 savecsw:        .word   $0000
 savedos:        .word   $0000

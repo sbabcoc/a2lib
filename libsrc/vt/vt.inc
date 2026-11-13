@@ -39,5 +39,6 @@ VT_ROWS         = 24
 ; Monitor and DOS
 CSWL            := $36          ; Output hook
 DOS_CSW         := $AA53        ; 48K DOS 3.3: saved true output hook
+DOS_VINT        := $9D04        ; 48K DOS 3.3: address of its video intercept
 
         .global         vt_active, vt_write, vt_goto, vt_r10, vt_screen

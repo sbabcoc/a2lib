@@ -65,7 +65,30 @@ wininit:
         lda     DOS_CSW+1
         sta     savedos+1
         jsr     HOME            ; Clear the text screen
+
+        ; Console output into the window.
+        ; Under DOS 3.3 with DOS's video intercept in CSW, become DOS's
+        ; true output routine instead: on every character through its
+        ; intercepts (stdio input included), DOS copies the true handlers
+        ; into CSW and KSW and reinstalls its intercepts on the way out
+        ; ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a
+        ; routine stored in CSW directly (DESIGN.md 3.5, 3.6).
+        lda     __dos_type
+        bne     direct
+        lda     CSWL
+        cmp     DOS_VINT
+        bne     direct
+        lda     CSWL+1
+        cmp     DOS_VINT+1
+        bne     direct
         lda     #<win_cout
+        sta     DOS_CSW
+        lda     #>win_cout
+        sta     DOS_CSW+1
+        lda     #$80
+        sta     viados
+        rts
+direct: lda     #<win_cout
         sta     CSWL
         lda     #>win_cout
         sta     CSWL+1
@@ -84,7 +107,14 @@ windone:
 :
 
         ; Restore the output hooks, as vt.s does
-        lda     savecsw
+        bit     viados
+        bpl     :+
+        lda     savedos
+        sta     DOS_CSW
+        lda     savedos+1
+        sta     DOS_CSW+1
+        jmp     cursor
+:       lda     savecsw
         sta     CSWL
         lda     savecsw+1
         sta     CSWL+1
@@ -103,7 +133,8 @@ windone:
 
         ; Leave the monitor's cursor where the window's is, so BASIC
         ; continues below the program's output
-:       jsr     win_cursorcol
+:
+cursor: jsr     win_cursorcol
         bcc     :+
         lda     #$00            ; Not visible: column 0
 :       sta     CH
@@ -533,6 +564,7 @@ win_y:          .byte   $00
 win_left:       .byte   $00
 win_follow:     .byte   $80     ; Bit 7: follow the cursor
 gslot:          .byte   $FF     ; Gauge's timer slot; bit 7: none
+viados:         .byte   $00     ; Bit 7: installed as DOS's true output routine
 gcell:          .byte   $00
 savecsw:        .word   $0000
 savedos:        .word   $0000
