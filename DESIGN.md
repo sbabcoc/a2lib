@@ -1080,6 +1080,31 @@ not be used: IP65's modules reference `timer_read` only after a2lib's
 library has been scanned. The replacement therefore ships as an object
 file to list explicitly on the link line.
 
+**Machines (decision):** NTSC Apple II+ only for now. The Europlus (PAL)
+has a different master clock, so its tick length differs; the tick
+constants (3 ms + 148/193) are kept in one place so PAL values can be
+added later.
+
+**The window's position indicator (decision), the timer's first
+client.** After the window pans, a gauge appears and the timer hides it
+again; the indicator is drawn over the screen and restored from the
+80 × 24 buffer, so it never changes the program's screen.
+
+- **40-column window:** `[====....]` in inverse video in the top-right
+  corner (10 characters). Each of the 8 cells stands for 10 columns and
+  the window covers 4, so the three positions read exactly:
+  `[====....]` (columns 0-39), `[..====..]` (20-59), `[....====]`
+  (40-79). Default display time about 1 second (proposed).
+- **Soft-70 (planned with it, section 3):** Soft-70 shows 70 of the 80
+  columns, so only 10 are hidden and there are two useful positions. In
+  hi-res, the indicator can be a thin bar on the bottom scanline: a
+  dotted track the full 280-pixel width with a solid thumb covering the
+  visible 70/80. It hides almost nothing, and drawn with XOR it is
+  removed by drawing it again, without reading the text back. It
+  overlays the bottom scanline of row 23, so the Soft-70 font should keep
+  each glyph's bottom scanline blank; to settle when that font is
+  designed.
+
 **Interrupt-driven improvement (later).** With a card that interrupts
 periodically (a Mockingboard's timers, a mouse card's 60 Hz interrupt, a
 clock card), an interruptor could advance the count exactly, using the
@@ -1132,9 +1157,8 @@ in each wait loop.
 
 ## 9. Open items
 
-- Cooperative timer (6.3): timing constants for PAL machines (the
-  Europlus has a different master clock); the window indicator's form (a
-  transient gauge was proposed).
+- Cooperative timer (6.3): the 40-column gauge's display time (about
+  1 second proposed).
 
 **Resolved since the first draft:**
 
