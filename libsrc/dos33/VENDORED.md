@@ -16,6 +16,11 @@ explaining the change:
   vectors in Language Card RAM before the module constructors run.
 - `irq.s` (from `libsrc/apple2/irq.s`): the stock ProDOS path is kept;
   a DOS 3.3 path is added.
+- `cgetc.s`, `kbhit.s` (from `libsrc/apple2/`): the wait loop calls the
+  cooperative timer's tick hook; `kbhit` waits one tick while the timer
+  is in use.
+- `gettime.s`, `settime.s` (from `libsrc/apple2/`): the stock code runs
+  under ProDOS; a software clock is added for DOS 3.3.
 
 Because these replace stock modules in `lib/apple2-dos33.lib`, compare
 them with cc65's versions after updating cc65.

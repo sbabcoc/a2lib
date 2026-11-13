@@ -13,6 +13,13 @@ full-featured on a stock II+:
   falls back to either the stock 40-column screen or a 40-column window
   onto an 80 × 24 screen, which follows the cursor or pans under program
   control. An optional hi-res "Soft-70" display is planned.
+- **Cooperative timer and software clock.** A stock II+ has no timer, so
+  a2lib counts time while programs wait in the library (for keys,
+  network packets, or explicitly), and runs timer callbacks then:
+  one-shot or periodic, for regular "go" intervals and timeouts. Under
+  DOS 3.3, `time()` and `clock_gettime` return the up-time until a
+  program sets the clock, for example from an Internet time server, and
+  IP65 programs can use it as their timer (`include/a2timer.h`).
 - **DOS 3.3 interrupts.** Stock cc65 can only install interrupt
   handlers under ProDOS. a2lib installs them under DOS 3.3 too, keeping
   the Language Card banking intact across interrupts.
@@ -39,6 +46,10 @@ for the Uthernet II.
   fallback.
 - **Increment 6** adds the 40-column window (`lib/apple2-dos33-vtwin.lib`),
   and passes all its tests, with and without the card.
+- **Increment 7** adds the cooperative timer, the software clock, the
+  40-column window's position gauge, and an IP65 timer driver. It passes
+  all its tests under DOS 3.3 and the sim65 regression tests
+  (`make simtest`).
 
 Next: the reflow filter and Soft-70.
 
@@ -93,14 +104,31 @@ fails visibly where it can't:
 | Seeking | As under ProDOS, except that T files can be positioned past their end, to reach records of random-access files. Positions are limited to 16 bits. |
 | Rename | The new name takes no suffixes, and an existing new name fails with `EEXIST`, as under ProDOS. |
 | Directories | `opendir` takes a location, not a path: `""` or `"."` for the default drive, optionally with suffixes (`",D2"`). `struct dirent` has the name, ProDOS-equivalent type, access and size in blocks and sectors; it omits the byte size, dates and aux type, which the catalog doesn't record (use `stat`). |
+| Clock | `time()` and `clock_gettime` count the up-time until `clock_settime` sets the clock; `a2_clock_age` tells whether, and how long ago, it was set. |
 | Errors | Reported with the same `errno` and `_oserror` values as under ProDOS. |
+
+## Using the timer with IP65
+
+Link `lib/a2lib-ip65.o` before IP65's libraries. It replaces IP65's
+Apple II timer driver, which busy-waits about 33 ms on every
+`timer_read`, with one that waits a single tick (about 3.9 ms) and
+reports counted milliseconds:
+
+```sh
+cl65 -t apple2 -I include -o prog prog.c lib/a2lib-ip65.o ip65.lib a2uther2.lib lib/apple2-dos33.lib
+```
 
 ## Testing
 
 `test/filetest.c` checks every file-layer behavior above and prints a
 `PASS` or `FAIL` line for each. Run it from a DOS 3.3 disk with a writable
-disk in the default drive. The target test environment is the
-[ReplicApple2Plus](https://github.com/sbabcoc/ReplicApple2Plus) emulator.
+disk in the default drive. `test/vttest.c` checks the display backends,
+and `test/timertest.c` the timer and clock. The target test environment
+is the [ReplicApple2Plus](https://github.com/sbabcoc/ReplicApple2Plus)
+emulator.
+
+`make simtest` runs regression tests for the timer and the window's
+gauge in cc65's 6502 simulator, `sim65`, with no Apple II needed.
 
 ## Documentation
 

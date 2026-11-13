@@ -21,6 +21,7 @@
         .include        "zeropage.inc"
         .include        "apple2.inc"
         .include        "vt.inc"
+        .include        "timer.inc"
 
 _cgetc:
         bit     vt_active
@@ -45,6 +46,7 @@ put_caret:
 :       inc     RNDL            ; Increment random counter low
         bne     :+
         inc     RNDH            ; Increment random counter high
+        jsr     a2_tickhook     ; One tick (DESIGN.md 6.3)
 :       lda     KBD
         bpl     :--             ; If < 128, no key pressed
 
@@ -80,6 +82,7 @@ vt:     lda     cursor          ; Cursor on? Show the card's
 :       inc     RNDL            ; Increment random counter low
         bne     :+
         inc     RNDH            ; Increment random counter high
+        jsr     a2_tickhook     ; One tick (DESIGN.md 6.3)
 :       lda     KBD
         bpl     :--             ; If < 128, no key pressed
         pha

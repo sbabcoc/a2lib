@@ -13,6 +13,7 @@
         .include        "apple2.inc"
         .include        "win.inc"
         .include        "vt.inc"
+        .include        "timer.inc"
 
 _cgetc:
         lda     cursor
@@ -44,6 +45,7 @@ _cgetc:
 wait:   inc     RNDL            ; Increment random counter low
         bne     :+
         inc     RNDH            ; Increment random counter high
+        jsr     a2_tickhook     ; One tick (DESIGN.md 6.3)
 :       lda     KBD
         bpl     wait            ; If < 128, no key pressed
         pha

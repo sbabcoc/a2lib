@@ -24,9 +24,10 @@
 #include <apple2.h>
 #ifdef C40WIN
 #include <c40win.h>
+#include <a2timer.h>
 #endif
 
-#define MAX_CHECKS 21
+#define MAX_CHECKS 23
 
 static const char* names[MAX_CHECKS];
 static unsigned char results[MAX_CHECKS];
@@ -55,6 +56,20 @@ static char peek_at (unsigned char x, unsigned char y)
 static unsigned char screen_at (unsigned char x, unsigned char y)
 {
     return *(unsigned char*) (0x400 + (y & 7) * 0x80 + (y >> 3) * 0x28 + x);
+}
+
+/* Whether row 0, columns 30-39 show the given text, in inverse (gauge) or
+** normal video */
+static unsigned char corner_is (const char* text, unsigned char inverse)
+{
+    unsigned char i;
+
+    for (i = 0; i < 10; ++i) {
+        if (screen_at (30 + i, 0) != (inverse ? text[i] & 0x3F : text[i] | 0x80)) {
+            return 0;
+        }
+    }
+    return 1;
 }
 #endif
 
@@ -125,6 +140,16 @@ int main (void)
         gotoxy (60, 3);
         cputc ('Z');
         check ("follow pans right", c40_left () == 40 && screen_at (20, 3) == ('Z' | 0x80));
+
+        /* The position gauge appears after a pan, and goes after a second */
+        check ("gauge shown", corner_is ("[....====]", 1));
+        {
+            unsigned long m0 = a2_millis ();
+            while (a2_millis () - m0 < 1100) {
+                a2_idle ();
+            }
+        }
+        check ("gauge hidden", corner_is ("          ", 0));
         gotoxy (5, 4);
         cputc ('Y');
         check ("follow pans left", c40_left () == 0 && screen_at (5, 4) == ('Y' | 0x80));

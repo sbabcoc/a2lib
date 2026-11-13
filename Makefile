@@ -46,9 +46,11 @@ WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC))
 WIN_INC := $(wildcard libsrc/win/*.inc)
 VTWIN_LIB := lib/apple2-dos33-vtwin.lib
 
-.PHONY: all test clean
+.PHONY: all test simtest clean
 
-all: $(DOS33_LIB) $(VT_LIB) $(VTWIN_LIB)
+IP65_OBJ := lib/a2lib-ip65.o
+
+all: $(DOS33_LIB) $(VT_LIB) $(VTWIN_LIB) $(IP65_OBJ)
 
 build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
@@ -60,27 +62,33 @@ $(DOS33_LIB): $(DOS33_OBJ) $(STOCK_LIB)
 	$(AR65) r $@ $(DOS33_OBJ)
 
 # VideoTerm backend: apple2-dos33.lib with VideoTerm-aware conio modules
-build/vt/%.o: libsrc/vt/%.s $(VT_INC)
+build/vt/%.o: libsrc/vt/%.s $(VT_INC) libsrc/dos33/timer.inc
 	@mkdir -p $(@D)
-	$(CA65) -t $(TARGET) -I libsrc/vt -o $@ $<
+	$(CA65) -t $(TARGET) -I libsrc/vt -I libsrc/dos33 -o $@ $<
 
 $(VT_LIB): $(VT_OBJ) $(DOS33_LIB)
 	@mkdir -p $(@D)
 	cp $(DOS33_LIB) $@
 	$(AR65) r $@ $(VT_OBJ)
 
+# IP65 timer driver on the cooperative timer: an object file, listed on the
+# link line before IP65's library (libsrc/ip65/a2timer.s)
+$(IP65_OBJ): libsrc/ip65/a2timer.s libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) -I libsrc/dos33 -o $@ $<
+
 # VideoTerm backend with the 40-column window as its fallback: vt.s and the
 # window's conio modules (which include the VideoTerm paths)
-build/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC)
+build/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
 	@mkdir -p $(@D)
-	$(CA65) -t $(TARGET) -I libsrc/win -I libsrc/vt -o $@ $<
+	$(CA65) -t $(TARGET) -I libsrc/win -I libsrc/vt -I libsrc/dos33 -o $@ $<
 
 $(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o $(DOS33_LIB)
 	@mkdir -p $(@D)
 	cp $(DOS33_LIB) $@
 	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ)
 
-test: build/test/filetest build/test/vttest build/test/wintest
+test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest
 
 build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -93,6 +101,35 @@ build/test/vttest: test/vttest.c $(VT_LIB)
 build/test/wintest: test/vttest.c $(VTWIN_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(VTWIN_LIB)
+
+build/test/timertest: test/timertest.c test/timerzp.s $(DOS33_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/timertest.c test/timerzp.s $(DOS33_LIB)
+
+# Regression tests that run in cc65's 6502 simulator, sim65, without an
+# Apple II: the timer modules and the window's gauge, built for sim6502.
+SIM_DIR  := build/sim
+SIM_MODS := timer tick kbhit gettime settime
+SIM_OBJ  := $(patsubst %,$(SIM_DIR)/%.o,$(SIM_MODS))
+SIM65    ?= sim65
+
+$(SIM_DIR)/%.o: libsrc/dos33/%.s libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t sim6502 -I libsrc/dos33 -o $@ $<
+
+$(SIM_DIR)/win.o: libsrc/win/win.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t sim6502 -I libsrc/win -I libsrc/vt -I libsrc/dos33 -o $@ $<
+
+$(SIM_DIR)/timersim: test/sim/timersim.c test/sim/shim.s test/timerzp.s $(SIM_OBJ)
+	$(CL65) -t sim6502 -O -I include -o $@ $^
+
+$(SIM_DIR)/gaugesim: test/sim/gaugesim.c test/sim/shim.s test/sim/winshim.s $(SIM_DIR)/win.o $(SIM_OBJ)
+	$(CL65) -t sim6502 -C test/sim/sim0c00.cfg -O -I include -o $@ $^
+
+simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim
+	$(SIM65) $(SIM_DIR)/timersim
+	$(SIM65) $(SIM_DIR)/gaugesim
 
 clean:
 	rm -rf build lib

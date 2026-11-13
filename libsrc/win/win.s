@@ -29,6 +29,13 @@
 ; C interface (include/c40win.h): c40_pan, c40_follow, c40_left,
 ; c40_active. They do nothing (or report 0) while the VideoTerm is in use.
 ;
+; Position gauge (DESIGN.md 6.3): after each pan, "[....====]" in inverse
+; video in the top-right corner shows which 40 of the 80 columns are
+; visible; a one-shot timer hides it after a second by restoring the corner
+; from the buffer. Drawn only if a timer slot is free. The timer functions
+; used here touch no zero page, since this runs inside cputc (cputs keeps
+; ptr1, chline tmp1 and tmp2).
+;
 
         .export         _c40_pan, _c40_follow, _c40_left, _c40_active
         .constructor    wininit, 6      ; After vt.s's (7): needs vt_active
@@ -39,6 +46,10 @@
         .include        "apple2.inc"
         .include        "win.inc"
         .include        "vt.inc"
+        .include        "timer.inc"
+
+GAUGE_COL       = WIN_VIEW - 10 ; Gauge in columns 30-39 of row 0
+GAUGE_TICKS     = MS_TICKS(1000)
 
         .segment        "ONCE"
 
@@ -65,6 +76,12 @@ wininit:
 windone:
         bit     vt_active
         bmi     done
+
+        ; Remove the gauge, if shown
+        bit     gslot
+        bmi     :+
+        jsr     gauge_hide
+:
 
         ; Restore the output hooks, as vt.s does
         lda     savecsw
@@ -257,7 +274,8 @@ left:   cmp     #WIN_STEP
 
 setleft:
         sta     win_left
-        jmp     redraw
+        jsr     redraw
+        jmp     gauge_show
 done2:  rts
 
 ; redraw: copy the window's 40 columns of each row to the screen.
@@ -377,6 +395,87 @@ back:   lda     win_x
 :       rts
 
 ; ------------------------------------------------------------------------
+; Position gauge
+
+; gauge_show: (re)start the one-shot timer, then draw the gauge. Each of
+; its 8 cells stands for 10 columns; the window covers 4, from cell
+; win_left / 10 (rounded).
+
+gauge_show:
+        ldx     gslot
+        bmi     :+
+        jsr     a2_timer_restart
+        jmp     draw
+:       lda     #<GAUGE_TICKS
+        sta     tmr_ticks
+        lda     #>GAUGE_TICKS
+        sta     tmr_ticks+1
+        lda     #<gauge_hide
+        sta     tmr_fn
+        lda     #>gauge_hide
+        sta     tmr_fn+1
+        lda     #$00            ; One-shot
+        sta     tmr_per
+        jsr     a2_timer_arm
+        cmp     #$FF
+        beq     nogauge         ; No free slot: no gauge
+        sta     gslot
+
+draw:   lda     win_left        ; First covered cell: (win_left + 5) / 10
+        clc
+        adc     #5
+        ldx     #$FF
+:       inx
+        sec
+        sbc     #10
+        bcs     :-
+        stx     gcell
+        lda     #'[' & $3F      ; Inverse
+        sta     $0400 + GAUGE_COL
+        lda     #']' & $3F
+        sta     $0400 + GAUGE_COL + 9
+        ldy     #$00
+:       lda     #'.' & $3F
+        cpy     gcell
+        bcc     :+
+        tya
+        sec
+        sbc     gcell
+        cmp     #4
+        lda     #'.' & $3F
+        bcs     :+
+        lda     #'=' & $3F
+:       sta     $0400 + GAUGE_COL + 1,y
+        iny
+        cpy     #8
+        bne     :--
+nogauge:
+        rts
+
+; gauge_hide: the timer's callback, also used at exit. Restores the
+; gauge's corner from the buffer.
+
+gauge_hide:
+        lda     #$FF            ; The one-shot has freed its slot
+        sta     gslot
+        lda     #$00
+        jsr     setbuf          ; BAS2L = buffer row 0
+        clc
+        lda     BAS2L
+        adc     win_left
+        sta     BAS2L
+        bcc     :+
+        inc     BAS2L+1
+:       ldy     #GAUGE_COL
+:       lda     (BAS2L),y
+        eor     #$A0
+        sta     $0400,y
+        iny
+        cpy     #WIN_VIEW
+        bne     :-
+        rts
+
+; ------------------------------------------------------------------------
 ; C interface
 
 _c40_pan:
@@ -388,7 +487,8 @@ _c40_pan:
 :       sta     win_left
         lda     #$00            ; Stop following
         sta     win_follow
-        jmp     redraw
+        jsr     redraw
+        jmp     gauge_show
 :       rts
 
 _c40_follow:
@@ -432,6 +532,8 @@ win_x:          .byte   $00
 win_y:          .byte   $00
 win_left:       .byte   $00
 win_follow:     .byte   $80     ; Bit 7: follow the cursor
+gslot:          .byte   $FF     ; Gauge's timer slot; bit 7: none
+gcell:          .byte   $00
 savecsw:        .word   $0000
 savedos:        .word   $0000
 

@@ -941,7 +941,7 @@ test interruptor also makes every test run go through `initirq` and
 at arbitrary points (inside `COUT`, a File Manager call, or RWTS). These
 need an emulated card that raises IRQ (section 10.5).
 
-### 6.3 Cooperative timer and software clock (planned, increment 7)
+### 6.3 Cooperative timer and software clock (increment 7)
 
 **Purpose.** A utility for programs that need a regular "go" interval
 (periodic work while idle, timeouts), with three clients in the library
@@ -995,6 +995,41 @@ into seconds for the software clock (add each tick's milliseconds to a
 sub-second count; at 1,000, subtract 1,000 and add a second), so no
 32-bit division is ever needed.
 
+**Revised in implementation: the tick includes the tick routine.** The
+wait loop is suspended while `a2_tick` runs, so a tick is 3,844 cycles
+*plus* the routine's own time; leaving that out would have run the count
+2.4% slow (about 35 minutes a day). The routine's common path (no timer
+active, no second boundary) was counted by hand at 90.6 cycles averaged
+over its branches, and **measured in sim65 at 90.5** (87.5 for
+`JSR a2_tick` and `RTS`, plus the 3-cycle `JMP` through the hook vector).
+So a tick is **3,934.6 cycles = 3.855602 ms**, and the timer uses
+**3 + 160/187 ms** per tick (`TICK_NUM`/`TICK_DEN` in `timer.inc`); the
+fraction matches that tick length within 3.5 ppm. 1,000 ticks are 3,855
+or 3,856 ms.
+
+**Layout dependence.** On the 6502, a taken branch that crosses a page
+boundary, and an indexed load whose address does, take one more cycle,
+so `a2_tick`'s cost depends slightly on where the linker places it and
+its tables. A later sim65 build, whose only change was in the startup
+code, measured 88.5 cycles (166.6 with a timer active) instead of 87.5
+and 159.6. Each cycle is about 0.025% of a tick (roughly 20 seconds a
+day), so the clock's accuracy is limited to about that order by layout,
+not by the 3.5 ppm fraction; this is well below the biases below.
+
+**Known biases (uncompensated):**
+
+- **While any timer is active,** each tick costs about 72 more cycles
+  (measured: 159.6 with one active timer), so counted time runs about
+  1.8% slow; each further active timer adds roughly 0.5%. The cost
+  depends on how many timers run, so it isn't folded into the constant.
+- **During stdio input,** the `KSW` routine saves and restores registers
+  and switches banks around each tick (about 46 cycles), so counted time
+  runs about 1.2% slow while a program waits in stdio input.
+
+Programs that need an accurate clock resync it (from a time server) now
+and then, which these biases don't change. Compensating them (a second
+error term for the active-timer path) is a possible refinement.
+
 **The Autostart ROM's input path (verified** by disassembling the II+
 system ROM used with ReplicApple2Plus, 12 KB at `$D000`, CRC32
 `1D05C1B1`, RESET vector `$FA62`):
@@ -1018,24 +1053,41 @@ The same disassembly confirms the IRQ path 6.1 relies on: `$FA40` is
 `STA $45`, `PLA`, `PHA`, three `ASL`s (the pushed status's B flag into
 the sign bit), `BMI $FA4C` (BRK, to the monitor), `JMP ($03FE)`.
 
+**Installing the input routine under DOS 3.3 (revised after the first
+emulator run).** DOS 3.3 normally keeps its keyboard intercept (`$9E81`)
+in `KSW` and the true input routine at `$AA55`. On every character
+through either of its intercepts, DOS copies its saved true handlers
+into `$36`-`$39` (`$9ED1`) and reinstalls its intercepts on the way out
+(`$A851`, saving whatever is then in `KSW` as the new true handler)
+(*Beneath Apple DOS* ch. 8). The first version stored the routine in
+`KSW` directly; the first character of output then replaced it with the
+ROM's `KEYIN`, which DOS filed away as the true handler, so stdio input
+never reached the routine (the INPUT checks failed: no callbacks, no
+counted time). Now, when DOS's intercept is in `KSW` (`KSW` equals the
+address DOS keeps at `$9D02`), the routine is installed as DOS's true
+input routine at `$AA55` instead, and DOS calls it; DOS restores the
+registers before that call, so the routine still receives the character
+under the cursor in A and `CH` in Y. Otherwise it goes into `KSW`
+directly. Exit restores whichever hook was changed.
+
 **Polling points**, where time advances and due callbacks run:
 
 | Point | How time is counted |
 |---|---|
 | `cgetc` | Its wait loop, in every library (the base library gains a modified `cgetc.s` for this) |
 | stdio input | A replacement `KSW` input routine with the same loop, installed while the timer is in use and restored at exit (as `CSW` is), mirroring the Autostart ROM's `KEYIN` (below) |
-| `kbhit` | While the timer is in use and no key is pending, waits one counted tick (3.8 ms), so loops that poll `kbhit` advance time and run callbacks |
+| `kbhit` | While the timer is in use and no key is pending, waits one counted tick (3.9 ms), so loops that poll `kbhit` advance time and run callbacks |
 | `a2_idle()` | Waits one counted tick, for programs' own idle loops |
-| IP65's `timer_read` | A replacement that calls `a2_idle()` once (3.8 ms instead of IP65's 33 ms) and returns the millisecond count |
+| IP65's `timer_read` | A replacement that calls `a2_idle()` once (3.9 ms instead of IP65's 33 ms) and returns the millisecond count |
 
 **Linked on demand, as reflow is (3.2).** The library's wait loops call a
 hook vector (a 3-byte `JMP` in DATA, initially to an `RTS`) at each tick.
 The timer module is linked only if a program calls its functions, and
 installs itself in the vector when started. Programs that don't use the
-timer pay a few bytes of hook and an extra `JSR`/`RTS` every 3.8 ms of
+timer pay a few bytes of hook and an extra `JSR`/`RTS` every 3.9 ms of
 waiting.
 
-**API (proposed; `include/a2timer.h`):**
+**API (`include/a2timer.h`):**
 
 | Function | Purpose |
 |---|---|
@@ -1045,8 +1097,12 @@ waiting.
 | `void a2_timer_stop (unsigned char handle)` | Stop it |
 | `unsigned long a2_clock_age (void)` | Seconds since the software clock was last set, or `A2_CLOCK_UNSET` |
 
-- A fixed table of a few timer slots (4 proposed), to keep memory small.
-- Intervals are rounded to ticks (3.8 ms), suitable for "go" intervals.
+- A fixed table of 4 timer slots, to keep memory small. A one-shot
+  timer's slot is freed when it fires; a periodic one's when stopped.
+- Internally, `a2_timer_arm` (interval in ticks) and `a2_timer_restart`
+  touch no zero page, so the window's gauge can use them from inside
+  `cputc` (where `cputs` keeps `ptr1` and `chline` `tmp1`/`tmp2`).
+- Intervals are rounded to ticks (3.9 ms), suitable for "go" intervals.
 - **Callback rules:** callbacks run inside polling points, so they must
   be short; they may use conio and stdio output; they must not wait for
   keys (`cgetc`, stdio input) or call `a2_idle`. The dispatcher doesn't
@@ -1111,9 +1167,36 @@ clock card), an interruptor could advance the count exactly, using the
 interrupt support in 6.1. Not the default, since a stock II+ has no such
 card, and ReplicApple2Plus doesn't emulate one yet.
 
-**Size (estimate before implementation):** 300-400 bytes for the timer
-module, the clock replacements and the `KSW` routine; a few bytes of hook
-in each wait loop.
+**Size (measured).** The estimate before implementation (300-400 bytes)
+was low. Resident code and data:
+
+| Module | Bytes | Linked by |
+|---|---|---|
+| `timer.s` | 836, plus 46 of startup code (freed) | Any use of the timer, the clock, or the window's gauge |
+| `gettime.s`, `settime.s` | 179 (+10 BSS), 156 | `clock_gettime`, `time()`; `clock_settime`, `a2_clock_age` |
+| `tick.s` | 5 | Any `cgetc` or `kbhit` |
+| Hook in each wait loop | 3 per loop | Same |
+
+Most of `timer.s` is the dispatcher's save and restore, `a2_timer_start`'s
+24-bit ms-to-tick arithmetic, and the slot tables. Programs that use none
+of these pay only the hook: `filetest` is unchanged, `vttest` grew by 11
+bytes. The window's gauge adds about 150 bytes to `win.s`, and because
+the gauge uses the timer, programs linked with `apple2-dos33-vtwin.lib`
+include `timer.s` (`wintest` grew by 1,374 bytes, gauge checks included).
+
+**Testing in sim65 (`make simtest`).** cc65's 6502 simulator runs the
+real modules, built for its `sim6502` target, with stubs for the few
+Apple II-only imports: `test/sim/timersim.c` checks the Bresenham
+arithmetic against an exact model, ms-to-tick rounding (100 ms = 26
+ticks), one-shot and periodic timers, slot limits, zero-page
+preservation and the clock, and measures `a2_tick` with sim65's cycle
+counter; `test/sim/gaugesim.c` links the real `win.s` (at `$0C00`, so
+the text screen is free) and checks what the gauge leaves on screen. It
+caught a real defect: the 32-bit add and subtract loops in the clock
+modules ended with `CPX #4`, which overwrote the carry chaining the
+bytes, so any nonzero clock offset gave wrong times (the up-time check
+passed only because the offset was 0). They now test the loop end with
+`EOR`, which leaves the carry alone.
 
 ---
 
@@ -1149,6 +1232,9 @@ in each wait loop.
     misunderstandings of the spec.
 - **AppleCommander** provides an independent check of what actually ends
   up on disk images.
+- **sim65** (`make simtest`): cc65's 6502 simulator runs library modules
+  built for its `sim6502` target, with stubs for Apple II-only imports,
+  so logic and cycle counts can be checked without an Apple II (6.3).
 - **Machine configs:** ProDOS tests need the language card (slot 0) or
   the Saturn card. The VideoTerm must be in slot 3 (firmware 2.4
   requirement).
@@ -1157,8 +1243,17 @@ in each wait loop.
 
 ## 9. Open items
 
-- Cooperative timer (6.3): the 40-column gauge's display time (about
-  1 second proposed).
+- **DOS 3.3 and the display backends' `CSW` hook (from the timer's
+  input finding, 6.3; not yet confirmed by a test).** `vt.s` and `win.s`
+  store their output routines in `CSW` directly, the way the timer first
+  stored its input routine in `KSW`. By the same DOS mechanism, stdio
+  input through DOS's keyboard intercept would restore the original
+  `CSW`. cc65's own output is unaffected, because the backends' `cout.s`
+  call them directly, not through `CSW`; but code that calls the
+  monitor's `COUT` (`$FDED`) directly after stdio input would write to
+  the 40-column screen instead of the VideoTerm or window. The likely
+  fix is the timer's: install as DOS's true output routine at `$AA53`
+  when DOS's intercept is in `CSW`. To confirm with a test first.
 
 **Resolved since the first draft:**
 
@@ -1370,10 +1465,41 @@ The Makefile builds `lib/apple2-dos33-vtwin.lib`.
 waited, and after exit the BASIC prompt appeared below the program's
 output.
 
-### 10.8 Next increments
+### 10.8 Increment 7: cooperative timer, software clock, gauge
 
-- Cooperative timer and software clock (6.3), then the window's position
-  indicator as its first client
+| File | Role |
+|---|---|
+| `libsrc/dos33/timer.inc`, `timer.s` | Tick counting, slots, dispatcher, API, `KSW` input routine (6.3) |
+| `libsrc/dos33/tick.s` | The hook vector the wait loops call |
+| `libsrc/dos33/cgetc.s`, `kbhit.s` | Modified copies of stock modules: tick hook; `kbhit` waits one tick while the timer is in use |
+| `libsrc/dos33/gettime.s`, `settime.s` | Modified copies of stock modules: software clock under DOS 3.3, stock code under ProDOS; `a2_clock_age` |
+| `libsrc/vt/cgetc.s`, `libsrc/win/cgetc.s` | Tick hook in their wait loops |
+| `libsrc/win/win.s` | Position gauge (6.3) |
+| `libsrc/ip65/a2timer.s` | IP65 timer driver, built as `lib/a2lib-ip65.o` |
+| `include/a2timer.h` | Public API |
+| `test/timertest.c`, `test/timerzp.s` | Emulator tests (ticks, timers, zero page, clock, stdio input) |
+| `test/sim/` | sim65 regression tests (`make simtest`) |
+
+`test/vttest.c` gains two gauge checks in its window build.
+
+**Verified:** `make simtest` passes (all timer and gauge checks); the
+IP65 object links ahead of IP65's Uthernet II driver library, which
+then doesn't contribute its own `a2timer.o` (checked with a link map of
+a program calling `ip65_init` and `ip65_process`).
+
+**First run on DOS 3.3, in ReplicApple2Plus:** `wintest` passed all 22
+checks without the card, including the gauge appearing after a pan and
+disappearing after a second of counted time. `timertest` passed 17 of
+19: TICKS, TIMERS and CLOCK passed; the INPUT group's callback and
+counted-time checks failed because DOS replaced the `KSW` routine (6.3,
+"Installing the input routine under DOS 3.3"). Fixed by installing it as
+DOS's true input routine when DOS's intercept is in `KSW`.
+
+**Second run on DOS 3.3:** `timertest` passed all 19 checks, including
+callbacks and counted time during stdio input.
+
+### 10.9 Next increments
+
 - Display backends: the reflow filter (decided in 3.2: activated at run
   time, linked on demand, breaking at the viewport width) and Soft-70
   (section 3)
