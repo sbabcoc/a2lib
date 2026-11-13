@@ -995,12 +995,35 @@ into seconds for the software clock (add each tick's milliseconds to a
 sub-second count; at 1,000, subtract 1,000 and add a second), so no
 32-bit division is ever needed.
 
+**The Autostart ROM's input path (verified** by disassembling the II+
+system ROM used with ReplicApple2Plus, 12 KB at `$D000`, CRC32
+`1D05C1B1`, RESET vector `$FA62`):
+
+- `RDKEY` (`$FD0C`): `LDY CH`, `LDA (BASL),Y`, saves that character,
+  draws a flashing cursor in its place (`AND #$3F`, `ORA #$40`), and
+  jumps through `KSW` with **A = the original character under the
+  cursor and Y = `CH`**.
+- `KEYIN` (`$FD1B`, the default `KSW` routine): `INC RNDL` / `BNE` /
+  `INC RNDH` / `BIT KBD` / `BPL` (back to the top), then, once a key is
+  pressed, `STA (BASL),Y` (restores the character under the cursor),
+  `LDA KBD`, `BIT KBDSTRB`, `RTS`, returning the key in A with X and Y
+  unchanged. Its loop is 15 cycles per pass, plus 4 when `RNDL` wraps,
+  so it advances `RNDH` at the same 3,844-cycle tick as `cgetc`.
+
+The replacement `KSW` routine keeps this contract exactly: same loop,
+same restore through `(BASL),Y`, key in A, X and Y preserved; it adds
+only the tick check on each `RNDH` increment.
+
+The same disassembly confirms the IRQ path 6.1 relies on: `$FA40` is
+`STA $45`, `PLA`, `PHA`, three `ASL`s (the pushed status's B flag into
+the sign bit), `BMI $FA4C` (BRK, to the monitor), `JMP ($03FE)`.
+
 **Polling points**, where time advances and due callbacks run:
 
 | Point | How time is counted |
 |---|---|
 | `cgetc` | Its wait loop, in every library (the base library gains a modified `cgetc.s` for this) |
-| stdio input | A replacement `KSW` input routine with the same loop, installed while the timer is in use and restored at exit (as `CSW` is), to be modeled on the Autostart ROM's `KEYIN` |
+| stdio input | A replacement `KSW` input routine with the same loop, installed while the timer is in use and restored at exit (as `CSW` is), mirroring the Autostart ROM's `KEYIN` (below) |
 | `kbhit` | While the timer is in use and no key is pending, waits one counted tick (3.8 ms), so loops that poll `kbhit` advance time and run callbacks |
 | `a2_idle()` | Waits one counted tick, for programs' own idle loops |
 | IP65's `timer_read` | A replacement that calls `a2_idle()` once (3.8 ms instead of IP65's 33 ms) and returns the millisecond count |
@@ -1109,10 +1132,9 @@ in each wait loop.
 
 ## 9. Open items
 
-- Cooperative timer (6.3): the Autostart ROM's `KEYIN` behavior to mirror in
-  the replacement `KSW` routine (verify against the ROM listing); timing
-  constants for PAL machines (the Europlus has a different master clock);
-  the window indicator's form (a transient gauge was proposed).
+- Cooperative timer (6.3): timing constants for PAL machines (the
+  Europlus has a different master clock); the window indicator's form (a
+  transient gauge was proposed).
 
 **Resolved since the first draft:**
 
