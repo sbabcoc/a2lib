@@ -141,8 +141,41 @@ reflow.
 - **Reflow:** implemented as a **stream output filter**, not as a conio
   backend. Conio is cursor-addressed, and `gotoxy` has no meaning in
   reflowed output, so a "reflowing conio" would contradict itself. The
-  filter word-wraps stream output at the screen width and works over any
-  backend.
+  filter word-wraps stream output and works over any backend.
+- **The window and reflow are not alternatives to each other in the
+  library;** each program chooses per kind of output. Cursor-addressed
+  output (a terminal session, a full-screen menu) has fixed positions and
+  can't be reflowed, so it needs the window to be shown on 40 columns.
+  Running text (a Gopher document) has no fixed layout, so reflowing it
+  changes only readability. One program may use both, e.g. a Gopher
+  client that pans for its menus and reflows documents.
+- **Reflow is activated at run time (decision).** Programs turn it on
+  and off as they go (`reflow_on`, `reflow_off`), for example reflowing
+  documents but not menus. Memory compared (estimates before
+  implementation: 150-250 bytes of code, an 80-byte word buffer in BSS):
+
+  | Approach | Programs that reflow | Programs that don't |
+  |---|---|---|
+  | Always linked, switched at run time | Filter + flag | Filter + flag, unused |
+  | Link-time module (fixed for the run) | Filter | Nothing |
+  | **Linked on demand by calling `reflow_on()`** | Filter + switch | Nothing, or a few bytes of hook in the output path |
+
+  With cc65's linker, a module is linked only if referenced, so putting
+  the filter in the same module as `reflow_on`/`reflow_off` gives runtime
+  control at link-time cost: programs that never call them don't link
+  the filter. The remaining design work is the hook point. The stock
+  library's console output goes through `CSW`, so a filter can chain
+  itself there; but the VideoTerm and window libraries' `cout.s` call
+  `vt_write`/`win_cout` directly, bypassing `CSW`, so they need a hook
+  vector (or to route through `CSW`, at a small speed cost).
+- **Reflow breaks lines at the viewport width (decision):** the width
+  actually visible, 80 on the VideoTerm and 40 in the window and on the
+  stock screen. In the window, the program's screen is 80 columns wide
+  but only 40 are shown; breaking reflowed text at 80 would leave half of
+  each line out of view, forcing the reader to pan back and forth, which
+  defeats the purpose of reflowing. A program may still pass an explicit
+  width (`reflow_on(width)`, with 0 meaning the viewport width), e.g. 80
+  to break lines exactly as on the VideoTerm.
 - **Panning: mechanism in the library, key bindings in the
   application.** No standard Apple II convention for panning a 40-column
   window over 80 columns was found. The II+ has only two arrow keys
@@ -908,6 +941,132 @@ test interruptor also makes every test run go through `initirq` and
 at arbitrary points (inside `COUT`, a File Manager call, or RWTS). These
 need an emulated card that raises IRQ (section 10.5).
 
+### 6.3 Cooperative timer and software clock (planned, increment 7)
+
+**Purpose.** A utility for programs that need a regular "go" interval
+(periodic work while idle, timeouts), with three clients in the library
+itself: the 40-column window's position indicator (a gauge hidden after
+a delay), IP65's timer, and a software clock for `time()` and
+`clock_gettime()` under DOS 3.3, which programs can set from an Internet
+time server (IP65 includes an SNTP client, `sntp_get_time`).
+Millisecond accuracy isn't a goal.
+
+**The constraint.** A stock II+ has no timer and no vertical-blank
+interrupt (the //e's `$C019` doesn't exist on it), so nothing can
+interrupt a program after a delay. The timer is therefore
+**cooperative**: time advances only while the program waits inside the
+library, in loops whose cycle counts are known, and callbacks run only
+at those points. While a program computes without calling the library,
+the count stands still. Interactive programs spend nearly all their time
+waiting for keys or packets, so in practice the count stays close to
+real time; a program that needs wall-clock accuracy over long busy
+stretches resyncs from a time server.
+
+**State of the art (verified).**
+
+- cc65 has no `clock()` for the Apple II (`time.h` defines no
+  `CLOCKS_PER_SEC` for it), and its `clock_gettime` reads the ProDOS
+  clock (`libsrc/apple2/gettime.s`), so under DOS 3.3 there is no time
+  base at all. `time()` is built on `clock_gettime`.
+- IP65's Apple II timer (`drivers/a2timer.s`) is a stopgap: with no
+  timing hardware, every call to `timer_read` busy-waits about 33 ms
+  (`JSR $FCA8`) and adds 33 to its millisecond count, so each network
+  timeout check costs 33 ms.
+
+**Time base.** The monitor's random-seed counter, `RNDL`/`RNDH`
+(`$4E`/`$4F`), which keyboard wait loops increment on every pass. cc65's
+`cgetc` loop (`INC RNDL` / `BNE` / `LDA KBD` / `BPL`) takes 15 cycles per
+pass, plus 4 when `RNDL` wraps, so one increment of `RNDH` (a **tick**)
+is 255 × 15 + 19 = **3,844 cycles**. Every wait loop the library owns
+uses the same structure and checks the timer when `RNDH` increments.
+
+**Milliseconds without division (Bresenham).** A tick is a non-integer
+number of milliseconds. The II+'s average CPU clock is
+14,318,180 Hz × 65 / 912 = 1,020,484 Hz (a cycle is 14 cycles of the
+14.31818 MHz master clock, except the last of each 65-cycle scan line,
+which is stretched by 2), so a tick is 3.766839 ms. Rather than divide,
+the timer distributes the fraction with a Bresenham-style error
+accumulator: each tick adds 3 to a 32-bit millisecond counter and 148 to
+an 8-bit error term; when the error reaches 193, it subtracts 193 and
+adds one more millisecond. 3 + 148/193 matches the exact ratio to
+0.1 ppm (0.01 s/day), far below the tolerance of the II+'s crystal. The
+counter wraps after 49.7 days. The same technique carries milliseconds
+into seconds for the software clock (add each tick's milliseconds to a
+sub-second count; at 1,000, subtract 1,000 and add a second), so no
+32-bit division is ever needed.
+
+**Polling points**, where time advances and due callbacks run:
+
+| Point | How time is counted |
+|---|---|
+| `cgetc` | Its wait loop, in every library (the base library gains a modified `cgetc.s` for this) |
+| stdio input | A replacement `KSW` input routine with the same loop, installed while the timer is in use and restored at exit (as `CSW` is), to be modeled on the Autostart ROM's `KEYIN` |
+| `kbhit` | While the timer is in use and no key is pending, waits one counted tick (3.8 ms), so loops that poll `kbhit` advance time and run callbacks |
+| `a2_idle()` | Waits one counted tick, for programs' own idle loops |
+| IP65's `timer_read` | A replacement that calls `a2_idle()` once (3.8 ms instead of IP65's 33 ms) and returns the millisecond count |
+
+**Linked on demand, as reflow is (3.2).** The library's wait loops call a
+hook vector (a 3-byte `JMP` in DATA, initially to an `RTS`) at each tick.
+The timer module is linked only if a program calls its functions, and
+installs itself in the vector when started. Programs that don't use the
+timer pay a few bytes of hook and an extra `JSR`/`RTS` every 3.8 ms of
+waiting.
+
+**API (proposed; `include/a2timer.h`):**
+
+| Function | Purpose |
+|---|---|
+| `unsigned long a2_millis (void)` | Milliseconds counted since startup |
+| `void a2_idle (void)` | Wait one counted tick and run due callbacks |
+| `unsigned char a2_timer_start (unsigned ms, void (*fn) (void), unsigned char periodic)` | Start a one-shot or periodic timer; returns a handle, or a failure value when all slots are in use |
+| `void a2_timer_stop (unsigned char handle)` | Stop it |
+| `unsigned long a2_clock_age (void)` | Seconds since the software clock was last set, or `A2_CLOCK_UNSET` |
+
+- A fixed table of a few timer slots (4 proposed), to keep memory small.
+- Intervals are rounded to ticks (3.8 ms), suitable for "go" intervals.
+- **Callback rules:** callbacks run inside polling points, so they must
+  be short; they may use conio and stdio output; they must not wait for
+  keys (`cgetc`, stdio input) or call `a2_idle`. The dispatcher doesn't
+  dispatch again while a callback runs. Because the `KSW` routine runs
+  with ROM switched in (as `RDKEY` calls it), the dispatcher switches LC
+  bank 2 back in (`$C080`) around callbacks and restores ROM afterward,
+  so callbacks always run in cc65's normal banking.
+
+**Software clock (DOS 3.3).** a2lib replaces `clock_settime` and
+`clock_gettime` with a software clock: `clock_settime` records the time
+given (for example, from `sntp_get_time`), and `clock_gettime` returns it
+plus the seconds counted since, so `time()` works too. It drifts slow by
+whatever time the program spends computing, so programs resync
+occasionally.
+
+- **Before the clock is set, `clock_gettime` returns the up-time
+  (decision):** the seconds counted since the program started, from an
+  epoch of 0 (1 January 1970). Programs can measure elapsed time without
+  a time server.
+- **Whether the clock has been set (decision):** a2lib provides
+  `unsigned long a2_clock_age (void)`, the seconds since the clock was
+  last set, or `A2_CLOCK_UNSET` (`0xFFFFFFFF`) if it never was. One call
+  answers both "was it ever synchronized?" and "is it time to resync?":
+  `if (a2_clock_age () > 3600) resync ();` also catches the unset case,
+  since `A2_CLOCK_UNSET` exceeds any threshold. A plain "set" flag would
+  answer only the first.
+
+**IP65 linking.** ld65 scans each library once (section 2), so a
+replacement `timer_read` placed in a library listed before IP65's would
+not be used: IP65's modules reference `timer_read` only after a2lib's
+library has been scanned. The replacement therefore ships as an object
+file to list explicitly on the link line.
+
+**Interrupt-driven improvement (later).** With a card that interrupts
+periodically (a Mockingboard's timers, a mouse card's 60 Hz interrupt, a
+clock card), an interruptor could advance the count exactly, using the
+interrupt support in 6.1. Not the default, since a stock II+ has no such
+card, and ReplicApple2Plus doesn't emulate one yet.
+
+**Size (estimate before implementation):** 300-400 bytes for the timer
+module, the clock replacements and the `KSW` routine; a few bytes of hook
+in each wait loop.
+
 ---
 
 ## 7. Runtime environment (verified)
@@ -950,7 +1109,10 @@ need an emulated card that raises IRQ (section 10.5).
 
 ## 9. Open items
 
-- None at present.
+- Cooperative timer (6.3): the Autostart ROM's `KEYIN` behavior to mirror in
+  the replacement `KSW` routine (verify against the ROM listing); timing
+  constants for PAL machines (the Europlus has a different master clock);
+  the window indicator's form (a transient gauge was proposed).
 
 **Resolved since the first draft:**
 
@@ -1164,7 +1326,11 @@ output.
 
 ### 10.8 Next increments
 
-- Display backends: the reflow filter and Soft-70 (section 3)
+- Cooperative timer and software clock (6.3), then the window's position
+  indicator as its first client
+- Display backends: the reflow filter (decided in 3.2: activated at run
+  time, linked on demand, breaking at the viewport width) and Soft-70
+  (section 3)
 - Emulator test fixture (section 8)
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)
 
