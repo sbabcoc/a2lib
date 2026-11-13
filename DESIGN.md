@@ -256,6 +256,97 @@ for the CRTC table, so all code, including the dispatch tables at
 applies to both. The 1982 manual describes `$1A` `0`/`1` as 24/18-line
 modes; the ROM is authoritative.
 
+### 3.5 VideoTerm implementation (increment 5)
+
+**Packaging.** `lib/apple2-dos33-vt.lib` is `apple2-dos33.lib` with
+VideoTerm-aware versions of the stock conio modules (`libsrc/vt/`). It is
+the link-time choice of section 3.1: programs that don't want the backend
+link `apple2-dos33.lib` and pay nothing. Each replaced module is a
+modified copy of stock cc65's that first tests `vt_active` (set at
+startup when the card is found) and either drives the card or runs the
+stock 40-column code. The stock `chline`, `cvline`, `cclear` and `cputs`
+work unchanged on top, because they reach the screen only through
+`cputc.s`'s entry points (`cputdirect`, `putchar`, `newline`) and
+`gotoxy`.
+
+| Module | On the VideoTerm |
+|---|---|
+| `vt.s` (new) | Detection, INIT, the WRITE wrapper, GOTOXY, cursor control, exit restore |
+| `cputc.s` | `cputc`: `'\r'` is CR only, `'\n'` a line feed in the same column; `cputdirect`, `putchar`, `putchardirect`, `newline` |
+| `gotoxy.s`, `gotoy.s` | Firmware GOTOXY (`$1E`, column + 32, row + 32) |
+| `wherex.s`, `wherey.s` | The firmware's cursor variables (`$57B`, `$5FB`) |
+| `clrscr.s` | Firmware clear-and-home (`$0C`) |
+| `_scrsize.s` | 80 × 24 |
+| `cpeekc.s` | Reads VRAM at the cursor, locating it as the firmware's `$CA59` does |
+| `cgetc.s`, `rdkey.s` | Show the card's cursor while waiting for a key |
+| `cout.s` | Calls WRITE directly; linking it (all console output does) links `vt.s`, so stdio-only programs get the backend too |
+
+**Firmware facts the design relies on** (verified from the 2.4 ROM, by
+disassembly):
+
+- The Pascal 1.1 entries are INIT `$C311` (`JMP $C800`) and WRITE `$C31C`
+  (`JSR $C9A7`). WRITE, unlike the BASIC entry, doesn't deselect other
+  cards' `$C800` ROMs, so `vt_write` touches `$CFFF` first. It passes
+  X = `$C3`, Y = `$30` per the protocol and preserves A, X and Y, so the
+  same routine serves as the COUT hook.
+- A plain `$0D` is a carriage return only; `$8D` goes through the control
+  table as CR + LF; a line feed keeps the column. So conio's `'\r'` and
+  `'\n'` map directly, and stdio's console output (which sends `$8D`)
+  gets CR + LF.
+- WRITE clears bit 7 of `$0478`, selecting **delayed wrap**: after a
+  character in column 79 the cursor waits at column 80 until the next
+  character. `wherex` reports 79 while a wrap is pending, and `putchar`'s
+  backspace undoes it.
+- After each character the firmware sets the CRTC cursor position
+  (R14/R15) but never R10 (cursor start and mode), so the backend can
+  hide or show the cursor through R10 without the firmware undoing it.
+- INIT does a full setup only if the power-on marker at `$077B` isn't
+  set; `vt.s` clears it first, so every program starts from a known
+  state (standard character set, 24 lines, cleared screen).
+
+**Single cursor.** Conio and stdio both write through the firmware, so
+they share its cursor: `printf` output lands where `gotoxy` put the
+cursor, as on the 40-column screen (checked by the tests). `CSW` is also
+hooked, so code that calls `$FDED` directly reaches the card.
+
+**Cursor visibility.** Hidden (R10 = `$20`), as on the stock 40-column
+screen, and shown blinking (R10 = `$E0`, the firmware's own setting)
+only while `cgetc` with `cursor(1)`, or stdio input, waits for a key.
+
+**Controls in `cputc`.** Characters below `$20` other than `'\r'` and
+`'\n'` show as their letters (`@`, `A`–`Z`, `[ \ ] ^ _`), as screen
+codes `$80`–`$9F` do on the 40-column screen; they aren't sent as
+firmware commands.
+
+**Scrolling (difference from the 40-column screen).** A line feed on the
+last row scrolls the card's screen, as the firmware does. The stock
+40-column conio wraps the cursor to the top row instead. Each backend
+keeps its native behavior.
+
+**`revers` (decision).** `revers()` keeps its stock bookkeeping (it
+returns the previous state) but has **no visible effect on the
+VideoTerm**. The card can show inverse video only with an inverse
+character ROM in the alternate-set socket or the inverse-video
+modification; on a stock card, characters in the alternate set display
+garbage. Selecting the alternate set for `revers` could be added later as
+an opt-in for cards that have the ROM.
+
+**Exit.** `vtdone` restores `CSW`. If DOS's reconnect routine (`A851`)
+moved the backend's hook into its saved true hook (`$AA53`) while the
+program ran, it restores that too; otherwise BASIC's output would go to
+freed memory after exit. The display returns to 40 columns (`$C058`),
+unless output was already going to the card before the program started
+(`CSW`, or DOS's saved hook, pointing into `$C3xx`, as after `PR#3`); then
+it stays in 80 columns with the blinking cursor restored.
+
+**Startup state in DATA.** Everything `vt.s`'s constructor sets is in
+DATA, because `crt0` clears BSS after the constructors run (6.1).
+
+**Size.** At most 427 bytes of resident code and data when every conio
+function is used (757 against stock's 330), plus 118 bytes of startup
+code that is freed after initialization. Programs link only the modules
+they use.
+
 ---
 
 ## 4. DOS 3.3 file layer: architecture
@@ -968,9 +1059,29 @@ earlier groups also pass under the changed startup order.
 **Open:** testing with real interrupts needs an IRQ source in
 ReplicApple2Plus (6.2).
 
-### 10.6 Next increments
+### 10.6 Increment 5: VideoTerm backend
 
-- Display backends (section 3)
+| File | Role |
+|---|---|
+| `libsrc/vt/vt.inc`, `vt.s` | Firmware interface and core (3.5) |
+| `libsrc/vt/` conio modules | Modified copies of stock `cputc.s`, `gotoxy.s`, `gotoy.s`, `clrscr.s`, `wherex.s`, `wherey.s`, `cgetc.s`, `_scrsize.s`, `cpeekc.s`, `cout.s`, `rdkey.s` |
+| `test/vttest.c` | Display tests, run with and without the card |
+
+The Makefile builds `lib/apple2-dos33-vt.lib` alongside
+`apple2-dos33.lib`. **Verified by building:** the VideoTerm modules
+replace the stock ones in the new library (larger segment sizes), the
+test links them, and a stdio-only program links `vt.s` through `cout.s`.
+
+**First run, in ReplicApple2Plus:** all 15 checks passed both with the
+VideoTerm in slot 3 (80 columns) and without it (the 40-column
+fallback). On the card, the cursor blinked while `cgetc` waited with
+`cursor(1)`, and after exit the display returned to the 40-column screen
+with a working BASIC prompt.
+
+### 10.7 Next increments
+
+- Display backends: the 40-column window (`c40win`), the reflow filter,
+  and Soft-70 (section 3)
 - Emulator test fixture (section 8)
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)
 
