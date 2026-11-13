@@ -11,7 +11,9 @@ full-featured on a stock II+:
 - **Display backends** *(planned)*: Videx VideoTerm 80 columns, a 40-column
   window over an 80-column screen, and an optional hi-res "Soft-70"
   display, selected at link time.
-- **DOS 3.3 interrupts** *(planned)*.
+- **DOS 3.3 interrupts.** Stock cc65 can only install interrupt
+  handlers under ProDOS. a2lib installs them under DOS 3.3 too, keeping
+  the Language Card banking intact across interrupts.
 
 The first programs built on it are a telnet terminal and a Gopher client
 for the Uthernet II.
@@ -26,8 +28,12 @@ for the Uthernet II.
 - **Increment 3** adds directories (`opendir`, `readdir`, `closedir`,
   `rewinddir`) over the DOS 3.3 catalog, and `st_blocks` in `stat`, and
   also passes all its tests under DOS 3.3.
+- **Increment 4** adds interrupt support under DOS 3.3 (cc65's
+  interruptors, as used by the mouse and serial drivers), and also passes
+  all its tests under DOS 3.3. The interrupt paths are tested with
+  simulated interrupts until ReplicApple2Plus has a card that raises IRQ.
 
-Next: DOS 3.3 interrupts and the display backends.
+Next: the display backends.
 
 ## Building
 

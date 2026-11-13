@@ -653,6 +653,104 @@ for non-ProDOS programs. **Decision:** a DOS 3.3 `initirq`/`doneirq` that
 hooks the monitor's IRQ vector at `$3FE`, chaining the previous handler,
 selected at link time like the other modules.
 
+### 6.1 Design (increment 4)
+
+`libsrc/dos33/irq.s` replaces stock `irq.s`. Its ProDOS path is stock
+cc65's, unchanged, so a DOS 3.3 build run under ProDOS still allocates
+an interrupt through the MLI.
+
+**The banking problem.** Under DOS 3.3, `crt0` points the IRQ vector in
+Language Card RAM at `irq_6502`, which switches ROM in and jumps through
+ROM's vector. A program interrupted while running with LC RAM enabled,
+which is cc65's normal state, would resume with ROM visible instead of
+its LC code. A 16K Language Card on a II+ has no switch that reports
+whether LC RAM or ROM is enabled for reading (the //e's `$C011`/`$C012`
+don't exist), so a handler can't save and restore that state.
+
+**Decision: two entry points, as ProDOS does.** The way an interrupt
+arrives tells which bank was enabled:
+
+- **LC RAM enabled:** the CPU takes the vector at `$FFFE` from LC RAM.
+  `initirq` replaces `crt0`'s `irq_6502` there with `lcirq`, which saves
+  A, X and Y, calls the interruptors, and returns without touching the
+  banking.
+- **ROM enabled** (during `COUT`, `RDKEY`, File Manager and RWTS calls,
+  or on a machine without a Language Card): the CPU takes ROM's vector,
+  to the Autostart ROM's IRQ handler at `$FA40`, which saves A in `$45`,
+  passes a BRK to the monitor, and jumps through `$3FE`. `initirq` points
+  `$3FE` at `romirq`, which saves X and Y, calls the interruptors, and
+  restores A from `$45` before `RTI`, the convention for DOS 3.3 IRQ
+  handlers.
+
+Either way, the interrupted code resumes with the banking it had.
+
+**Unhandled interrupts and BRK** go where they went before `initirq`: an
+interrupt no interruptor handles goes to the previous `$3FE` handler,
+and a BRK (or unhandled interrupt) in LC RAM goes to `crt0`'s
+`irq_6502`, which, as in stock cc65, leaves ROM enabled. The previous
+handlers are stored into absolute `JMP` instructions in the DATA segment
+rather than jumped to indirectly, because an indirect `JMP` through a
+variable that ended up at `$xxFF` would hit the NMOS 6502's page-wrap
+bug.
+
+**`doneirq`** restores `$3FE` and the LC RAM vector at exit.
+
+**Startup order: a2lib's `crt0.s` (decision, from the first run).** Stock
+`crt0` runs the module constructors (`initlib`, which calls `initirq`)
+*before* it patches the RESET and IRQ vectors in LC RAM for DOS 3.3. So
+`initirq` installed `lcirq`, and `crt0` then overwrote it with
+`irq_6502`. The first run showed this: on the simulated LC RAM path, the
+interrupt was handled (it went through `irq_6502`, ROM and `$3FE` to
+`romirq`), but ROM was left enabled, failing the banking check. It also
+meant `initirq` saved whatever was in LC RAM before `crt0`, not
+`irq_6502`, as the handler to chain to. Options considered:
+
+| Option | Assessment |
+|---|---|
+| Install `lcirq` lazily, from `romirq`, on the first interrupt that arrives through `irq_6502` | Keeps the bug for that first interrupt, which could crash a program running LC code |
+| Replace `zerobss` or `callmain` to get a hook after `crt0`'s patch | Forks a stock module only for its timing; no simpler than forking `crt0` |
+| **Fork `crt0.s`, patching the vectors before `initlib`** | **Chosen.** The smallest change in behavior: only the vector patch moves; constructors still run before the LC segment is copied, as in stock cc65 |
+
+a2lib's `libsrc/dos33/crt0.s` is a modified copy of stock `crt0.s` that
+patches the vectors, switches back to ROM with LC RAM write-protected
+(the state at entry), then calls `initlib`. Like `write.s`, it belongs in
+the upstream proposal; it costs 9 bytes of startup code, which is freed
+after initialization.
+
+**BSS is cleared after the constructors.** `crt0` calls `zerobss` after
+`init` returns, so anything a constructor stores in BSS is lost. The
+first draft kept `irq.s`'s "installed" flag in BSS, so `doneirq` would
+have skipped restoring the vectors at exit. The flag is now in DATA, as
+stock `irq.s` keeps its `int_num`.
+
+**Disk I/O is safe with interrupts enabled.** DOS 3.3's RWTS masks
+interrupts while it runs (*Beneath Apple DOS* ch. 2; ch. 8 at `$B7B5`,
+"Disable interrupts and call RWTS"); interrupting RWTS while writing
+could destroy a disk under DOS 3.1. The File Manager and RWTS wrappers
+therefore need no extra masking.
+
+**Size:** 128 bytes resident (stock: 29), plus 115 bytes of startup code
+in the `ONCE` segment, which is freed after initialization. Only
+programs that declare interruptors link it.
+
+### 6.2 Testing
+
+No card emulated by ReplicApple2Plus raises IRQ yet (the CPU models the
+IRQ line, but no device asserts it), so the tests simulate interrupts in
+software (`test/irqtest.s`): they push the return address and a status
+byte with B clear, as the CPU does, set I, and jump through the vector
+at `$FFFE` as currently enabled. With LC RAM enabled, that enters
+`lcirq`; with ROM switched in, it enters the real Autostart ROM handler,
+which goes through `$3FE` to `romirq`. Each path is checked for the
+interruptor being called, the same bank being enabled after `RTI`, and
+A, X and Y surviving (A through `$45` on the ROM path). Declaring the
+test interruptor also makes every test run go through `initirq` and
+`doneirq`, so all the file tests run with the handlers installed.
+
+**Not covered:** the CPU's own interrupt entry, and interrupts arriving
+at arbitrary points (inside `COUT`, a File Manager call, or RWTS). These
+need an emulated card that raises IRQ (section 10.5).
+
 ---
 
 ## 7. Runtime environment (verified)
@@ -844,9 +942,34 @@ without library fails to link; with the library it links).
 **First run on DOS 3.3:** all 59 checks in ten groups passed, including
 the directory checks and `st_blocks` agreeing with `d_blocks`.
 
-### 10.5 Next increments
+### 10.5 Increment 4: DOS 3.3 interrupts
 
-- DOS 3.3 interrupts (section 6)
+| File | Role |
+|---|---|
+| `libsrc/dos33/irq.s` | Replaces stock `irq.s`: DOS 3.3 entry points `lcirq` and `romirq`, stock ProDOS path kept (section 6) |
+| `libsrc/dos33/crt0.s` | Modified copy of stock `crt0.s`: patches the 6502 vectors before the constructors run (6.1) |
+| `test/irqtest.s` | Simulated interrupts on both paths, and the test interruptor |
+
+`test/filetest.c` gains an INTERRUPTS group, for 65 checks in eleven
+groups; the on-screen failure list is capped at 8 lines.
+
+**Verified by building:** the library's `irq.o` is the DOS 3.3 version
+(segment sizes differ from stock), and the test links `initirq`,
+`doneirq` and `callirq`.
+
+**First run on DOS 3.3:** 64 of 65 passed. The LC RAM path's banking
+check failed because stock `crt0` overwrote `lcirq` after the
+constructors ran (6.1). Fixed with a2lib's `crt0.s`; the "installed"
+flag also moved from BSS to DATA.
+
+**Second run on DOS 3.3:** all 65 checks in eleven groups passed, so the
+earlier groups also pass under the changed startup order.
+
+**Open:** testing with real interrupts needs an IRQ source in
+ReplicApple2Plus (6.2).
+
+### 10.6 Next increments
+
 - Display backends (section 3)
 - Emulator test fixture (section 8)
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)

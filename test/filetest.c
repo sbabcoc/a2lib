@@ -19,9 +19,9 @@
 #include <sys/stat.h>
 #include <dirent.h>             /* a2lib's DOS 3.3 dirent.h (-I include) */
 
-/* Failure lines shown: 24 rows less the BRUN line, the title, 10 groups,
+/* Failure lines shown: 24 rows less the BRUN line, the title, 11 groups,
 ** the overflow line, the summary and the prompt after exit. */
-#define MAX_SHOWN   9
+#define MAX_SHOWN   8
 #define MAX_GROUP   10          /* Most checks in one group */
 
 static unsigned char passed, total;         /* All groups */
@@ -336,6 +336,27 @@ static void dir_tests (void)
                                      && t_blocks > 0 && st.st_blocks == t_blocks);
 }
 
+/* Interrupts (DESIGN.md section 6), simulated by test/irqtest.s */
+unsigned char irq_lc (void);
+unsigned char irq_rom (void);
+#define IRQ_HANDLED 0x01
+#define IRQ_BANKING 0x02
+#define IRQ_REGS    0x04
+
+static void irq_tests (void)
+{
+    unsigned char r;
+
+    r = irq_lc ();
+    check ("LC RAM path handled", r & IRQ_HANDLED);
+    check ("LC RAM path banking", r & IRQ_BANKING);
+    check ("LC RAM path registers", r & IRQ_REGS);
+    r = irq_rom ();
+    check ("ROM path handled", r & IRQ_HANDLED);
+    check ("ROM path banking", r & IRQ_BANKING);
+    check ("ROM path registers", r & IRQ_REGS);
+}
+
 /* stdio on top of the POSIX layer */
 static void stdio_layer (void)
 {
@@ -377,6 +398,7 @@ int main (void)
     remove_rename ();           group ("REMOVE, RENAME");
     stat_tests ();              group ("STAT");
     dir_tests ();               group ("DIRECTORY");
+    irq_tests ();               group ("INTERRUPTS");
     if (hidden) {
         printf ("  (%u MORE FAILURES)\n", hidden);
     }

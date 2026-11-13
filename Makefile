@@ -44,9 +44,9 @@ $(DOS33_LIB): $(DOS33_OBJ) $(STOCK_LIB)
 
 test: build/test/filetest
 
-build/test/filetest: test/filetest.c $(DOS33_LIB)
+build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/filetest.c test/irqtest.s $(DOS33_LIB)
 
 clean:
 	rm -rf build lib
