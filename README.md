@@ -8,11 +8,11 @@ full-featured on a stock II+:
   under DOS 3.3, `open` fails with `ENOSYS`. a2lib implements cc65's POSIX
   layer on top of the DOS 3.3 File Manager, so `open`, `read`, `write` and
   stdio work under both DOSes with the same behavior.
-- **Display backends**, selected at link time. The Videx VideoTerm
-  backend is in place: conio and console output use the card in slot 3
-  when present, and the stock 40-column screen otherwise. A 40-column
-  window over an 80-column screen and an optional hi-res "Soft-70"
-  display are planned.
+- **Display backends**, selected at link time. Conio and console output
+  use a Videx VideoTerm in slot 3 when present. Without one, a program
+  falls back to either the stock 40-column screen or a 40-column window
+  onto an 80 × 24 screen, which follows the cursor or pans under program
+  control. An optional hi-res "Soft-70" display is planned.
 - **DOS 3.3 interrupts.** Stock cc65 can only install interrupt
   handlers under ProDOS. a2lib installs them under DOS 3.3 too, keeping
   the Language Card banking intact across interrupts.
@@ -37,8 +37,10 @@ for the Uthernet II.
 - **Increment 5** adds the VideoTerm backend (`lib/apple2-dos33-vt.lib`),
   and passes all its tests both with the card and on the 40-column
   fallback.
+- **Increment 6** adds the 40-column window (`lib/apple2-dos33-vtwin.lib`),
+  and passes all its tests, with and without the card.
 
-Next: the remaining display backends.
+Next: the reflow filter and Soft-70.
 
 ## Building
 
@@ -67,8 +69,12 @@ cl65 -t apple2 -I include -o prog prog.c lib/apple2-dos33.lib
 
 `-I include` selects a2lib's DOS 3.3 `dirent.h`, which programs that use
 the directory functions need. To use a Videx VideoTerm in slot 3 when one
-is present, link `lib/apple2-dos33-vt.lib` instead; without the card, the
-same program uses the 40-column screen. Compiling with it but linking without the
+is present, link one of these instead:
+
+| Library | Without a VideoTerm |
+|---|---|
+| `lib/apple2-dos33-vt.lib` | The stock 40-column screen |
+| `lib/apple2-dos33-vtwin.lib` | A 40-column window onto an 80 × 24 screen; see `include/c40win.h` | Compiling with it but linking without the
 library fails at link time, so the two can't be mixed up silently.
 
 Rebuild a2lib after updating cc65, so the stock modules it contains match

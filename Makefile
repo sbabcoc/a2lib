@@ -14,6 +14,9 @@
 # console output use the card in slot 3 when present, and the stock
 # 40-column screen otherwise. Link with it instead of apple2-dos33.lib.
 #
+# lib/apple2-dos33-vtwin.lib uses the VideoTerm when present and, without
+# it, a 40-column window onto an 80 x 24 screen (include/c40win.h).
+#
 # A library of only the replacement modules isn't enough: ld65 scans each
 # library once, so a stock module reached through another stock module
 # (fopen -> open, remove -> _sysremove) would be resolved from apple2.lib.
@@ -38,9 +41,14 @@ VT_OBJ := $(patsubst libsrc/vt/%.s,build/vt/%.o,$(VT_SRC))
 VT_INC := $(wildcard libsrc/vt/*.inc)
 VT_LIB := lib/apple2-dos33-vt.lib
 
+WIN_SRC := $(wildcard libsrc/win/*.s)
+WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC))
+WIN_INC := $(wildcard libsrc/win/*.inc)
+VTWIN_LIB := lib/apple2-dos33-vtwin.lib
+
 .PHONY: all test clean
 
-all: $(DOS33_LIB) $(VT_LIB)
+all: $(DOS33_LIB) $(VT_LIB) $(VTWIN_LIB)
 
 build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
@@ -61,7 +69,18 @@ $(VT_LIB): $(VT_OBJ) $(DOS33_LIB)
 	cp $(DOS33_LIB) $@
 	$(AR65) r $@ $(VT_OBJ)
 
-test: build/test/filetest build/test/vttest
+# VideoTerm backend with the 40-column window as its fallback: vt.s and the
+# window's conio modules (which include the VideoTerm paths)
+build/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC)
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) -I libsrc/win -I libsrc/vt -o $@ $<
+
+$(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o $(DOS33_LIB)
+	@mkdir -p $(@D)
+	cp $(DOS33_LIB) $@
+	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ)
+
+test: build/test/filetest build/test/vttest build/test/wintest
 
 build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -70,6 +89,10 @@ build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 build/test/vttest: test/vttest.c $(VT_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(VT_LIB)
+
+build/test/wintest: test/vttest.c $(VTWIN_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(VTWIN_LIB)
 
 clean:
 	rm -rf build lib

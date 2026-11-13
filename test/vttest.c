@@ -1,11 +1,17 @@
 /*
-** Display backend tests (DESIGN.md 3.4), linked with apple2-dos33-vt.lib.
+** Display backend tests (DESIGN.md 3.4-3.6).
 **
-** With a VideoTerm in slot 3, the conio functions and stdio drive the card
-** (80 x 24); without one, the stock 40-column code. The same checks run in
-** both cases, adjusted for the width and for lowercase (the 40-column
-** screen of a II+ shows uppercase only). Each check reads the screen back
-** with cpeekc, wherex and wherey.
+** Built twice:
+**   vttest   linked with apple2-dos33-vt.lib: the VideoTerm, or the stock
+**            40-column screen without one
+**   wintest  (C40WIN defined) linked with apple2-dos33-vtwin.lib: the
+**            VideoTerm, or the 40-column window onto 80 x 24 without one
+**
+** The same checks run in every case, adjusted for the width and for
+** lowercase (the 40-column screen of a II+ shows uppercase only). Each
+** check reads the screen back with cpeekc, wherex and wherey. On 80-column
+** screens (card or window), scrolling is checked; in the window, panning,
+** by reading the text screen itself.
 **
 ** The results are printed after the checks, followed by a wait for a key,
 ** since the display returns to 40 columns at exit. The cursor should be
@@ -16,8 +22,11 @@
 #include <string.h>
 #include <conio.h>
 #include <apple2.h>
+#ifdef C40WIN
+#include <c40win.h>
+#endif
 
-#define MAX_CHECKS 20
+#define MAX_CHECKS 21
 
 static const char* names[MAX_CHECKS];
 static unsigned char results[MAX_CHECKS];
@@ -41,12 +50,25 @@ static char peek_at (unsigned char x, unsigned char y)
     return cpeekc ();
 }
 
+#ifdef C40WIN
+/* What the 40-column text screen (page 1) shows at a column and row */
+static unsigned char screen_at (unsigned char x, unsigned char y)
+{
+    return *(unsigned char*) (0x400 + (y & 7) * 0x80 + (y >> 3) * 0x28 + x);
+}
+#endif
+
 int main (void)
 {
-    unsigned char w, h, vt, i;
+    unsigned char w, h, vt, win, i;
 
     screensize (&w, &h);
-    vt = (w == 80);
+#ifdef C40WIN
+    win = c40_active ();
+#else
+    win = 0;
+#endif
+    vt = (w == 80 && !win);
 
     check ("screen size", h == 24 && (w == 80 || w == 40));
 
@@ -97,9 +119,41 @@ int main (void)
     printf ("lc");
     check ("stdio lowercase", peek_at (0, 19) == (vt ? 'l' : 'L'));
 
+#ifdef C40WIN
+    if (win) {
+        /* Following pans in steps of 20 columns */
+        gotoxy (60, 3);
+        cputc ('Z');
+        check ("follow pans right", c40_left () == 40 && screen_at (20, 3) == ('Z' | 0x80));
+        gotoxy (5, 4);
+        cputc ('Y');
+        check ("follow pans left", c40_left () == 0 && screen_at (5, 4) == ('Y' | 0x80));
+
+        /* c40_pan stops following; c40_follow resumes it */
+        gotoxy (30, 3);
+        cputc ('V');            /* Visible at column 10 once panned to 20 */
+        c40_pan (20);
+        gotoxy (70, 4);
+        cputc ('W');
+        check ("c40_pan stops follow", c40_left () == 20 && screen_at (10, 3) == ('V' | 0x80));
+        c40_follow ();
+        check ("c40_follow resumes", c40_left () == 40 && screen_at (30, 4) == ('W' | 0x80));
+    }
+#endif
+
+    if (w == 80) {
+        /* A line feed on the last row scrolls (card and window alike) */
+        gotoxy (0, 1);
+        cputc ('M');
+        gotoxy (0, 23);
+        cputc ('\n');
+        check ("LF scrolls at bottom", wherey () == 23 && peek_at (0, 0) == 'M');
+    }
+
     /* Results */
     clrscr ();
-    printf ("A2LIB DISPLAY TESTS: %s\n", vt ? "VIDEOTERM 80 COLUMNS" : "40 COLUMNS");
+    printf ("A2LIB DISPLAY TESTS: %s\n",
+            vt ? "VIDEOTERM 80 COLUMNS" : win ? "40-COLUMN WINDOW" : "40 COLUMNS");
     for (i = 0; i < total && i < MAX_CHECKS; ++i) {
         printf ("%s %s\n", results[i] ? "PASS" : "FAIL", names[i]);
     }

@@ -347,6 +347,72 @@ function is used (757 against stock's 330), plus 118 bytes of startup
 code that is freed after initialization. Programs link only the modules
 they use.
 
+### 3.6 40-column window implementation (increment 6)
+
+**Packaging.** `lib/apple2-dos33-vtwin.lib` holds the VideoTerm backend
+with the 40-column window (`c40win`) as its fallback, in place of the
+stock 40-column screen (section 3.1: a binary contains the VideoTerm
+backend plus one fallback). It is `apple2-dos33.lib` plus `vt.s`, shared
+unchanged with `apple2-dos33-vt.lib`, plus the window's conio modules
+(`libsrc/win/`), each with the same VideoTerm branch as in the VideoTerm
+library and window code in place of the stock 40-column code.
+
+**The same screen as the VideoTerm (decision).** A program sees 80 × 24
+either way (`screensize` reports 80 × 24), and the window copies the
+VideoTerm's behavior: delayed wrap at column 80, `'\r'` to column 0, a
+line feed in the same column, scrolling at the bottom, and the
+firmware's backspace (from column 0 to column 79 of the row above). So a
+program behaves the same with or without the card. Two differences
+remain, both from the hardware: the window shows `revers` (the text
+screen has inverse video), and it can't show lowercase (a II+ limit;
+`uppercasemask` applies, as on the stock screen).
+
+**The 80 × 24 buffer.** 1,920 bytes in BSS. `crt0` clears BSS after the
+constructors run (6.1), so the buffer can't be initialized by a
+constructor; each byte holds its screen code XOR `$A0`, so the zeroed
+buffer is already a blank screen.
+
+**Panning (decision, from 3.2).**
+
+- The window shows columns `left` to `left + 39`, with `left` at 0, 20
+  or 40. By default it **follows the cursor in steps of 20**: when the
+  cursor's column is outside the window, it moves to the nearest step
+  that shows it. Half-window steps keep redraws rare while text is
+  written across a line; each redraw copies 960 bytes.
+- It pans **only when a character is written or the cursor is about to
+  be shown** (`cgetc` with the cursor on, stdio input), never on a bare
+  `gotoxy`, so a program drawing a screen doesn't trigger a redraw for
+  every move.
+- Programs control it through `include/c40win.h`: `c40_pan(left)` shows
+  the given columns and stops following, `c40_follow()` resumes
+  following, and `c40_left()` and `c40_active()` report the state. On the
+  VideoTerm they do nothing (or return 0), so programs need no
+  conditionals. Key bindings are left to programs, as decided in 3.2.
+
+**Console output and input.** `cout.s` and the `CSW` hook send stdio
+into the window: Return is CR + LF, line feed and backspace act as on
+the card, other controls are ignored, and `INVFLG` applies, as in the
+monitor's COUT. Before stdio input, `rdkey.s` pans to the cursor and
+points the monitor's cursor (`CH`, `CV`, `BASL`) at it, so RDKEY's own
+flashing cursor appears in the right place; its echo goes through COUT
+into the window. `cgetc` shows the stock II+ caret (a flashing blank).
+
+**Zero page.** `chline` keeps its counters in `tmp1`/`tmp2` across
+`cputdirect`, and `cputs` keeps its string in `ptr1`, so the window code
+uses only the monitor's `BASL`/`BAS2L` (`$28`–`$2B`) as pointers, set on
+every use, the way stock `putchar` uses `BASL`.
+
+**Startup and exit.** `win.s`'s constructor runs after `vt.s`'s
+(priority 6 against 7; ld65 orders constructors by decreasing priority)
+and does nothing if the card is in use. Otherwise it clears the screen
+and hooks `CSW`; at exit it restores the hooks, as `vt.s` does, and
+leaves the monitor's cursor at the window's, so BASIC continues below
+the program's output.
+
+**Size.** `win.o` is 663 bytes of code and tables, plus the 1,920-byte
+buffer in BSS (no file space); the window's conio modules add a little
+on top.
+
 ---
 
 ## 4. DOS 3.3 file layer: architecture
@@ -1078,10 +1144,27 @@ fallback). On the card, the cursor blinked while `cgetc` waited with
 `cursor(1)`, and after exit the display returned to the 40-column screen
 with a working BASIC prompt.
 
-### 10.7 Next increments
+### 10.7 Increment 6: the 40-column window
 
-- Display backends: the 40-column window (`c40win`), the reflow filter,
-  and Soft-70 (section 3)
+| File | Role |
+|---|---|
+| `libsrc/win/win.inc`, `win.s` | The 80 × 24 buffer, window, panning and COUT hook (3.6) |
+| `libsrc/win/` conio modules | `cputc.s`, `gotoxy.s`, `gotoy.s`, `clrscr.s`, `wherex.s`, `wherey.s`, `cgetc.s`, `_scrsize.s`, `cpeekc.s`, `cout.s`, `rdkey.s`, each with the VideoTerm path and the window path |
+| `include/c40win.h` | `c40_pan`, `c40_follow`, `c40_left`, `c40_active` |
+| `test/vttest.c` | Also built as `wintest` (with `C40WIN`), adding scrolling and panning checks |
+
+The Makefile builds `lib/apple2-dos33-vtwin.lib`.
+
+**First run, in ReplicApple2Plus:** all four combinations passed:
+`wintest` without the card (40-column window, 20 checks) and with it
+(VideoTerm, 16), and `vttest` with the card (16) and without it (stock
+40-column screen, 15). In the window, the caret flashed while `cgetc`
+waited, and after exit the BASIC prompt appeared below the program's
+output.
+
+### 10.8 Next increments
+
+- Display backends: the reflow filter and Soft-70 (section 3)
 - Emulator test fixture (section 8)
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)
 
