@@ -531,6 +531,178 @@ the starting column, backspace, the viewport default (40 and 80),
 all three libraries, prints through the filter on the Apple II and reads
 the screen back with `cpeekc`.
 
+### 3.8 Soft-70: research and design (increment 9, not started)
+
+**Precedent.** Software 70-column displays existed in the period; 70
+columns is what hi-res allows with 4-pixel cells (280 / 4 = 70).
+
+- **Soft Seventy** (verified from a disk image of the original
+  distribution): its `FONT MERGE` program reads "COPYRIGHT 1981
+  HEARTWOOD DESIGNS, INC". It gave a 70-column screen with a full
+  96-character upper- and lowercase set and a separate graphics set,
+  worked with programs using the standard I/O hooks, and loaded its
+  regular font at `$D00` and its graphics font at `$1000`.
+- **Flex Type** (verified from its manual): Mark S. Simonsen, Beagle
+  Bros, 1982. 70, 56 and 40 columns, plus a 20-column double-wide mode;
+  up to nine resident character sets of 768 bytes each; 70-column fonts
+  use "the leftmost 4 pixels" of each row and carry a `.70` suffix; it
+  accepts character sets from Apple's DOS Tool Kit "and other similar
+  hi-res character programs"; it includes a character editor (A.C.E.);
+  and its manual states that 70-column text "requires monochrome
+  monitor".
+- Reported but not verified here: Magic Window II, Word Handler and
+  ScreenWriter II also used hi-res 70-column text.
+
+**The period font format (verified from Soft Seventy's font files).**
+A character set is **768 bytes: 96 characters (`$20`-`$7F`) x 8 bytes**,
+one byte per scanline, top first, the same layout as DOS Tool Kit and
+Flex Type sets. In each byte, **bit 0 is the leftmost pixel** (the
+standard hi-res order, so no bit reversal is needed), and a 70-column
+glyph uses bits 0-3. In `ASCII.FONT`, every printable glyph sits in
+pixels 1-3, with pixel 0 as the gap between characters; only `DEL`
+(`$7F`, a solid block) uses a fifth pixel. **Descenders use the bottom
+scanline** (row 7: `Q _ g j p q y`). Because 70-column glyphs use only 4
+bits, Soft Seventy also stores **two fonts in one 768-byte file**:
+`SYSTEM.FONT` is exactly `ASCII.FONT` in the low nibble of each byte and
+`GRAPHICS.FONT` in the high nibble (checked byte for byte).
+
+**Licensing.** Both products are commercial: Soft Seventy is copyright
+Heartwood Designs, and Flex Type's manual licenses it "only for your
+personal use" and forbids reproduction without permission. a2lib
+therefore can't ship their fonts. Proposed instead: Soft-70 uses the
+768-byte period format, ships its own license-clean default font, and
+can load a font file at run time, so period `.70` fonts a user owns
+(and fonts edited with A.C.E.) work without a2lib distributing them;
+merged two-font files could supply the alternate character set.
+
+**Geometry (computed).** Hi-res rows are 40 bytes of 7 pixels, bit 0
+leftmost; bit 7 of each byte shifts that byte's pixels by half a pixel
+(selecting the blue/orange colour set). A 4-pixel cell at column c
+starts at pixel 4c: byte 4c / 7, bit 4c mod 7. The pattern repeats
+every 7 cells (28 pixels, 4 bytes); cells at c mod 7 = 1, 3, 5 straddle
+two bytes. Scanline k (0-7) of text row r is at
+`$2000 + (r & 7) * $80 + (r >> 3) * $28 + k * $400`, so a cell's 8
+scanlines differ only by `$04` in the high byte: a 24-entry table of row
+bases suffices. No row's 40-byte run crosses a page, so copies pay no
+page-crossing cycles.
+
+**Drawing (proposed).** Glyph rows are 4 bits wide. For each of the 7
+bit offsets, a 16-entry table gives a glyph row's contribution to the
+first byte and, for offsets 4-6, the second (7 x 16 x 2 = 224 bytes), so
+a scanline is a table lookup, a mask and an OR per byte, with no
+shifting at run time. Estimated **about 377 cycles per character
+(roughly 2,700 characters per second)**, using self-modified absolute
+addresses rather than zero page (conio callers keep `ptr1`, `tmp1` and
+`tmp2` across `cputdirect`, as with the window, 3.6). With the period
+format, each scanline's 4 bits are read directly (the low nibble, or
+the high nibble of a merged file), with no unpacking.
+
+**The 80 x 24 screen.** As with the 40-column window, a program sees 80
+x 24 (the shadow buffer is shared code, 3.1); Soft-70 shows 70 of the 80
+columns, so it pans between two positions (columns 0-69 and 10-79). A
+pan can't shift pixels, since 10 columns are 40 pixels, not a whole
+number of bytes, so it redraws from the buffer: about 0.6 s for a full
+screen, or about 0.3 s if the screen is cleared first and blank cells
+skipped (at 40% full). Pans are rare. Reflow's viewport width would be
+70 (lines of 69 characters, 3.7). The position indicator is the XOR
+scanline bar decided in 6.3.
+
+**Scrolling (computed).** Scrolling up one text row moves 23 x 8
+scanlines of 40 bytes (7,360 bytes) and clears one text row:
+
+| Method | Cycles | Time |
+|---|---|---|
+| Simple loop per byte | 107,480 | 105 ms |
+| Unrolled per scanline (`LDA abs,Y` / `STA abs,Y` x 40, ~240 bytes of code) | 72,520 | 71 ms |
+| Unrolled, copying only each row's used length (lines 50-70% full) | ~37,000-51,000 | 36-50 ms |
+
+Proposed: unrolled copy with per-row length tracking (the longest
+visible extent of each text row, 24 bytes, taken from the buffer).
+Throughput with 80-character lines, drawing plus one scroll per line
+(about 101 ms without length tracking):
+
+| Line rate | A line every | Keeps up |
+|---|---|---|
+| 300-2,400 baud | 2,667-333 ms | Yes |
+| 9,600 baud | 83 ms | Slightly behind |
+
+Falling behind costs nothing over the Uthernet II: TCP flow control
+holds data back instead of losing it, so a burst only displays a little
+slower. (Over a serial line without flow control it would lose data.) A
+possible later refinement is batch scrolling: moving the screen by
+several rows at once costs about the same as one, when more output is
+already waiting.
+
+**Artifact colour (researched).**
+
+- Hi-res colour comes only from the composite signal's interpretation
+  of the bit pattern: alternating lit and unlit pixels show colour, two
+  or more adjacent lit pixels show white. An isolated lit pixel is
+  violet or green (bit 7 clear) or blue or orange (bit 7 set) by its
+  column's parity.
+- The II+ colour killer (Revision 1 boards on) **removes the colour
+  burst only in text mode**, and imperfectly; in graphics modes,
+  including Soft-70's full-screen hi-res, the burst is always on. So on
+  a colour monitor Soft-70 text fringes on a real II+ as well. Period
+  users of hi-res text used monochrome monitors, or added a switch to
+  cut the burst.
+- Because the cell width is even, a glyph pixel's parity depends only
+  on its column within the cell: each stroke has the same colour wherever
+  the character appears (with bit 7 clear, glyph columns 0 and 2 violet,
+  column 1 green; adjacent lit pixels white). Fringing is therefore
+  consistent rather than flickering from position to position.
+- Options: (a) a thin font designed for monochrome monitors, accepting
+  consistent fringes in colour; (b) "bold stems" (2-pixel verticals,
+  which show white) for colour monitors, at a cost in legibility in a
+  3-pixel-wide glyph. Proposed: (a), with bit 7 clear throughout.
+- On a colour monitor, the gauge's dotted track (alternating pixels)
+  shows as a solid coloured line and its thumb as white.
+
+**Font (researched).** The period fonts use glyphs 3 pixels wide (pixels
+1-3) and up to 8 tall, with descenders on the bottom scanline. That
+scanline is where the gauge's XOR bar goes (6.3), so on row 23 the bar
+overlaps descenders for the second it is shown; XOR leaves them intact
+when the bar is removed, and only row 23 is affected. Robey
+Pointer's "Tom Thumb" font (4 x 6 cell, 3 x 5 usable pixels, upper and
+lowercase, derived from Brian Swetland's font) may be used under MIT,
+CC0 or CC-BY 3.0; CC0 is compatible with a2lib's zlib license. Options:
+use Tom Thumb's glyphs within the taller cell, or draw taller 3 x 7
+glyphs (more legible, more work), possibly starting from Tom Thumb.
+
+**Memory (estimated).** Font 768 bytes (period format), shift tables 224, row
+tables 48, code about 1 KB including the unrolled scroll, plus the
+shared 1,920-byte buffer (BSS) and the reserved hi-res page
+(`$2000`-`$3FFF`, 8 KB), which is why Soft-70 is a link-time choice
+with its own linker config (3.1).
+
+**Testing support in ReplicApple2Plus (proposed).** A selectable
+**monochrome monitor** setting (white, green or amber phosphor),
+persisted with `java.util.prefs` as `ShiftKeyModSetting` is: in
+monochrome, `HiResRenderer` draws every lit bit in the phosphor colour
+instead of applying its artifact-colour rules; lo-res would show each
+colour's bit pattern as a stipple, as a real monochrome monitor does.
+This models what period users did, rather than the II+ colour killer,
+which acts only in text mode. Refinement: a monochrome monitor also
+shows bit 7's half-pixel shift as a real offset, which needs 560-pixel
+rendering (the renderer currently works at 280). This is a change to
+ReplicApple2Plus, not to a2lib.
+
+**Decisions (confirmed):**
+
+1. **Font format:** the 768-byte period format (96 characters x 8
+   bytes, bit 0 leftmost, bits 0-3 used), so period fonts a user owns
+   can be loaded at run time; merged two-font files supply the alternate
+   character set.
+2. **Default font:** a2lib's own, glyphs 3 pixels wide and up to 8 tall
+   like the period fonts, possibly starting from Tom Thumb (CC0).
+3. **Glyph style:** thin, designed for monochrome monitors, with bit 7
+   clear; fringes on colour monitors are accepted.
+4. **Lowercase:** yes, with descenders on the bottom scanline as in the
+   period fonts.
+5. **Scrolling:** unrolled copy with per-row length tracking.
+6. **Order:** the monochrome monitor setting in ReplicApple2Plus comes
+   first, so Soft-70 can be judged the way period users saw it.
+
 ---
 
 ## 4. DOS 3.3 file layer: architecture
@@ -1607,7 +1779,9 @@ on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
 
 ### 10.11 Next increments
 
-- Display backends: Soft-70 (section 3)
+- Monochrome monitor setting in ReplicApple2Plus (3.8; a change to that
+  project)
+- Display backends: Soft-70 (3.8, design decided)
 - Emulator test fixture (section 8)
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)
 
