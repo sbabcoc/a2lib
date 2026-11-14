@@ -6,12 +6,15 @@
 **            40-column screen without one
 **   wintest  (C40WIN defined) linked with apple2-dos33-vtwin.lib: the
 **            VideoTerm, or the 40-column window onto 80 x 24 without one
+**   s70test  (S70 defined) linked with apple2-dos33-vts70.lib at $4000:
+**            the VideoTerm, or Soft-70 without one
 **
 ** The same checks run in every case, adjusted for the width and for
 ** lowercase (the 40-column screen of a II+ shows uppercase only). Each
 ** check reads the screen back with cpeekc, wherex and wherey. On 80-column
-** screens (card or window), scrolling is checked; in the window, panning,
-** by reading the text screen itself.
+** screens (card, window or Soft-70), scrolling is checked; in the window
+** and Soft-70, panning and the position gauge, by reading the screen
+** itself (the text screen, or the hi-res page).
 **
 ** The results are printed after the checks, followed by a wait for a key,
 ** since the display returns to 40 columns at exit. The cursor should be
@@ -26,12 +29,17 @@
 #include <c40win.h>
 #include <a2timer.h>
 #endif
+#ifdef S70
+#include <soft70.h>
+#include <a2timer.h>
+#endif
 
-#define MAX_CHECKS 23
+#define MAX_CHECKS 24
 
 static const char* names[MAX_CHECKS];
 static unsigned char results[MAX_CHECKS];
 static unsigned char total, passed;
+static char line[41];
 
 static void check (const char* what, int ok)
 {
@@ -73,17 +81,70 @@ static unsigned char corner_is (const char* text, unsigned char inverse)
 }
 #endif
 
+#ifdef S70
+/* The 4 pixels of each scanline of Soft-70's cell at a screen column and
+** row, from the hi-res page */
+static void cell_at (unsigned char x, unsigned char y, unsigned char bits[8])
+{
+    unsigned char k, sh = x * 4 % 7;
+    unsigned char* p;
+    unsigned v;
+
+    for (k = 0; k < 8; ++k) {
+        p = (unsigned char*) (0x2000 + (y & 7) * 0x80 + (y >> 3) * 0x28 + k * 0x400 + x * 4 / 7);
+        v = p[0] | (unsigned) p[1] << 7;
+        bits[k] = (v >> sh) & 0x0F;
+    }
+}
+
+/* Whether two cells show the same pixels, and the first isn't blank */
+static unsigned char same_cells (unsigned char x1, unsigned char y1,
+                                 unsigned char x2, unsigned char y2)
+{
+    unsigned char a[8], b[8], k, any = 0;
+
+    cell_at (x1, y1, a);
+    cell_at (x2, y2, b);
+    for (k = 0; k < 8; ++k) {
+        if (a[k] != b[k]) return 0;
+        any |= a[k];
+    }
+    return any != 0;
+}
+
+/* Whether the bottom scanline shows the gauge's bar for a position (track
+** of alternate pixels, solid thumb over 35 bytes), or is blank */
+static unsigned char bar_is (unsigned char left, unsigned char shown)
+{
+    unsigned char b, start = left >> 1, want;
+    const unsigned char* line = (const unsigned char*) (0x2000 + 0x3D0 + 7 * 0x400);
+
+    for (b = 0; b < 40; ++b) {
+        want = !shown ? 0 : (b >= start && b < start + 35) ? 0x7F : (b & 1) ? 0x2A : 0x55;
+        if (line[b] != want) return 0;
+    }
+    return 1;
+}
+#endif
+
 int main (void)
 {
-    unsigned char w, h, vt, win, i;
+    unsigned char w, h, vt, win, lower, twocol, i;
 
     screensize (&w, &h);
-#ifdef C40WIN
+#if defined(C40WIN)
     win = c40_active ();
+#elif defined(S70)
+    win = s70_active ();
 #else
     win = 0;
 #endif
     vt = (w == 80 && !win);
+#ifdef S70
+    lower = 1;                  /* VideoTerm or Soft-70 */
+#else
+    lower = vt;
+#endif
 
     check ("screen size", h == 24 && (w == 80 || w == 40));
 
@@ -100,7 +161,7 @@ int main (void)
 
     gotoxy (3, 6);
     cputc ('q');
-    check ("lowercase", peek_at (3, 6) == (vt ? 'q' : 'Q'));
+    check ("lowercase", peek_at (3, 6) == (lower ? 'q' : 'Q'));
 
     gotoxy (7, 8);
     cputc ('\r');
@@ -132,7 +193,7 @@ int main (void)
 
     gotoxy (0, 19);
     printf ("lc");
-    check ("stdio lowercase", peek_at (0, 19) == (vt ? 'l' : 'L'));
+    check ("stdio lowercase", peek_at (0, 19) == (lower ? 'l' : 'L'));
 
 #ifdef C40WIN
     if (win) {
@@ -166,6 +227,54 @@ int main (void)
     }
 #endif
 
+#ifdef S70
+    if (win) {
+        /* Following pans between columns 0-69 and 10-79. The same letter
+        ** drawn at another bit offset must show the same pixels. */
+        gotoxy (12, 2);
+        cputc ('Z');
+        gotoxy (75, 3);
+        cputc ('Z');
+        check ("follow pans right", s70_left () == 10 && same_cells (65, 3, 2, 2));
+
+        /* The position gauge appears after a pan, and goes after a second */
+        check ("gauge shown", bar_is (10, 1));
+        {
+            unsigned long m0 = a2_millis ();
+            while (a2_millis () - m0 < 1100) {
+                a2_idle ();
+            }
+        }
+        check ("gauge hidden", bar_is (10, 0));
+        gotoxy (5, 4);
+        cputc ('Z');
+        check ("follow pans left", s70_left () == 0 && same_cells (5, 4, 12, 2));
+
+        /* Inverse shows the complement of the cell */
+        gotoxy (20, 4);
+        revers (1);
+        cputc ('Z');
+        revers (0);
+        {
+            unsigned char a[8], b[8], k, ok = 1;
+            cell_at (20, 4, a);
+            cell_at (5, 4, b);
+            for (k = 0; k < 8; ++k) {
+                if (a[k] != (b[k] ^ 0x0F)) ok = 0;
+            }
+            check ("inverse", ok && peek_at (20, 4) == 'Z');
+        }
+
+        /* s70_pan stops following; s70_follow resumes it */
+        s70_pan (10);
+        gotoxy (2, 4);
+        cputc ('W');
+        check ("s70_pan stops follow", s70_left () == 10);
+        s70_follow ();
+        check ("s70_follow resumes", s70_left () == 0);
+    }
+#endif
+
     if (w == 80) {
         /* A line feed on the last row scrolls (card and window alike) */
         gotoxy (0, 1);
@@ -178,9 +287,27 @@ int main (void)
     /* Results */
     clrscr ();
     printf ("A2LIB DISPLAY TESTS: %s\n",
-            vt ? "VIDEOTERM 80 COLUMNS" : win ? "40-COLUMN WINDOW" : "40 COLUMNS");
+            vt ? "VIDEOTERM 80 COLUMNS" :
+#ifdef S70
+            win ? "SOFT-70" :
+#endif
+            win ? "40-COLUMN WINDOW" : "40 COLUMNS");
+    /* Two columns where 70 or more are visible, so that the results fit */
+#ifdef C40WIN
+    twocol = vt;
+#else
+    twocol = (w == 80);
+#endif
     for (i = 0; i < total && i < MAX_CHECKS; ++i) {
-        printf ("%s %s\n", results[i] ? "PASS" : "FAIL", names[i]);
+        sprintf (line, "%s %s", results[i] ? "PASS" : "FAIL", names[i]);
+        if (twocol && !(i & 1)) {
+            printf ("%-40s", line);
+        } else {
+            printf ("%s\n", line);
+        }
+    }
+    if (twocol && (i & 1)) {
+        printf ("\n");
     }
     if (passed == total) {
         printf ("ALL %u PASSED\n", total);

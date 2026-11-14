@@ -4,6 +4,8 @@
 **   reflowvt    apple2-dos33-vt.lib (VideoTerm, 80 columns; stock without)
 **   reflowwin   apple2-dos33-vtwin.lib, C40WIN (40-column window without
 **               the VideoTerm)
+**   reflows70   apple2-dos33-vts70.lib, S70 (Soft-70 without the
+**               VideoTerm)
 ** Each check prints through the filter, then reads the screen back with
 ** cpeekc. W is the visible width; reflowed lines hold at most W - 1.
 */
@@ -14,6 +16,9 @@
 #include <a2reflow.h>
 #ifdef C40WIN
 #include <c40win.h>
+#endif
+#ifdef S70
+#include <soft70.h>
 #endif
 
 #define MAX_CHECKS 10
@@ -98,6 +103,12 @@ int main (void)
         win = 1;
     }
 #endif
+#ifdef S70
+    if (s70_active ()) {
+        W = 70;
+        win = 1;
+    }
+#endif
 
     clrscr ();
     reflow_on (0);
@@ -106,6 +117,9 @@ int main (void)
     check ("PARAGRAPH: WORDS WHOLE, < W", paragraph_ok ());
 #ifdef C40WIN
     if (win) check ("WINDOW DID NOT PAN", c40_left () == 0);
+#endif
+#ifdef S70
+    if (win) check ("SOFT-70 DID NOT PAN", s70_left () == 0);
 #endif
 
     clrscr ();
@@ -141,7 +155,11 @@ int main (void)
     check ("INDENT AFTER NEWLINE KEPT", peek_at (3, 1) == 'B');
 
     clrscr ();
+#ifdef S70
+    printf ("A2LIB REFLOW TESTS, W=%u%s\n", W, win ? " (SOFT-70)" : "");
+#else
     printf ("A2LIB REFLOW TESTS, W=%u%s\n", W, win ? " (WINDOW)" : "");
+#endif
     for (i = 0; i < total && i < MAX_CHECKS; ++i) {
         printf ("%s %s\n", results[i] ? "PASS" : "FAIL", names[i]);
     }

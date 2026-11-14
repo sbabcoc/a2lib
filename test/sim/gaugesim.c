@@ -11,6 +11,8 @@
 #include <a2timer.h>
 
 void tick (void);
+void model_clear (void);
+extern unsigned char s80_buf[1920];
 static unsigned char fails;
 static void check (const char* what, int ok)
 {
@@ -30,6 +32,12 @@ static void ticks (unsigned n) { while (n--) tick (); }
 
 int main (void)
 {
+    unsigned i;
+
+    for (i = 0; i < sizeof s80_buf && s80_buf[i] == 0xEA; ++i) {
+    }
+    check ("startup leaves the buffer (BSS) to crt0", i == sizeof s80_buf);
+    model_clear ();
     check ("no gauge at start", !corner_is ("[====....]", 1));
     c40_pan (40);
     check ("pan 40: [....====]", corner_is ("[....====]", 1));

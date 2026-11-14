@@ -2,11 +2,12 @@
 ; void __fastcall__ cputcxy (unsigned char x, unsigned char y, char c);
 ; void __fastcall__ cputc (char c);
 ;
-; 40-column window backend (apple2-dos33-vtwin.lib), based on cc65's
-; libsrc/apple2/cputc.s (Ullrich von Bassewitz). With a VideoTerm, as in
-; apple2-dos33-vt.lib; otherwise the 80 x 24 window (DESIGN.md 3.6).
-; Character handling follows the stock module: uppercase on a II+, INVFLG
-; (revers) applied, controls shown as their letters (screen codes
+; 80 x 24 backends (apple2-dos33-vtwin.lib, apple2-dos33-vts70.lib), based
+; on cc65's libsrc/apple2/cputc.s (Ullrich von Bassewitz). With a
+; VideoTerm, as in apple2-dos33-vt.lib; otherwise the model (s80.s).
+; Character handling follows the stock module: uppercase unless the
+; display shows lowercase (uppercasemask), INVFLG (revers) applied by
+; S80_ATTR (display.inc), controls shown as their letters (screen codes
 ; $80-$9F).
 ;
 ; The implementation of cputs() relies on cputc() not clobbering ptr1;
@@ -18,7 +19,8 @@
         .import         gotoxy, uppercasemask
 
         .include        "apple2.inc"
-        .include        "win.inc"
+        .include        "s80.inc"
+        .include        "display.inc"
         .include        "vt.inc"
 
 _cputcxy:
@@ -31,7 +33,7 @@ _cputc:
         bmi     vtcputc
         cmp     #$0D            ; Carriage return
         bne     :+
-        jmp     win_cr
+        jmp     s80_cr
 :       cmp     #$0A            ; Line feed
         beq     newline
         eor     #$80            ; Screen code
@@ -42,24 +44,24 @@ _cputc:
 cputdirect:
         bit     vt_active
         bmi     vtdirect
-        and     INVFLG          ; Normal or inverse
-        jmp     win_put
+        S80_ATTR                ; Normal or inverse
+        jmp     s80_put
 
 newline:
         bit     vt_active
         bmi     vtnewline
-        jmp     win_lf
+        jmp     s80_lf
 
 putchar:
         bit     vt_active
         bmi     vtput
-        and     INVFLG
-        jmp     win_putnoadv
+        S80_ATTR
+        jmp     s80_putnoadv
 
 putchardirect:
         bit     vt_active
         bmi     vtput
-        jmp     win_putnoadv
+        jmp     s80_putnoadv
 
 ; ------------------------------------------------------------------------
 ; VideoTerm, as in apple2-dos33-vt.lib's cputc.s

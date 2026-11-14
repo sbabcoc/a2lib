@@ -41,16 +41,28 @@ VT_OBJ := $(patsubst libsrc/vt/%.s,build/vt/%.o,$(VT_SRC))
 VT_INC := $(wildcard libsrc/vt/*.inc)
 VT_LIB := lib/apple2-dos33-vt.lib
 
+# The shared 80 x 24 model (libsrc/s80) is assembled once for each backend
+# that shows part of it, with that backend's display.inc
+S80_SRC := $(wildcard libsrc/s80/*.s)
+S80_INC := $(wildcard libsrc/s80/*.inc)
+
 WIN_SRC := $(wildcard libsrc/win/*.s)
-WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC))
-WIN_INC := $(wildcard libsrc/win/*.inc)
+WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC)) \
+           $(patsubst libsrc/s80/%.s,build/win/%.o,$(S80_SRC))
+WIN_INC := $(wildcard libsrc/win/*.inc) $(S80_INC)
 VTWIN_LIB := lib/apple2-dos33-vtwin.lib
 
 .PHONY: all test simtest clean
 
+S70_SRC := $(wildcard libsrc/s70/*.s)
+S70_OBJ := $(patsubst libsrc/s70/%.s,build/s70/%.o,$(S70_SRC)) \
+           $(patsubst libsrc/s80/%.s,build/s70/%.o,$(S80_SRC))
+S70_INC := $(wildcard libsrc/s70/*.inc) $(S80_INC)
+VTS70_LIB := lib/apple2-dos33-vts70.lib
+
 IP65_OBJ := lib/a2lib-ip65.o
 
-all: $(DOS33_LIB) $(VT_LIB) $(VTWIN_LIB) $(IP65_OBJ)
+all: $(DOS33_LIB) $(VT_LIB) $(VTWIN_LIB) $(VTS70_LIB) $(IP65_OBJ)
 
 build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
@@ -79,17 +91,47 @@ $(IP65_OBJ): libsrc/ip65/a2timer.s libsrc/dos33/timer.inc
 
 # VideoTerm backend with the 40-column window as its fallback: vt.s and the
 # window's conio modules (which include the VideoTerm paths)
+WIN_FLAGS := -I libsrc/win -I libsrc/s80 -I libsrc/vt -I libsrc/dos33
+
 build/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
 	@mkdir -p $(@D)
-	$(CA65) -t $(TARGET) -I libsrc/win -I libsrc/vt -I libsrc/dos33 -o $@ $<
+	$(CA65) -t $(TARGET) $(WIN_FLAGS) -o $@ $<
+
+build/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) $(WIN_FLAGS) -o $@ $<
 
 $(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o $(DOS33_LIB)
 	@mkdir -p $(@D)
 	cp $(DOS33_LIB) $@
 	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ)
 
+# Soft-70 with the VideoTerm: vt.s and Soft-70's modules, on the shared
+# 80 x 24 model. Programs are linked with --start-addr 0x4000.
+S70_FLAGS := -I libsrc/s70 -I libsrc/s80 -I libsrc/vt -I libsrc/dos33
+
+build/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) $(S70_FLAGS) -o $@ $<
+
+build/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) $(S70_FLAGS) -o $@ $<
+
+# The default font, generated from its source (tools/s70font.txt)
+libsrc/s70/font.s: tools/s70font.txt tools/s70font.py
+	python3 tools/s70font.py $< $@
+
+$(VTS70_LIB): $(S70_OBJ) build/vt/vt.o $(DOS33_LIB)
+	@mkdir -p $(@D)
+	cp $(DOS33_LIB) $@
+	$(AR65) r $@ build/vt/vt.o $(S70_OBJ)
+
+S70_LINK := --start-addr 0x4000
+
 test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest \
-      build/test/reflowtest build/test/reflowvt build/test/reflowwin
+      build/test/reflowtest build/test/reflowvt build/test/reflowwin \
+      build/test/s70test build/test/cswstest build/test/reflows70
 
 build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -123,6 +165,18 @@ build/test/reflowwin: test/reflowtest.c $(VTWIN_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(VTWIN_LIB)
 
+build/test/s70test: test/vttest.c $(VTS70_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ $< $(VTS70_LIB)
+
+build/test/cswstest: test/cswtest.c test/cswcout.s $(VTS70_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ test/cswtest.c test/cswcout.s $(VTS70_LIB)
+
+build/test/reflows70: test/reflowtest.c $(VTS70_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ $< $(VTS70_LIB)
+
 build/test/timertest: test/timertest.c test/timerzp.s $(DOS33_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/timertest.c test/timerzp.s $(DOS33_LIB)
@@ -139,23 +193,42 @@ $(SIM_DIR)/%.o: libsrc/dos33/%.s libsrc/dos33/timer.inc
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 -I libsrc/dos33 -o $@ $<
 
-$(SIM_DIR)/win.o: libsrc/win/win.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+$(SIM_DIR)/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
 	@mkdir -p $(@D)
-	$(CA65) -t sim6502 -I libsrc/win -I libsrc/vt -I libsrc/dos33 -o $@ $<
+	$(CA65) -t sim6502 $(WIN_FLAGS) -o $@ $<
+
+$(SIM_DIR)/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t sim6502 $(WIN_FLAGS) -o $@ $<
 
 $(SIM_DIR)/timersim: test/sim/timersim.c test/sim/shim.s test/timerzp.s $(SIM_OBJ)
 	$(CL65) -t sim6502 -O -I include -o $@ $^
 
-$(SIM_DIR)/gaugesim: test/sim/gaugesim.c test/sim/shim.s test/sim/winshim.s $(SIM_DIR)/win.o $(SIM_OBJ)
+$(SIM_DIR)/gaugesim: test/sim/gaugesim.c test/sim/shim.s test/sim/winshim.s test/sim/bssfill.s $(SIM_DIR)/win/s80.o $(SIM_DIR)/win/win.o $(SIM_OBJ)
 	$(CL65) -t sim6502 -C test/sim/sim0c00.cfg -O -I include -o $@ $^
+
+S70_SIM_MODS := s80 cputc cpeekc gotoxy gotoy wherex wherey clrscr s70 font
+S70_SIM_OBJ  := $(patsubst %,$(SIM_DIR)/s70/%.o,$(S70_SIM_MODS))
+
+$(SIM_DIR)/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t sim6502 $(S70_FLAGS) -o $@ $<
+
+$(SIM_DIR)/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+	@mkdir -p $(@D)
+	$(CA65) -t sim6502 $(S70_FLAGS) -o $@ $<
+
+$(SIM_DIR)/s70sim: test/sim/s70sim.c test/sim/shim.s test/sim/winshim.s test/sim/s70shim.s $(S70_SIM_OBJ) $(SIM_OBJ)
+	$(CL65) -t sim6502 -C test/sim/sim4000.cfg -O -I include -o $@ $^
 
 $(SIM_DIR)/reflowsim: test/sim/reflowsim.c test/sim/reflowshim.s $(SIM_REFLOW)
 	$(CL65) -t sim6502 -O -I include -o $@ $^
 
-simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim
+simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim $(SIM_DIR)/s70sim
 	$(SIM65) $(SIM_DIR)/timersim
 	$(SIM65) $(SIM_DIR)/gaugesim
 	$(SIM65) $(SIM_DIR)/reflowsim
+	$(SIM65) $(SIM_DIR)/s70sim
 
 clean:
 	rm -rf build lib

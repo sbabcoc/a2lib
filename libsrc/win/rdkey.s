@@ -13,7 +13,7 @@
         .import         VTABZ
 
         .include        "apple2.inc"
-        .include        "win.inc"
+        .include        "s80.inc"
         .include        "vt.inc"
 
         .segment        "LOWCODE"
@@ -30,12 +30,12 @@ RDKEY:
         pla
         rts
 
-win:    jsr     win_show
-        jsr     win_cursorcol
+win:    jsr     s80_show
+        jsr     s80_cursorcol
         bcc     :+
         lda     #$00            ; Not visible (not following): column 0
 :       sta     CH
-        lda     win_y
+        lda     s80_y
         sta     CV
         jsr     VTABZ           ; BASL for CV
 

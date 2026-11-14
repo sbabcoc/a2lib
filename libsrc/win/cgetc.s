@@ -3,15 +3,15 @@
 ;
 ; 40-column window backend (apple2-dos33-vtwin.lib), based on cc65's
 ; libsrc/apple2/cgetc.s (Kevin Ruland). With the cursor on, shows the
-; VideoTerm's cursor, or a flashing caret at the window's cursor (panning
-; to it if following), while waiting.
+; VideoTerm's cursor, or a flashing caret at the cursor of the 80 x 24
+; model (s80.s; panning to it if following), while waiting.
 ;
 
         .export         _cgetc
-        .import         cursor
+        .import         cursor, win_scrptr
 
         .include        "apple2.inc"
-        .include        "win.inc"
+        .include        "s80.inc"
         .include        "vt.inc"
         .include        "timer.inc"
 
@@ -25,11 +25,11 @@ _cgetc:
         jmp     wait
 
         ; Window: a flashing blank, as the stock cgetc shows on a II+
-:       jsr     win_show
-        jsr     win_cursorcol
+:       jsr     s80_show
+        jsr     s80_cursorcol
         bcs     wait            ; Not visible (not following)
         pha                     ; Screen column
-        lda     win_y
+        lda     s80_y
         jsr     win_scrptr
         pla
         tay
@@ -58,7 +58,7 @@ wait:   inc     RNDL            ; Increment random counter low
         jmp     :++
 :       bit     shown
         bpl     :+
-        lda     win_y
+        lda     s80_y
         jsr     win_scrptr
         ldy     caretcol
         lda     under

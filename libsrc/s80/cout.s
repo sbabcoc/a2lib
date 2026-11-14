@@ -1,15 +1,17 @@
 ;
 ; COUT routine
 ;
-; 40-column window backend (apple2-dos33-vtwin.lib), based on cc65's
-; libsrc/apple2/cout.s (Oliver Schmidt). Console output goes to the
-; VideoTerm or into the window. Linking this module (all console output
-; does) also links vt.s and win.s, whose constructors set up the display.
+; 80 x 24 backends (apple2-dos33-vtwin.lib, apple2-dos33-vts70.lib), based
+; on cc65's libsrc/apple2/cout.s (Oliver Schmidt). Console output goes to
+; the VideoTerm or into the model (s80.s). Linking this module (all console
+; output does) also links vt.s and s80.s, whose constructors set up the
+; display.
 ;
 
         .export         COUT, a2_rawcout, a2_coutvec
 
-        .include        "win.inc"
+        .include        "s80.inc"
+        .include        "display.inc"
         .include        "vt.inc"
 
 ; COUT is a JMP in DATA that reflow.s's reflow_on points at its filter
@@ -26,4 +28,4 @@ a2_rawcout:
         bit     vt_active
         bpl     :+
         jmp     vt_write
-:       jmp     win_cout
+:       jmp     s80_cout

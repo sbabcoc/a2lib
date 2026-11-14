@@ -1,30 +1,31 @@
 ;
 ; char cpeekc (void);
 ;
-; 40-column window backend (apple2-dos33-vtwin.lib), based on cc65's
-; libsrc/apple2/cpeekc.s. The character at the cursor: from VRAM on the
-; VideoTerm, as apple2-dos33-vt.lib's cpeekc.s; from the 80 x 24 buffer
-; otherwise. A pending wrap reads column 79.
+; 80 x 24 backends (apple2-dos33-vtwin.lib, apple2-dos33-vts70.lib), based
+; on cc65's libsrc/apple2/cpeekc.s. The character at the cursor: from VRAM
+; on the VideoTerm, as apple2-dos33-vt.lib's cpeekc.s; from the model's
+; buffer otherwise (S80_PEEK, display.inc). A pending wrap reads column 79.
 ;
 
         .export         _cpeekc
 
         .include        "apple2.inc"
-        .include        "win.inc"
+        .include        "s80.inc"
+        .include        "display.inc"
         .include        "vt.inc"
 
 _cpeekc:
         bit     vt_active
         bmi     vt
 
-        jsr     win_bufptr
-        ldy     win_x
-        cpy     #WIN_COLS
+        jsr     s80_bufptr
+        ldy     s80_x
+        cpy     #S80_COLS
         bcc     :+
-        ldy     #WIN_COLS-1
+        ldy     #S80_COLS-1
 :       lda     (BAS2L),y
         eor     #$A0            ; Screen code
-        eor     #$80            ; Character, as the stock cpeekc
+        S80_PEEK                ; Character
         ldx     #>$0000
         rts
 

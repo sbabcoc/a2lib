@@ -121,11 +121,15 @@ updating cc65**; the Makefile locates the installed `apple2.lib` through
 - A binary contains `vt` plus exactly one fallback. At startup, init
   probes for the card and fills a small jump table with either the
   VideoTerm routines or the fallback's routines.
-- The 1,920-byte 80×24 shadow buffer is a separate object pulled in only
-  by `c40win` and `soft70`.
-- Soft-70 builds use their own linker config that reserves the hi-res
-  page `$2000–$3FFF`. Builds without Soft-70 get that page back as
-  program space, which is the main saving from keeping Soft-70 optional.
+- The 1,920-byte 80×24 shadow buffer and the screen model around it
+  (cursor, wrap, scrolling, panning, the gauge's timer) are shared code
+  in `libsrc/s80/`, linked only by `c40win` and `soft70`; each backend
+  supplies the display (3.8, "Implementation").
+- Soft-70 programs are linked with `--start-addr 0x4000`, so the program
+  sits above the hi-res page `$2000–$3FFF` (decided in increment 9, in
+  place of an own linker config: 3.8). Builds without Soft-70 get that
+  page back as program space, which is the main saving from keeping
+  Soft-70 optional.
 - **Why link time (not run time):** a runtime-selectable Soft-70 would
   force every binary to carry the renderer and font and to reserve the
   hi-res page whether or not it is used.
@@ -465,6 +469,12 @@ the program's output.
 buffer in BSS (no file space); the window's conio modules add a little
 on top.
 
+**Shared model (increment 9).** The window's 80 × 24 model moved to
+`libsrc/s80/`, shared with Soft-70 (3.8, "Implementation"); `win.s` is
+now the window's display. The window's behavior is unchanged (verified,
+10.12); the resident size grew by 29 bytes (870 against 841: calls
+through the display routines, and a general panning step).
+
 ### 3.7 Reflow filter implementation (increment 8)
 
 **Hook (decision).** All stdio console output passes through `COUT` in
@@ -531,7 +541,7 @@ the starting column, backspace, the viewport default (40 and 80),
 all three libraries, prints through the filter on the Apple II and reads
 the screen back with `cpeekc`.
 
-### 3.8 Soft-70: research and design (increment 9, not started)
+### 3.8 Soft-70: research, design and implementation (increment 9)
 
 **Precedent.** Software 70-column displays existed in the period; 70
 columns is what hi-res allows with 4-pixel cells (280 / 4 = 70).
@@ -673,9 +683,9 @@ glyphs (more legible, more work), possibly starting from Tom Thumb.
 tables 48, code about 1 KB including the unrolled scroll, plus the
 shared 1,920-byte buffer (BSS) and the reserved hi-res page
 (`$2000`-`$3FFF`, 8 KB), which is why Soft-70 is a link-time choice
-with its own linker config (3.1).
+(3.1). Measured figures are under "Implementation" below.
 
-**Testing support in ReplicApple2Plus (proposed).** A selectable
+**Testing support in ReplicApple2Plus (done).** A selectable
 **monochrome monitor** setting (white, green or amber phosphor),
 persisted with `java.util.prefs` as `ShiftKeyModSetting` is: in
 monochrome, `HiResRenderer` draws every lit bit in the phosphor colour
@@ -684,8 +694,8 @@ colour's bit pattern as a stipple, as a real monochrome monitor does.
 This models what period users did, rather than the II+ colour killer,
 which acts only in text mode. Refinement: a monochrome monitor also
 shows bit 7's half-pixel shift as a real offset, which needs 560-pixel
-rendering (the renderer currently works at 280). This is a change to
-ReplicApple2Plus, not to a2lib.
+rendering. This is a change to ReplicApple2Plus, not to a2lib; it was
+made before increment 9, half-pixel shift included.
 
 **Decisions (confirmed):**
 
@@ -702,6 +712,106 @@ ReplicApple2Plus, not to a2lib.
 5. **Scrolling:** unrolled copy with per-row length tracking.
 6. **Order:** the monochrome monitor setting in ReplicApple2Plus comes
    first, so Soft-70 can be judged the way period users saw it.
+
+**Implementation decisions (confirmed, increment 9):**
+
+1. **Memory layout:** the program starts at `$4000`, above the hi-res
+   page, and the buffer and font go in `LOWBSS` below it, so the program
+   file isn't padded. cc65's stock `apple2-hgr.cfg` was the alternative;
+   it places an `HGR` segment at `$2000` in the file, making every
+   Soft-70 binary at least 14 KB, mostly zeros, slow to BLOAD under DOS
+   3.3. In implementation, cc65's stock `apple2.cfg` already provides this
+   layout with `--start-addr 0x4000` (its `LOW` area runs from `$0800` to
+   the start address and holds `LOWBSS`), so no linker config of a2lib's
+   own is needed. Link-time assertions in `s70.s` catch a program linked
+   without it, or `LOWBSS` reaching `$2000`.
+2. **Sharing:** the 80 × 24 model is extracted from the window into
+   `libsrc/s80/`, with the window and Soft-70 as displays, rather than
+   copied; the window was verified unchanged before Soft-70 was built on
+   it (10.12).
+3. **Cursor:** an inverse block, blinking at about 2 Hz (250 ms per
+   phase) from a periodic timer; steady if no timer slot is free.
+4. **Fonts:** the default font is compiled in; `s70_font(set, nibble)`
+   replaces it with one nibble of a 768-byte set read by the program, so
+   merged period files work. Selecting the second set of a merged file
+   while text is shown has no counterpart in the other backends and is
+   left for later. The default font is drawn new, 3 x 7 with descenders,
+   not derived from Tom Thumb, and reviewed as a rendered preview.
+
+**Implementation.**
+
+- **Files.** `libsrc/s80/` holds the model (`s80.s`) and the conio
+  modules the window and Soft-70 share (`cputc`, `cpeekc`, `gotoxy`,
+  `gotoy`, `wherex`, `wherey`, `clrscr`, `cout`, `_scrsize`,
+  `viewport`). Each is assembled once per backend, with the backend's
+  directory first on the include path for its `display.inc`: the visible
+  width and panning step (40/20, 70/10), the prefix of the C interface
+  (`c40_`, `s70_`), the buffer's segment (`BSS`, `LOWBSS`), and two
+  macros for screen codes. The model calls the display through eight
+  routines (`disp_init`, `disp_done`, `disp_cell`, `disp_redraw`,
+  `disp_scroll`, `disp_clear`, `disp_gauge_draw`, `disp_gauge_erase`;
+  `s80.inc`). `libsrc/win/win.s` is now the window's display, and
+  `libsrc/s70/` holds Soft-70's display (`s70.s`), `cgetc`, `rdkey` and
+  the generated default font (`font.s`, from `tools/s70font.txt` by
+  `tools/s70font.py`, which also writes a `.70` file or a preview).
+- **Screen codes.** In the window, codes are the text screen's, so
+  inverse letters lose their case. Soft-70 uses bit 7 for normal (set)
+  or inverse (clear) and keeps the character in bits 0-6, so inverse
+  lowercase and punctuation show correctly; flashing shows as inverse.
+  `uppercasemask` is set to `$FF` (lowercase shown), as on the
+  VideoTerm. `cpeekc` returns the character in either video.
+- **Drawing.** A cell's glyph index selects one of the font's three
+  pages and an offset in it, the column a byte and bit offset (70-entry
+  tables), the row a base address (24-entry tables). The two loops (one
+  byte per scanline for offsets 0-3, two for 4-6) use self-modified
+  operands for the font page, inverse mask, lookup table, byte and mask,
+  and `BAS2L` as the pointer, advancing `$400` per scanline. Every byte
+  written has bit 7 clear.
+- **Scrolling.** `sext[r]` records one more than the rightmost byte drawn
+  on screen row `r` since it was cleared; a row copies the larger of its
+  own and the next row's extent, 8 scanlines per byte column, with
+  self-modified addresses set per row. Blank cells are never drawn, so
+  the space glyph is kept blank (`s70_font` clears it).
+- **Panning** clears the page and draws the window's nonblank cells.
+- **Gauge.** The bar is drawn and removed with EOR on row 23's bottom
+  scanline. Drawing a cell on row 23 while it is shown puts the bar back
+  into that cell's bits; scrolling takes it off and puts it back; panning
+  and clearing remove it with the page.
+- **Cursor.** The cell is redrawn from the buffer, inverted or not, at
+  each blink and when it is removed, so output from a timer callback in
+  that cell isn't lost. `rdkey` shows it, then calls the monitor's RDKEY
+  through the input hook with the monitor's own cursor at row 0, column
+  0 of the hidden text screen, as stdio input and DOS expect.
+- **Startup and exit.** The constructor copies the font, sets
+  `uppercasemask`, clears the page and switches to full-screen hi-res
+  page 1; the model then clears and hooks `CSW` as in the window. At
+  exit, text mode and `HOME`.
+
+**Measured (sim65, `make simtest`).** The estimates above were low:
+
+| Operation | Estimated | Measured |
+|---|---|---|
+| `disp_cell`, one cell | about 377 cycles | about 650 (offsets 0-3) to 880 (4-6) |
+| `cputc`, model included | | about 1,010 cycles: about 1,000 characters/s |
+| Scroll, 70 columns in every row | 71 ms | 108,000 cycles: 106 ms |
+| Scroll, 38 columns in every row | 36-50 ms | 78,000 cycles: 76 ms |
+| Pan, 69 columns in every row | 0.6 s | 909,000 cycles: 0.89 s |
+
+The estimate counted a tighter inner loop than the per-scanline
+bookkeeping allows (pointer advance, two table lookups, masked stores),
+and the scroll figures include the model's own buffer scroll (about
+29,000 cycles, shared with the window). At about 1,000 characters per
+second, Soft-70 keeps up with 9,600 baud text without scrolling and with
+2,400 baud with a scroll per line; over the Uthernet II, TCP flow control
+absorbs the rest. Possible later speedups, if needed: a font transposed
+into 8 planes with an unrolled scanline loop (about 40% less per cell,
+about 300 bytes more code), and batch scrolling.
+
+**Memory (measured).** Resident: model 656 bytes, display 1,476, `cgetc`
+61, `rdkey` 52, about 2.2 KB in all. Below the program, in `LOWBSS`: the
+buffer (1,920), the font (768), row extents and the gauge's bar (64). The
+default font (768) and the startup code are in `ONCE`, reused as BSS
+after startup.
 
 ---
 
@@ -1779,11 +1889,79 @@ on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
 
 ### 10.11 Next increments
 
-- Monochrome monitor setting in ReplicApple2Plus (3.8; a change to that
-  project)
-- Display backends: Soft-70 (3.8, design decided)
+- Monochrome monitor setting in ReplicApple2Plus (3.8): done, in that
+  project, with the half-pixel shift
+- Display backends: Soft-70 (3.8): increment 9, 10.12
 - Emulator test fixture (section 8)
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)
+
+### 10.12 Increment 9: shared 80 × 24 model, Soft-70
+
+| File | Role |
+|---|---|
+| `libsrc/s80/s80.s`, `s80.inc` | The shared 80 × 24 model (from `win.s`) |
+| `libsrc/s80/*.s` | Conio modules shared by the window and Soft-70 (moved from `libsrc/win/`) |
+| `libsrc/win/win.s`, `display.inc` | The window's display |
+| `libsrc/s70/s70.s`, `display.inc` | Soft-70's display, `s70_font` |
+| `libsrc/s70/cgetc.s`, `rdkey.s` | Soft-70's cursor while waiting |
+| `libsrc/s70/font.s` | Default font, generated |
+| `tools/s70font.txt`, `s70font.py` | Font source and tool |
+| `include/soft70.h` | Public API |
+| `lib/apple2-dos33-vts70.lib` | VideoTerm, or Soft-70 without one |
+| `test/vttest.c`, `reflowtest.c`, `cswtest.c` | Emulator tests, also built as `s70test`, `reflows70`, `cswstest` |
+| `test/sim/s70sim.c`, `s70shim.s`, `sim4000.cfg` | sim65 regression test |
+| `test/sim/bssfill.s`, `gaugesim.c` | Check that startup leaves a BSS buffer to `crt0` |
+
+**Verified, refactoring.** A differential sim65 run of the window before
+and after the extraction: 3,000 random conio operations (characters,
+controls, cursor moves, inverse, pans, follow, clears, timer ticks), with
+the text screen, cursor, pan position and `cpeekc` compared after every
+one, gave identical results. The existing suites (`gaugesim` and the
+others) pass.
+
+**Verified, Soft-70 (`s70sim`).** The hi-res page is checked against a
+rendering of the model's buffer with the font in use: every cell phase
+in normal, inverse and flashing video; both nibbles of a merged font;
+then 4,000 random operations (as above, plus font changes and the
+blinking cursor shown and removed), checked every 40; a full scroll; a
+pan; the gauge shown after a pan and gone after a second; bit 7 clear
+throughout. Two deliberate faults (scroll extents, the bar in cells on
+row 23) were each caught. `s70test` checks on the emulator that a
+letter drawn at two bit offsets shows the same pixels, inverse, the
+gauge's bar and panning.
+
+**First emulator run: `wintest` stopped in the monitor (BRK at `$2D82`).**
+Diagnosed from the link map: the address is in `ONCE`, in the model's
+constructor, just after it cleared the buffer. `apple2.cfg` starts BSS
+where `ONCE` starts (BSS is cleared after the constructors run, 6.1), so
+clearing the window's buffer, which is in BSS, overwrote the running
+constructor. Before the extraction the window never cleared its buffer at
+startup; the clear was added for Soft-70, whose buffer is in `LOWBSS`.
+Fix: the constructor clears the buffer only when it is outside BSS
+(`S80_BUFSEG`), and leaves a BSS buffer to `crt0`. sim65 missed it because
+its `crt0` clears BSS before the constructors run and its configs don't
+overlap `ONCE` and BSS; `gaugesim` now checks it directly (a constructor
+run before the model's marks the buffer, `test/sim/bssfill.s`, and the
+mark must survive startup). The check failed before the fix and passes
+after it.
+
+**Emulator runs, ReplicApple2Plus under DOS 3.3 (after the fix above).**
+All passed:
+
+- Without the VideoTerm, the window on the shared model: `wintest` (22
+  checks), `reflowwin` (7, no pan) and `cswwtest` (both, with `s80_cout`
+  as DOS's true output routine), as in increments 6-8.
+- Without the VideoTerm, Soft-70 on a monochrome monitor: `s70test` (23),
+  `reflows70` (7, `W=70`, no pan) and `cswstest` (both; stdio input
+  through `rdkey`).
+- With the VideoTerm: `s70test` on the card (16).
+
+Two test faults were found and fixed on the way, neither in the library:
+`s70test`'s inverse check read `cpeekc` at the cursor, which had moved
+past the cell it wrote (it now reads that cell), and `reflows70`'s
+heading said "WINDOW". The emulator run also showed the underscore
+(bottom scanline) touching the capitals of the line below; it stays
+there, as in the period fonts (decision).
 
 ## 11. Sources
 

@@ -12,7 +12,8 @@ full-featured on a stock II+:
   use a Videx VideoTerm in slot 3 when present. Without one, a program
   falls back to either the stock 40-column screen or a 40-column window
   onto an 80 × 24 screen, which follows the cursor or pans under program
-  control. An optional hi-res "Soft-70" display is planned.
+  control, or the optional "Soft-70" display: 70 of the 80 columns, with
+  lowercase, drawn on the hi-res screen.
 - **Reflow.** stdio output can be word-wrapped at the visible width,
   switched on and off as a program runs (`include/a2reflow.h`), for
   running text such as documents.
@@ -55,8 +56,10 @@ for the Uthernet II.
   (`make simtest`).
 - **Increment 8** adds the reflow filter, and passes all its tests on the
   stock screen, the VideoTerm and the 40-column window.
-
-Next: Soft-70.
+- **Increment 9** adds Soft-70 (`lib/apple2-dos33-vts70.lib`), on an
+  80 × 24 screen model now shared with the 40-column window. It passes
+  all its tests on the emulator, with and without the card, and the sim65
+  regression tests.
 
 ## Building
 
@@ -90,8 +93,24 @@ is present, link one of these instead:
 | Library | Without a VideoTerm |
 |---|---|
 | `lib/apple2-dos33-vt.lib` | The stock 40-column screen |
-| `lib/apple2-dos33-vtwin.lib` | A 40-column window onto an 80 × 24 screen; see `include/c40win.h` | Compiling with it but linking without the
-library fails at link time, so the two can't be mixed up silently.
+| `lib/apple2-dos33-vtwin.lib` | A 40-column window onto an 80 × 24 screen; see `include/c40win.h` |
+| `lib/apple2-dos33-vts70.lib` | Soft-70: 70 columns of an 80 × 24 screen on hi-res page 1; see `include/soft70.h` |
+
+Soft-70 programs must be linked with `--start-addr 0x4000`, above the
+hi-res page; linking without it fails with a message saying so:
+
+```sh
+cl65 -t apple2 --start-addr 0x4000 -I include -o prog prog.c lib/apple2-dos33-vts70.lib
+```
+
+Soft-70 is drawn for monochrome monitors, as period hi-res text was.
+`s70_font` loads 768-byte fonts in the period format (Soft Seventy, Flex
+Type `.70` sets). The default font's source is `tools/s70font.txt`;
+`tools/s70font.py` turns it into assembler source, a `.70` file or a
+preview image.
+
+Compiling with a2lib's `dirent.h` but linking without an a2lib library
+fails at link time, so the two can't be mixed up silently.
 
 Rebuild a2lib after updating cc65, so the stock modules it contains match
 your toolchain.
@@ -132,8 +151,9 @@ and `test/timertest.c` the timer and clock. The target test environment
 is the [ReplicApple2Plus](https://github.com/sbabcoc/ReplicApple2Plus)
 emulator.
 
-`make simtest` runs regression tests for the timer and the window's
-gauge in cc65's 6502 simulator, `sim65`, with no Apple II needed.
+`make simtest` runs regression tests for the timer, the window's gauge,
+the reflow filter and Soft-70 in cc65's 6502 simulator, `sim65`, with no
+Apple II needed.
 
 ## Documentation
 
