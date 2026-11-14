@@ -24,6 +24,8 @@ void tick (void);
 void s70_curshow (void);
 void s70_curhide (void);
 extern unsigned char s80_buf[24][80];
+extern unsigned char* s80_left_addr;
+void run_destructors (void);
 
 #define INVFLG (*(unsigned char*) 0x32)
 #define PAGE ((unsigned char*) 0x2000)
@@ -147,6 +149,16 @@ int main (void)
 
     INVFLG = 0xFF;
 
+    /* The text marker (DESIGN.md 3.9), directly before the buffer */
+    {
+        const unsigned char* m = (const unsigned char*) s80_buf - 16;
+        check ("text marker",
+               memcmp (m, "A2SCR80", 7) == 0 && m[7] == 1
+               && m[8] == 80 && m[9] == 24 && m[10] == 70 && m[11] == 1
+               && *(unsigned char**) (m + 12) == s80_left_addr
+               && *(void**) (m + 14) == (void*) s80_buf);
+    }
+
     /* The default font, and the cell layout */
     clrscr ();
     cputc ('A');
@@ -256,6 +268,9 @@ int main (void)
     t = cycles () - t0;
     printf ("  pan, 69 columns in every row: %lu cycles\n", t);
     check ("page matches after pan", screen_ok ());
+
+    run_destructors ();
+    check ("no text marker after exit", *((unsigned char*) s80_buf - 16) == 0);
 
     printf ("%u FAILED\n", fails);
     return fails;

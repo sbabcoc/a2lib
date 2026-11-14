@@ -15,8 +15,9 @@
 **        lib/apple2-dos33-vts70.lib
 **
 ** Soft-70 is drawn for monochrome monitors; on a colour monitor its text
-** shows colour fringes, as hi-res text did on a real II+. See DESIGN.md
-** section 3.8.
+** shows colour fringes, as hi-res text did on a real II+. While it runs, a
+** marker before its 80 x 24 buffer lets emulators copy the screen's text
+** (DESIGN.md 3.9). See DESIGN.md section 3.8.
 **
 ** Copyright (c) 2026 Scott Babcock. zlib license; see LICENSE.
 */

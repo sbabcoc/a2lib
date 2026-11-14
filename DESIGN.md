@@ -813,6 +813,49 @@ buffer (1,920), the font (768), row extents and the gauge's bar (64). The
 default font (768) and the startup code are in `ONCE`, reused as BSS
 after startup.
 
+### 3.9 Text marker: copying Soft-70's text (increment 9)
+
+**Problem.** An emulator's text copy reads the text page (`$400`-`$7FF`),
+where text-mode characters live. While Soft-70 is shown, the text page
+holds nothing: the text exists only in a2lib's 80 × 24 buffer, at an
+address the linker picks, in a2lib's own encoding. Recognising characters
+from the hi-res image was considered and rejected as too complicated
+(decision). Reading the buffer is memory inspection, as the standard copy
+already does; what's needed is a way to find it without knowing a2lib's
+link map.
+
+**Decision: a marker directly before the buffer.** Soft-70's constructor
+writes 16 bytes immediately before the buffer; the destructor clears the
+first byte at exit. A tool (ReplicApple2Plus's Copy) searches `$0800`-
+`$1FFF` for the signature while hi-res is shown and, if it finds one,
+copies the whole 80 × 24 screen, including the columns panned out of view.
+The format is documented here, so any program can use it.
+
+| Offset | Bytes | Contents |
+|---|---|---|
+| 0 | 7 | Signature: ASCII `A2SCR80`, bit 7 clear |
+| 7 | 1 | Version: 1 |
+| 8 | 1 | Columns (80) |
+| 9 | 1 | Rows (24) |
+| 10 | 1 | Visible columns (70) |
+| 11 | 1 | Encoding (below) |
+| 12 | 2 | Address of the leftmost visible column (one byte), low byte first |
+| 14 | 2 | Address of the buffer, low byte first (offset 16, directly after) |
+
+**Encoding 1 (Soft-70).** The buffer holds rows of 80 bytes, top first.
+Each byte XOR `$A0` is a screen code: bit 7 set for normal video, clear
+for inverse; bits 0-6 the character, with `$00`-`$1F` standing for
+controls shown as their letters (`$40`-`$5F`). So a blank screen is all
+zeros. Encoding 0 (the text screen's own codes) is reserved for the
+40-column window, which writes no marker: its buffer is in BSS, which the
+constructor must not write (10.12), and the text page already shows its
+visible 40 columns.
+
+**Limits.** A program that stops without running its destructors (a crash,
+RESET) leaves the marker in memory; a later hi-res program could then be
+mistaken for Soft-70 text. The VideoTerm build writes no marker when the
+card is in use, since the card holds the text.
+
 ---
 
 ## 4. DOS 3.3 file layer: architecture
@@ -1911,6 +1954,7 @@ on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
 | `test/vttest.c`, `reflowtest.c`, `cswtest.c` | Emulator tests, also built as `s70test`, `reflows70`, `cswstest` |
 | `test/sim/s70sim.c`, `s70shim.s`, `sim4000.cfg` | sim65 regression test |
 | `test/sim/bssfill.s`, `gaugesim.c` | Check that startup leaves a BSS buffer to `crt0` |
+| `libsrc/s80/s80.s` (marker), `s70sim.c` | Text marker (3.9) and its check |
 
 **Verified, refactoring.** A differential sim65 run of the window before
 and after the extraction: 3,000 random conio operations (characters,

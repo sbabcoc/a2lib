@@ -28,3 +28,7 @@ normal:
 .macro  S80_PEEK
         and     #$7F
 .endmacro
+
+; Encoding of the buffer for the text marker (DESIGN.md 3.9): bytes XOR
+; $A0 give these screen codes
+S80_TEXTENC     = 1

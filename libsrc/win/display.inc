@@ -20,3 +20,8 @@ S80_STEP        = 20
 .macro  S80_PEEK
         eor     #$80
 .endmacro
+
+; Encoding of the buffer for the text marker (DESIGN.md 3.9; the window,
+; with its buffer in BSS, writes none): bytes XOR $A0 give text screen
+; codes
+S80_TEXTENC     = 0

@@ -60,7 +60,7 @@ GAUGE_TICKS     = MS_TICKS(1000)
 
 s80init:
         bit     vt_active
-        bmi     :+
+        bmi     initdone
         lda     CSWL
         sta     savecsw
         lda     CSWL+1
@@ -76,6 +76,14 @@ s80init:
         ; overwrite this code
         .if .not .xmatch(S80_BUFSEG, "BSS")
         jsr     clearbuf
+
+        ; The text marker, for emulators and other tools that copy the
+        ; screen's text (DESIGN.md 3.9)
+        ldx     #MARKLEN-1
+:       lda     marktpl,x
+        sta     s80_marker,x
+        dex
+        bpl     :-
         .endif
 
         ; Console output into the model.
@@ -104,13 +112,34 @@ direct: lda     #<s80_cout
         sta     CSWL
         lda     #>s80_cout
         sta     CSWL+1
-:       rts
+initdone:
+        rts
+
+        .if .not .xmatch(S80_BUFSEG, "BSS")
+
+; The text marker (DESIGN.md 3.9): written before the buffer at startup,
+; its first byte cleared at exit
+marktpl:
+        .byte   "A2SCR80"       ; Signature
+        .byte   1               ; Version
+        .byte   S80_COLS, S80_ROWS, S80_VIEW
+        .byte   S80_TEXTENC     ; Encoding of the buffer's bytes
+        .addr   s80_left        ; Leftmost visible column (a byte)
+        .addr   s80_buf         ; The buffer: rows of S80_COLS bytes
+MARKLEN = * - marktpl
+        .assert MARKLEN = 16, error, "text marker is 16 bytes"
+        .endif
 
         .code
 
 s80done:
         bit     vt_active
         bmi     done
+
+        .if .not .xmatch(S80_BUFSEG, "BSS")
+        lda     #$00            ; No text marker after exit
+        sta     s80_marker
+        .endif
 
         ; Remove the gauge, if shown
         bit     gslot
@@ -494,4 +523,7 @@ savedos:        .word   $0000
 
         .segment        S80_BUFSEG
 
+        .if .not .xmatch(S80_BUFSEG, "BSS")
+s80_marker:     .res    MARKLEN         ; Directly before the buffer
+        .endif
 s80_buf:        .res    S80_COLS * S80_ROWS
