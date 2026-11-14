@@ -10,14 +10,22 @@
 ; links vt.s, whose constructor detects the card.
 ; (DESIGN.md 3.4).
 
-        .export         COUT
+        .export         COUT, a2_rawcout, a2_coutvec
 
         .include        "apple2.inc"
         .include        "vt.inc"
 
+; COUT is a JMP in DATA that reflow.s's reflow_on points at its filter
+; (DESIGN.md 3.7); a2_rawcout is the output routine itself.
+
+        .data
+
+COUT:   jmp     a2_rawcout
+a2_coutvec      = COUT + 1      ; The JMP's target
+
         .segment        "LOWCODE"
 
-COUT:
+a2_rawcout:
         bit     vt_active
         bpl     :+
         jmp     vt_write        ; Same as COUT through the hook, minus banking

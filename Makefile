@@ -88,7 +88,8 @@ $(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o $(DOS33_LIB)
 	cp $(DOS33_LIB) $@
 	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ)
 
-test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest
+test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest \
+      build/test/reflowtest build/test/reflowvt build/test/reflowwin
 
 build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -110,6 +111,18 @@ build/test/cswwtest: test/cswtest.c test/cswcout.s $(VTWIN_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ test/cswtest.c test/cswcout.s $(VTWIN_LIB)
 
+build/test/reflowtest: test/reflowtest.c $(DOS33_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
+
+build/test/reflowvt: test/reflowtest.c $(VT_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(VT_LIB)
+
+build/test/reflowwin: test/reflowtest.c $(VTWIN_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(VTWIN_LIB)
+
 build/test/timertest: test/timertest.c test/timerzp.s $(DOS33_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/timertest.c test/timerzp.s $(DOS33_LIB)
@@ -118,6 +131,7 @@ build/test/timertest: test/timertest.c test/timerzp.s $(DOS33_LIB)
 # Apple II: the timer modules and the window's gauge, built for sim6502.
 SIM_DIR  := build/sim
 SIM_MODS := timer tick kbhit gettime settime
+SIM_REFLOW := $(SIM_DIR)/reflow.o
 SIM_OBJ  := $(patsubst %,$(SIM_DIR)/%.o,$(SIM_MODS))
 SIM65    ?= sim65
 
@@ -135,9 +149,13 @@ $(SIM_DIR)/timersim: test/sim/timersim.c test/sim/shim.s test/timerzp.s $(SIM_OB
 $(SIM_DIR)/gaugesim: test/sim/gaugesim.c test/sim/shim.s test/sim/winshim.s $(SIM_DIR)/win.o $(SIM_OBJ)
 	$(CL65) -t sim6502 -C test/sim/sim0c00.cfg -O -I include -o $@ $^
 
-simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim
+$(SIM_DIR)/reflowsim: test/sim/reflowsim.c test/sim/reflowshim.s $(SIM_REFLOW)
+	$(CL65) -t sim6502 -O -I include -o $@ $^
+
+simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim
 	$(SIM65) $(SIM_DIR)/timersim
 	$(SIM65) $(SIM_DIR)/gaugesim
+	$(SIM65) $(SIM_DIR)/reflowsim
 
 clean:
 	rm -rf build lib

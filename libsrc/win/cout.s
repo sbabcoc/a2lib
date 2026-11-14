@@ -7,14 +7,22 @@
 ; does) also links vt.s and win.s, whose constructors set up the display.
 ;
 
-        .export         COUT
+        .export         COUT, a2_rawcout, a2_coutvec
 
         .include        "win.inc"
         .include        "vt.inc"
 
+; COUT is a JMP in DATA that reflow.s's reflow_on points at its filter
+; (DESIGN.md 3.7); a2_rawcout is the output routine itself.
+
+        .data
+
+COUT:   jmp     a2_rawcout
+a2_coutvec      = COUT + 1      ; The JMP's target
+
         .segment        "LOWCODE"
 
-COUT:
+a2_rawcout:
         bit     vt_active
         bpl     :+
         jmp     vt_write

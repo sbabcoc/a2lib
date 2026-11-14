@@ -21,6 +21,8 @@ explaining the change:
   is in use.
 - `gettime.s`, `settime.s` (from `libsrc/apple2/`): the stock code runs
   under ProDOS; a software clock is added for DOS 3.3.
+- `cout.s` (from `libsrc/apple2/cout.s`): `COUT` is a vector, so the
+  reflow filter can be switched in; the stock routine is `a2_rawcout`.
 
 Because these replace stock modules in `lib/apple2-dos33.lib`, compare
 them with cc65's versions after updating cc65.

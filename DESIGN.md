@@ -168,6 +168,9 @@ reflow.
   itself there; but the VideoTerm and window libraries' `cout.s` call
   `vt_write`/`win_cout` directly, bypassing `CSW`, so they need a hook
   vector (or to route through `CSW`, at a small speed cost).
+  **Resolved in 3.7:** a vector in every library's `cout.s`, the one
+  routine all stdio console output passes through; not `CSW`, which DOS
+  3.3 manages (3.5).
 - **Reflow breaks lines at the viewport width (decision):** the width
   actually visible, 80 on the VideoTerm and 40 in the window and on the
   stock screen. In the window, the program's screen is 80 columns wide
@@ -461,6 +464,72 @@ the program's output.
 **Size.** `win.o` is 663 bytes of code and tables, plus the 1,920-byte
 buffer in BSS (no file space); the window's conio modules add a little
 on top.
+
+### 3.7 Reflow filter implementation (increment 8)
+
+**Hook (decision).** All stdio console output passes through `COUT` in
+the library's `cout.s`: `write.s` sends each character there, and
+`read.s` sends its echo of typed input. In every library, `COUT` is now
+a 3-byte `JMP` in DATA whose target is the output routine itself
+(`a2_rawcout`); `reflow_on` repoints it at the filter and `reflow_off`
+restores it. Programs that never call `reflow_on` pay those 3 bytes and
+3 cycles per character, and don't link the filter (every test program
+grew by exactly 3 bytes). `CSW` was rejected as the hook: DOS 3.3
+manages it (3.5), and the VideoTerm and window libraries' stdio output
+doesn't go through it.
+
+**What the filter must preserve (verified in cc65's source).** `write.s`
+relies on `COUT` preserving X and Y (its comment says so), and `read.s`
+uses A after echoing through `COUT`; `write.s` keeps its buffer pointer
+and count in the zero page. The filter therefore preserves A, X and Y
+and uses no zero page.
+
+**Nothing held back (decision).** A buffering word-wrapper holds each
+word until the next space, so a prompt such as `Name?` would stay
+invisible while the program waits for input. The filter instead prints
+each character at once and keeps the current word (up to 80 characters,
+in BSS). When a word would overflow the line, it backs up over the
+word with backspaces, blanks it, breaks the line, and prints the word
+again. A word that fills a whole line is broken there.
+
+**Line length: width - 1 (decision).** The backends wrap differently at
+the right edge: the stock screen wraps immediately after the last
+column, the VideoTerm and the window on the next character. A line that
+exactly filled the width would therefore be followed by a blank line on
+one backend but not the others when the text's own line break came
+next. Holding lines to width - 1 characters means the filter never
+relies on the display's wrap, so output looks the same on every
+backend, at the cost of one column.
+
+**Spaces.** A space that ends a full line becomes the line break.
+Spaces at the start of a line the filter began are dropped; spaces
+after the text's own line break are kept, so indentation survives.
+Other control characters pass through; backspace moves the filter's
+column back one.
+
+**Width.** `reflow_on(width)` takes 2-81 (values outside are clamped);
+0 means the visible width, from a small per-library module
+`viewport.s` (`a2_viewport`): the monitor's window width (40) in the
+base library; 80 on the VideoTerm; in the window library, 40 (the
+visible columns, as decided in 3.2) or 80 on the VideoTerm.
+
+**Column tracking.** The filter counts columns itself, starting from
+`wherex` at `reflow_on`. After moving the cursor with conio, a program
+calls `reflow_on` again. Typed input echoed by stdio passes through the
+filter too.
+
+**Size.** `reflow.s` is 304 bytes resident plus 87 bytes of BSS (the
+estimate before implementation, 150-250 bytes plus an 80-byte buffer,
+was low); `viewport.s` 3 to 10 bytes; the `COUT` vector 3 bytes.
+
+**Testing.** `test/sim/reflowsim.c` (`make simtest`) links the real
+`reflow.s` with stubs that record what it sends to the screen, renders
+that onto a model screen, and compares against wrapping worked out by
+hand: greedy wrapping, moved and broken words, dropped and kept spaces,
+the starting column, backspace, the viewport default (40 and 80),
+`reflow_off`, and register preservation. `test/reflowtest.c`, built for
+all three libraries, prints through the filter on the Apple II and reads
+the screen back with `cpeekc`.
 
 ---
 
@@ -1517,11 +1586,28 @@ staying in `CSW` (`$9EBD`) and the backend's routine as DOS's true output
 handler before and after input. As regression checks, `vttest` (with the
 card, 16 checks) and `wintest` (without it, 22 checks) passed too.
 
-### 10.9 Next increments
+### 10.10 Increment 8: reflow filter
 
-- Display backends: the reflow filter (decided in 3.2: activated at run
-  time, linked on demand, breaking at the viewport width) and Soft-70
-  (section 3)
+| File | Role |
+|---|---|
+| `libsrc/dos33/reflow.s` | The filter, `reflow_on`, `reflow_off` (3.7) |
+| `libsrc/dos33/cout.s` | Modified copy of stock `cout.s`: `COUT` as a vector |
+| `libsrc/vt/cout.s`, `libsrc/win/cout.s` | The same vector in the other libraries |
+| `libsrc/{dos33,vt,win}/viewport.s` | Visible width for each library |
+| `include/a2reflow.h` | Public API |
+| `test/reflowtest.c` | Emulator test, built as `reflowtest`, `reflowvt`, `reflowwin` |
+| `test/sim/reflowsim.c`, `reflowshim.s` | sim65 regression test |
+
+**Verified:** `make simtest` passes all reflow cases.
+
+**First run, in ReplicApple2Plus under DOS 3.3:** all three builds
+passed: `reflowtest` on the stock screen (`W=40`, 6 checks), `reflowvt`
+on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
+(`W=40`, 7, including that the window didn't pan).
+
+### 10.11 Next increments
+
+- Display backends: Soft-70 (section 3)
 - Emulator test fixture (section 8)
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)
 

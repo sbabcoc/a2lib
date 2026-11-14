@@ -13,6 +13,9 @@ full-featured on a stock II+:
   falls back to either the stock 40-column screen or a 40-column window
   onto an 80 × 24 screen, which follows the cursor or pans under program
   control. An optional hi-res "Soft-70" display is planned.
+- **Reflow.** stdio output can be word-wrapped at the visible width,
+  switched on and off as a program runs (`include/a2reflow.h`), for
+  running text such as documents.
 - **Cooperative timer and software clock.** A stock II+ has no timer, so
   a2lib counts time while programs wait in the library (for keys,
   network packets, or explicitly), and runs timer callbacks then:
@@ -50,8 +53,10 @@ for the Uthernet II.
   40-column window's position gauge, and an IP65 timer driver. It passes
   all its tests under DOS 3.3 and the sim65 regression tests
   (`make simtest`).
+- **Increment 8** adds the reflow filter, and passes all its tests on the
+  stock screen, the VideoTerm and the 40-column window.
 
-Next: the reflow filter and Soft-70.
+Next: Soft-70.
 
 ## Building
 
