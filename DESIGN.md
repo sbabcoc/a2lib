@@ -1641,7 +1641,10 @@ passed only because the offset was 0). They now test the loop end with
   tests, which count only failures, `0 FAILED`. filetest and timertest
   return to BASIC after their summary rather than waiting for a key, so
   their runs end on `PASSED`; a failing run of either waits out its
-  timeout.
+  timeout. timertest's INPUT checks need 100 ms of counted time between
+  its prompt and the end of the typed line; the runner types as soon as
+  it sees the prompt, which once fell short, so its run pauses half a
+  second (`--wait 0.5`) before typing, as a person would.
 - **Differential testing:**
   - Build the same test programs for ProDOS and DOS 3.3 and compare
     results, with ProDOS as the reference for file-layer behavior.

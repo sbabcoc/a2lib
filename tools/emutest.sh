@@ -31,7 +31,12 @@ run() {
     set -- --roms "$EMU_ROMS" --d1 "$DOS33_MASTER" --d2 "$DISKS/$name.dsk" \
         --timeout "$EMU_TIMEOUT" --screen "$screen" --type "BRUN $upper,D2\\r"
     [ "$config" = vt ] && set -- "$@" --videoterm
-    [ "$input" = input ] && set -- "$@" --expect "TYPE A WORD" --type "HELLO\\r"
+    if [ "$input" = input ]; then
+        set -- "$@" --expect "TYPE A WORD"
+        # timertest counts the time spent waiting for the word: pause as a person would
+        [ "$name" = timertest ] && set -- "$@" --wait 0.5
+        set -- "$@" --type "HELLO\\r"
+    fi
     case $name in
         # filetest and timertest return to BASIC after their summary
         filetest|timertest) set -- "$@" --until "PASSED" ;;
