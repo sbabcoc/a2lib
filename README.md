@@ -151,6 +151,14 @@ and `test/timertest.c` the timer and clock. The target test environment
 is the [ReplicApple2Plus](https://github.com/sbabcoc/ReplicApple2Plus)
 emulator.
 
+`make emutest` runs every test program on ReplicApple2Plus's headless
+runner, each from its own disk built with AppleCommander (`ac`), in the
+configurations its source comment names, and reports `PASS` or `FAIL` for
+each run; screens are kept in `build/emutest`. It needs the runner
+(`./gradlew installDist` in ReplicApple2Plus), the ROM folder and a DOS 3.3
+System Master; `EMU_RUN`, `EMU_ROMS` and `DOS33_MASTER` name them (see the
+Makefile for the defaults).
+
 `make simtest` runs regression tests for the timer, the window's gauge,
 the reflow filter and Soft-70 in cc65's 6502 simulator, `sim65`, with no
 Apple II needed.

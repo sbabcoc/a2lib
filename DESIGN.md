@@ -1628,11 +1628,20 @@ passed only because the offset was 0). They now test the loop end with
 
 ## 8. Testing
 
-- **Emulator:** ReplicApple2Plus. Headless JUnit 5 tests already run the
-  real system ROM and VideoTerm firmware, inject keystrokes, and read the
-  80-column text with `VideoTermRenderer.text(card)`. Disk II and DSK/WOZ
-  image tests exist too. **Remaining work:** a fixture that boots a disk
-  image, runs a binary, and captures the screen.
+- **Emulator:** ReplicApple2Plus. Its headless runner
+  (`replicapple2plus-run`) boots a disk, types through the emulated
+  keyboard, waits for text on screen, and writes the screen's text out:
+  the text page, the VideoTerm's 80 columns, or Soft-70's buffer through
+  the text marker (3.9). `make emutest` (`tools/emutest.sh`) runs every
+  test program on it. **Decisions:** each program gets its own disk, so
+  the disk's free space never limits filetest's files or the number of
+  tests; each program runs in the configurations its source comment
+  names (with the VideoTerm, without it, or both); a run passes when the
+  runner finishes and the screen shows `ALL n PASSED`, or, for the CSW
+  tests, which count only failures, `0 FAILED`. filetest and timertest
+  return to BASIC after their summary rather than waiting for a key, so
+  their runs end on `PASSED`; a failing run of either waits out its
+  timeout.
 - **Differential testing:**
   - Build the same test programs for ProDOS and DOS 3.3 and compare
     results, with ProDOS as the reference for file-layer behavior.
