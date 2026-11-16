@@ -1739,7 +1739,8 @@ passed only because the offset was 0). They now test the loop end with
   cc65's Contributing.md asks contributors to ask whether work is wanted
   before preparing it and to keep one pull request per change, so it is
   a question with the code linked, not a pull request. It also names the
-  `crt0` reordering (6.1).
+  `crt0` reordering (6.1). Posted as cc65/cc65 issue #3050
+  (<https://github.com/cc65/cc65/issues/3050>), 2026-11-16.
 - ProDOS behavior is unchanged by default (backward compatibility); the
   swap is available as an opt-in module (section 5.1).
 
