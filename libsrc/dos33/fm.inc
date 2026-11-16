@@ -138,7 +138,7 @@ FCB_TEXT        = $80           ; FCB::KIND value for T files
         .global         rwts_read, rwts_maperr
         .global         rwts_slot, rwts_drive, rwts_volume
         .global         rwts_track, rwts_sector, rwts_buf
-        .global         fm_tempfcb, fm_freefcb
+        .global         fm_tempfcb, fm_freefcb, fm_isopen
 
 ; ------------------------------------------------------------------------
 ; Directories. DIRENT must match struct dirent in include/dirent.h.

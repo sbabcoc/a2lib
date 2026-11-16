@@ -1114,10 +1114,19 @@ some mechanism is required. **Decision:** use DOS 3.3's own syntax.
   If that fails, they return ProDOS code `$25`, which maps to `ENOMEM`;
   the ProDOS table has no closer code, because stock cc65 allocates
   nothing for these calls.
-- **Known difference (open):** ProDOS refuses to delete or rename an open
-  file (`$50`, `EINVAL`). DOS 3.3 doesn't check, and this layer doesn't
-  yet record names in the control block to detect it. Deleting or
-  renaming a file that is open is therefore not detected.
+- **An open file can't be deleted or renamed, as under ProDOS** (`$50`,
+  `EINVAL`). DOS 3.3 itself doesn't check. Before DELETE or RENAME, both
+  OPEN the file in the temporary control block without allocating it,
+  CLOSE it, and compare the work area's first T/S list (track, sector),
+  slot and drive ("Beneath Apple DOS" ch. 6, work area offsets `$00`-`$01`,
+  `$26`, `$27`) with those of every open file (`fm_isopen`, `fmtemp.s`).
+  The first T/S list is unique on a disk, so a file is recognised under
+  any name it's opened by. A file missing or locked fails as before. The
+  check costs a catalog search, as DELETE and RENAME make anyway.
+  **Limit:** the volume number isn't compared, since disks commonly share
+  254; after swapping disks in a drive while a file is open, a file on the
+  new disk whose first T/S list happens to be in the same place is
+  refused too. Added in increment 10 (10.13).
 
 ### 5.6 Error mapping
 
@@ -1954,7 +1963,8 @@ on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
 - Display backends: Soft-70 (3.8): increment 9, 10.12
 - Emulator test fixture (section 8): ReplicApple2Plus 1.8.0's headless
   runner and `make emutest`
-- Detect deleting or renaming an open file, as ProDOS does (5.5a)
+- Detect deleting or renaming an open file, as ProDOS does (5.5a): done,
+  10.13
 
 ### 10.12 Increment 9: shared 80 × 24 model, Soft-70
 
@@ -2024,6 +2034,21 @@ past the cell it wrote (it now reads that cell), and `reflows70`'s
 heading said "WINDOW". The emulator run also showed the underscore
 (bottom scanline) touching the capitals of the line below; it stays
 there, as in the period fonts (decision).
+
+### 10.13 Increment 10: open files can't be deleted or renamed
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/fmtemp.s` | `fm_isopen`: whether a named file is open |
+| `libsrc/dos33/fm.inc` | Declares `fm_isopen` |
+| `libsrc/dos33/sysremove.s`, `sysrename.s` | Refuse an open file with `$50` (`EINVAL`) |
+| `test/filetest.c` | Three checks in REMOVE, RENAME |
+
+**Verified with `make emutest`** (ReplicApple2Plus 1.8.0's runner, DOS 3.3
+System Master). The new checks were run first against the unchanged
+library and failed ("remove open file", and "remove after close", since
+the open file had been deleted); with the change, `filetest` passes all 68
+checks, and the other 14 runs still pass.
 
 ## 11. Sources
 

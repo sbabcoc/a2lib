@@ -269,6 +269,18 @@ static void remove_rename (void)
     check ("rename new suffix", rename ("T.NEW", "T.X,D1") == -1 && errno == EINVAL);
     errno = 0;
     check ("rename missing", rename ("T.OLD", "T.Y") == -1 && errno == ENOENT);
+
+    /* An open file can't be removed or renamed, as under ProDOS ($50,
+    ** EINVAL); other files can */
+    remove ("T.OPEN2");         /* Left over from an earlier run */
+    make_file ("T.OPEN", "X", 1);
+    fd = open ("T.OPEN", O_RDONLY);
+    errno = 0;
+    check ("remove open file", fd >= 0 && remove ("T.OPEN") == -1 && errno == EINVAL
+                               && rename ("T.OPEN", "T.OPEN2") == -1 && errno == EINVAL);
+    check ("others while one is open", remove ("T.NEW") == 0);
+    close (fd);
+    check ("remove after close", remove ("T.OPEN") == 0);
 }
 
 /* stat (DESIGN.md 5.8) */

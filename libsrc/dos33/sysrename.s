@@ -12,7 +12,8 @@
 ;   - DOS's RENAME doesn't check whether the new name is already in use
 ;     and would leave two files with the same name. As under ProDOS, an
 ;     existing new name fails with EEXIST.
-;   - A locked file fails with EACCES, as under ProDOS.
+;   - A locked file fails with EACCES, and an open file with EINVAL, as
+;     under ProDOS (DESIGN.md 5.5a).
 ;
 ; See DESIGN.md 5.5.
 ;
@@ -20,6 +21,8 @@
         .export         __sysrename
         .import         __dos_type
         .import         popax
+
+        .macpack        longbranch
 
         .include        "zeropage.inc"
         .include        "fm.inc"
@@ -56,7 +59,7 @@ badname:
         rts
 
 :       jsr     fm_tempfcb
-        bcs     done
+        jcs     done
         jsr     fm_begin
 
         ; Parse the new name and keep it
@@ -70,7 +73,16 @@ badname:
         dex
         bpl     :-
 
-        ; Parse the old name: sets the name, volume, drive and slot
+        ; Parse the old name: sets the name, volume, drive and slot. An
+        ; open file can't be renamed; the check leaves the parameter list
+        ; to be set up again.
+        lda     oldname
+        ldx     oldname+1
+        jsr     fm_name
+        bcs     free
+        jsr     fm_isopen
+        bcs     free
+        jsr     fm_begin
         lda     oldname
         ldx     oldname+1
         jsr     fm_name

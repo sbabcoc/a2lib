@@ -5,7 +5,8 @@
 ;
 ; Replaces libsrc/apple2/sysremove.s from cc65. remove() passes the result
 ; to ___mappederrno, so it returns 0 or a ProDOS-equivalent error code
-; (DESIGN.md 5.6). A locked file fails with EACCES, as under ProDOS.
+; (DESIGN.md 5.6). As under ProDOS, a locked file fails with EACCES, and
+; an open file with EINVAL (DESIGN.md 5.5a).
 ;
 
         .export         __sysremove
@@ -28,6 +29,13 @@ __sysremove:
 
 :       jsr     fm_tempfcb
         bcs     done
+        jsr     fm_begin
+        lda     name
+        ldx     name+1
+        jsr     fm_name
+        bcs     free
+        jsr     fm_isopen       ; An open file can't be deleted
+        bcs     free
         jsr     fm_begin
         lda     name
         ldx     name+1
