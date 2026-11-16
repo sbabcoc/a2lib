@@ -1628,23 +1628,22 @@ passed only because the offset was 0). They now test the loop end with
 
 ## 8. Testing
 
-- **Emulator:** ReplicApple2Plus. Its headless runner
-  (`replicapple2plus-run`) boots a disk, types through the emulated
-  keyboard, waits for text on screen, and writes the screen's text out:
-  the text page, the VideoTerm's 80 columns, or Soft-70's buffer through
-  the text marker (3.9). `make emutest` (`tools/emutest.sh`) runs every
-  test program on it. **Decisions:** each program gets its own disk, so
-  the disk's free space never limits filetest's files or the number of
-  tests; each program runs in the configurations its source comment
-  names (with the VideoTerm, without it, or both); a run passes when the
-  runner finishes and the screen shows `ALL n PASSED`, or, for the CSW
-  tests, which count only failures, `0 FAILED`. filetest and timertest
-  return to BASIC after their summary rather than waiting for a key, so
-  their runs end on `PASSED`; a failing run of either waits out its
-  timeout. timertest's INPUT checks need 100 ms of counted time between
-  its prompt and the end of the typed line; the runner types as soon as
-  it sees the prompt, which once fell short, so its run pauses half a
-  second (`--wait 0.5`) before typing, as a person would.
+- **Emulator:** ReplicApple2Plus. Its headless runner (1.8.0,
+  `replicapple2plus-run`) boots a disk, types into the emulated keyboard,
+  runs unthrottled until given text is on screen, and writes the screen's
+  text: the text page, the VideoTerm's 80 columns, or a Soft-70 screen
+  found by its text marker (3.9). `make emutest MASTER=...`
+  (`test/emutest.sh`) builds a test disk with AppleCommander, runs each
+  test program with the DOS 3.3 System Master in drive 1 and the disk in
+  drive 2, with and without the VideoTerm as each needs, and checks each
+  screen's summary line ("ALL n PASSED", or "0 FAILED" for the CSW
+  tests). Screens are kept in `build/emu/`. `RUNS="..."` picks runs by
+  name; `RUNNER` and `AC` name the tools if they aren't on `PATH`.
+  Scripted input: the CSW tests and `timertest` are typed a word at their
+  prompt (`timertest` after a 0.2 s pause, since it checks that 100 ms
+  pass during input). `filetest` and `timertest` end with their summary
+  rather than "PRESS A KEY", so a failing run reaches the timeout (300 s
+  of emulated time) before it is reported, with the summary it shows.
 - **Differential testing:**
   - Build the same test programs for ProDOS and DOS 3.3 and compare
     results, with ProDOS as the reference for file-layer behavior.
@@ -1947,7 +1946,8 @@ on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
 - Monochrome monitor setting in ReplicApple2Plus (3.8): done, in that
   project, with the half-pixel shift
 - Display backends: Soft-70 (3.8): increment 9, 10.12
-- Emulator test fixture (section 8)
+- Emulator test fixture (section 8): ReplicApple2Plus 1.8.0's headless
+  runner and `make emutest`
 - Detect deleting or renaming an open file, as ProDOS does (5.5a)
 
 ### 10.12 Increment 9: shared 80 × 24 model, Soft-70

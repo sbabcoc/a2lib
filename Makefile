@@ -52,7 +52,7 @@ WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC)) \
 WIN_INC := $(wildcard libsrc/win/*.inc) $(S80_INC)
 VTWIN_LIB := lib/apple2-dos33-vtwin.lib
 
-.PHONY: all test simtest emutest clean
+.PHONY: emutest all test simtest clean
 
 S70_SRC := $(wildcard libsrc/s70/*.s)
 S70_OBJ := $(patsubst libsrc/s70/%.s,build/s70/%.o,$(S70_SRC)) \
@@ -128,6 +128,12 @@ $(VTS70_LIB): $(S70_OBJ) build/vt/vt.o $(DOS33_LIB)
 	$(AR65) r $@ build/vt/vt.o $(S70_OBJ)
 
 S70_LINK := --start-addr 0x4000
+
+# Runs the test programs on ReplicApple2Plus's headless runner (DESIGN.md
+# 8): make emutest MASTER=path/to/DOS-3.3-System-Master.woz [RUNS="..."]
+# RUNNER and AC name the runner and AppleCommander, if not on PATH.
+emutest: test
+	bash test/emutest.sh $(RUNS)
 
 test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest \
       build/test/reflowtest build/test/reflowvt build/test/reflowwin \
@@ -229,33 +235,6 @@ simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim $(SIM_DIR)
 	$(SIM65) $(SIM_DIR)/gaugesim
 	$(SIM65) $(SIM_DIR)/reflowsim
 	$(SIM65) $(SIM_DIR)/s70sim
-
-# Runs the test programs on the ReplicApple2Plus emulator, headless, each
-# in the configurations its source comment names (tools/emutest.sh). Each
-# program goes on its own disk, built with AppleCommander, and is BRUN from
-# drive 2 after booting the DOS 3.3 System Master. Screens are kept in
-# build/emutest. The runner comes from ReplicApple2Plus's
-# `./gradlew installDist`; override the paths below to suit.
-EMU_DIR      ?= $(HOME)/code/ReplicApple2Plus
-EMU_RUN      ?= $(EMU_DIR)/build/install/ReplicApple2Plus/bin/replicapple2plus-run
-EMU_ARTIFACTS ?= $(HOME)/code/apple-2-artifacts
-EMU_ROMS     ?= $(EMU_ARTIFACTS)/roms
-DOS33_MASTER ?= $(EMU_ARTIFACTS)/disks/DOS 3.3 System Master.woz
-EMU_TIMEOUT  ?= 120
-AC           ?= ac
-
-EMU_TESTS := filetest timertest vttest wintest s70test cswtest cswwtest cswstest \
-             reflowtest reflowvt reflowwin reflows70
-
-build/emutest/%.dsk: build/test/%
-	@mkdir -p $(@D)
-	rm -f $@
-	$(AC) -dos140 $@
-	$(AC) -as $@ $$(echo $* | tr a-z A-Z) < $<
-
-emutest: $(patsubst %,build/emutest/%.dsk,$(EMU_TESTS))
-	EMU_RUN='$(EMU_RUN)' EMU_ROMS='$(EMU_ROMS)' DOS33_MASTER='$(DOS33_MASTER)' \
-	EMU_TIMEOUT='$(EMU_TIMEOUT)' sh tools/emutest.sh build/emutest
 
 clean:
 	rm -rf build lib
