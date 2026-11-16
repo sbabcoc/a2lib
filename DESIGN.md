@@ -1644,6 +1644,12 @@ passed only because the offset was 0). They now test the loop end with
   pass during input). `filetest` and `timertest` end with their summary
   rather than "PRESS A KEY", so a failing run reaches the timeout (300 s
   of emulated time) before it is reported, with the summary it shows.
+  Verified with the 1.8.0 runner (built from its tag) and the DOS 3.3
+  System Master: all 15 runs pass in about 21 seconds, with the counts of
+  the manual runs (`filetest` 65, `timertest` 19, `vttest` 15/16,
+  `wintest` 22/16, `s70test` 23/16, reflow 6/6/7/7, CSW 0 failed); with
+  `s70test`'s old inverse-check fault put back, its run fails with "1 OF
+  23 FAILED" and the screen shows the failing check.
 - **Differential testing:**
   - Build the same test programs for ProDOS and DOS 3.3 and compare
     results, with ProDOS as the reference for file-layer behavior.
