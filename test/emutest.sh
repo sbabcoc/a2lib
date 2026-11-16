@@ -4,18 +4,25 @@
 #
 #   test/emutest.sh [name...]       (or: make emutest MASTER=...)
 #
-# Builds a DOS 3.3 disk holding the test programs (build/test/*), then runs
+# Builds DOS 3.3 disks holding the test programs (build/test/*), then runs
 # each program with ReplicApple2Plus's headless runner, booting the DOS 3.3
-# System Master in drive 1 with the test disk in drive 2, with and without
+# System Master in drive 1 with its test disk in drive 2, with and without
 # the VideoTerm as each test needs. Each run's screen is kept in build/emu/
 # and checked for its summary line. With names (for example "vttest" or
 # "vttest-vt"), only those runs.
 #
+# The network run (nettest) adds the Uthernet II in slot 3 and runs in real
+# time against an echo server on the host, which the card reaches through
+# its gateway, 10.0.2.2. It needs nettest built (make test IP65=...),
+# UTHERNET2, and python3 for the server; without the first two it's
+# skipped, unless named.
+#
 # Environment:
-#   MASTER   the DOS 3.3 System Master (DSK or WOZ); required
-#   RUNNER   the runner's launcher (default: replicapple2plus-run on PATH)
-#   AC       AppleCommander's command-line tool (default: ac)
-#   ROMS     a ROM folder for the runner (default: the runner's own choice)
+#   MASTER    the DOS 3.3 System Master (DSK or WOZ); required
+#   RUNNER    the runner's launcher (default: replicapple2plus-run on PATH)
+#   AC        AppleCommander's command-line tool (default: ac)
+#   ROMS      a ROM folder for the runner (default: the runner's own choice)
+#   UTHERNET2 the folder holding the Uthernet2 plug-in jar, for nettest
 #
 # Exit status: 0 if every run passed, 1 otherwise. Runs in bash 3.2 (macOS)
 # and later.
@@ -28,6 +35,7 @@ RUNNER="${RUNNER:-replicapple2plus-run}"
 AC="${AC:-ac}"
 OUT=build/emu
 DISK="$OUT/a2libtests.dsk"
+NET_DISK="$OUT/a2libnet.dsk"
 
 die() { echo "emutest: $*" >&2; exit 1; }
 upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }
@@ -36,10 +44,11 @@ upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }
 command -v "$RUNNER" >/dev/null || die "runner not found: $RUNNER (set RUNNER)"
 command -v "$AC" >/dev/null || die "AppleCommander not found: $AC (set AC)"
 
-# The runs: name | program | VideoTerm (vt or -) | script | --until text |
-# text that marks a pass. The script is --type/--expect/--wait steps after
-# BRUN. Programs that end with "PRESS A KEY" wait there; the others end
-# with their summary, and a failing one runs to the timeout.
+# The runs: name | program | card (vt for the VideoTerm, net for the
+# Uthernet II, or -) | script | --until text | text that marks a pass. The
+# script is --type/--expect/--wait steps after BRUN; @PORT@ in it is the
+# echo server's port. Programs that end with "PRESS A KEY" wait there; the
+# others end with their summary, and a failing one runs to the timeout.
 RUNS='
 filetest|filetest|-||PASSED|ALL [0-9]* PASSED
 timertest|timertest|-|--expect|TYPE A WORD|--wait|0.2|--type|HELLO\r|PASSED|ALL [0-9]* PASSED
@@ -56,6 +65,30 @@ reflows70|reflows70|-||PRESS A KEY|ALL [0-9]* PASSED
 cswtest-vt|cswtest|vt|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
 cswwtest|cswwtest|-|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
 cswstest|cswstest|-|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
+nettest|nettest|net|--expect|SERVER PORT|--type|@PORT@\r|PRESS A KEY|ALL [0-9]* PASSED
+'
+
+# Answers one connection: reads a line to its CR, waits two seconds (the
+# delay nettest times), and sends the line back. Its port goes to the file
+# named first.
+ECHO_SERVER='
+import socket, sys, time
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+s.listen(1)
+with open(sys.argv[1], "w") as f:
+    f.write(str(s.getsockname()[1]))
+s.settimeout(600)
+c, _ = s.accept()
+data = b""
+while not data.endswith(b"\r"):
+    chunk = c.recv(64)
+    if not chunk:
+        break
+    data += chunk
+time.sleep(2)
+c.sendall(data)
+c.close()
 '
 
 names="$(printf '%s\n' "$RUNS" | cut -d'|' -f1)"
@@ -63,17 +96,41 @@ for w in "$@"; do
     printf '%s\n' "$names" | grep -qx -- "$w" || die "no run named $w (runs: $(echo $names))"
 done
 
-mkdir -p "$OUT"
+# The network run takes what the others don't: drop it if that's missing,
+# or stop if it was asked for by name
+net_missing=
+[[ -f build/test/nettest ]] || net_missing="nettest isn't built (make test IP65=...)"
+[[ -z "$net_missing" && -z "${UTHERNET2:-}" ]] && net_missing="UTHERNET2 isn't set"
+[[ -z "$net_missing" && ! -d "$UTHERNET2" ]] && net_missing="UTHERNET2 isn't a folder: $UTHERNET2"
+[[ -z "$net_missing" ]] && ! command -v python3 >/dev/null && net_missing="python3 isn't on PATH"
+if [[ -n "$net_missing" ]]; then
+    for w in "$@"; do
+        [[ "$w" == nettest ]] && die "nettest: $net_missing"
+    done
+    (( $# == 0 )) && echo "SKIP nettest      $net_missing"
+    RUNS="$(printf '%s\n' "$RUNS" | grep -v '^nettest|')"
+fi
 
-# The test disk: every program the runs use, as DOS 3.3 binary files
-rm -f "$DISK"
-"$AC" -dos140 "$DISK" >/dev/null || die "couldn't create $DISK"
-for prog in $(printf '%s\n' "$RUNS" | cut -d'|' -f2 | sort -u); do
-    [[ -n "$prog" ]] || continue
-    [[ -f "build/test/$prog" ]] || die "build/test/$prog missing (make test first)"
-    "$AC" -as "$DISK" "$(upper "$prog")" < "build/test/$prog" >/dev/null \
-        || die "couldn't put $prog on $DISK"
-done
+mkdir -p "$OUT"
+printf '[3]\ntype=uthernet2\n\n[6]\ntype=disk2\n' > "$OUT/net.ini"
+
+# The test disks: the programs the runs use, as DOS 3.3 binary files. The
+# network run's program has a disk of its own, since with it the programs
+# would overflow one 140K disk.
+make_disk() {
+    local disk="$1" prog
+    shift
+    rm -f "$disk"
+    "$AC" -dos140 "$disk" >/dev/null || die "couldn't create $disk"
+    for prog in "$@"; do
+        [[ -f "build/test/$prog" ]] || die "build/test/$prog missing (make test first)"
+        "$AC" -as "$disk" "$(upper "$prog")" < "build/test/$prog" >/dev/null \
+            || die "couldn't put $prog on $disk"
+    done
+}
+make_disk "$DISK" $(printf '%s\n' "$RUNS" | grep -v '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u)
+printf '%s\n' "$RUNS" | grep -q '^[^|]*|[^|]*|net|' \
+    && make_disk "$NET_DISK" $(printf '%s\n' "$RUNS" | grep '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u)
 
 failed=0
 ran=0
@@ -95,10 +152,31 @@ while IFS= read -r line; do
     args=(--d1 "$MASTER" --d2 "$DISK" --type "BRUN $(upper "$prog"),D2\\r")
     [[ -n "${ROMS:-}" ]] && args=(--roms "$ROMS" "${args[@]}")
     [[ "$vt" == vt ]] && args+=(--videoterm)
-    args+=(${script[@]+"${script[@]}"} --until "$until_text" --timeout 300 --screen "$OUT/$name.txt")
+    timeout=300
+    server=
+    if [[ "$vt" == net ]]; then
+        # real time: the server's delay is real, and IP65's timeouts are counted
+        args=("${args[@]/#$DISK/$NET_DISK}")
+        args+=(--config "$OUT/net.ini" --plugins "$UTHERNET2" --real-time)
+        timeout=60
+        rm -f "$OUT/port"
+        python3 -c "$ECHO_SERVER" "$OUT/port" &
+        server=$!
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            [[ -s "$OUT/port" ]] && break
+            sleep 0.5
+        done
+        [[ -s "$OUT/port" ]] || die "the echo server didn't start"
+        script=("${script[@]//@PORT@/$(cat "$OUT/port")}")
+    fi
+    args+=(${script[@]+"${script[@]}"} --until "$until_text" --timeout "$timeout" --screen "$OUT/$name.txt")
 
     "$RUNNER" "${args[@]}" >/dev/null 2>"$OUT/$name.err"
     status=$?
+    if [[ -n "$server" ]]; then
+        kill "$server" 2>/dev/null
+        wait "$server" 2>/dev/null
+    fi
     ran=$((ran + 1))
     summary="$(grep -E -m1 "ALL [0-9]+ PASSED|[0-9]+ OF [0-9]+ FAILED|^[0-9]+ FAILED" "$OUT/$name.txt" 2>/dev/null)"
     if (( status == 0 )) && grep -q -E "$pass_re" "$OUT/$name.txt"; then

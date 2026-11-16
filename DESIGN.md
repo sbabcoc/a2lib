@@ -1659,6 +1659,34 @@ passed only because the offset was 0). They now test the loop end with
   `wintest` 22/16, `s70test` 23/16, reflow 6/6/7/7, CSW 0 failed); with
   `s70test`'s old inverse-check fault put back, its run fails with "1 OF
   23 FAILED" and the screen shows the failing check.
+- **Network run:** `test/nettest.c` exercises the IP65 timer driver (6.3)
+  with IP65 itself, which until now was checked only by its link map
+  (10.8). Linked with `lib/a2lib-ip65.o` ahead of IP65's libraries, it
+  brings up IP65 on an Uthernet II in slot 3, leases an address from the
+  emulated card's DHCP server, connects to an echo server on the host
+  through the card's gateway (10.0.2.2), and times the server's
+  two-second delay before it echoes, polling with `ip65_process` and
+  `a2_idle` as a program's idle loop would. Counted time must come to
+  1.5-2.6 s (it stands still while IP65 runs, so it falls a little
+  short), and `timer_read` must follow `a2_millis` to within a few ticks
+  -- IP65's own driver would instead add 33 ms per call, whatever time
+  passed. `make emutest` runs it with the Uthernet2 plug-in (ReplicApple2Plus
+  1.9.0's `--config` and `--plugins`) and in real time (`--real-time`), so
+  the server's two seconds are real ones; unthrottled, the same delay
+  would count as several times as long. `test/emutest.sh` starts the
+  server (Python) and types its port at the program's prompt. The run is
+  built only with `IP65=` and run only with `UTHERNET2=` (the plug-in's
+  folder); otherwise it's reported as skipped. `nettest` goes on a disk
+  of its own: with it, the programs come to more than one 140K disk
+  holds.
+  Verified with ReplicApple2Plus 1.9.0's runner, the DOS 3.3 System
+  Master, and cc65 and IP65 built from their current sources: IP65's own
+  `a2timer.o` stays out of the link, and `timer_read` comes from
+  `a2lib-ip65.o`. All 16 runs pass; `nettest` passes all 7 checks, with
+  the two seconds counted as 1,800-1,828 ms over four timed runs (IP65's
+  polling, uncounted, is the other 9%) and `timer_read` one tick (4 ms)
+  ahead of `a2_millis`. Unthrottled, the echo doesn't arrive within the
+  10 s of counted time the program allows, and the run fails 2 of 7.
 - **Differential testing:**
   - Build the same test programs for ProDOS and DOS 3.3 and compare
     results, with ProDOS as the reference for file-layer behavior.

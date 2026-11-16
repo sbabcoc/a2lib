@@ -62,6 +62,14 @@ VTS70_LIB := lib/apple2-dos33-vts70.lib
 
 IP65_OBJ := lib/a2lib-ip65.o
 
+# An IP65 checkout (https://github.com/cc65/ip65), for the network test,
+# with its TCP library and Uthernet II driver built (make -C ip65
+# ip65_tcp.lib; make -C drivers a2uther2.lib). Without IP65=, make test
+# leaves the network test out.
+IP65 ?=
+IP65_LIBS = $(IP65)/ip65/ip65_tcp.lib $(IP65)/drivers/a2uther2.lib
+NET_TEST := $(if $(IP65),build/test/nettest)
+
 all: $(DOS33_LIB) $(VT_LIB) $(VTWIN_LIB) $(VTS70_LIB) $(IP65_OBJ)
 
 build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
@@ -131,13 +139,15 @@ S70_LINK := --start-addr 0x4000
 
 # Runs the test programs on ReplicApple2Plus's headless runner (DESIGN.md
 # 8): make emutest MASTER=path/to/DOS-3.3-System-Master.woz [RUNS="..."]
-# RUNNER and AC name the runner and AppleCommander, if not on PATH.
+# RUNNER and AC name the runner and AppleCommander, if not on PATH. The
+# network run also needs IP65= (above) and UTHERNET2=, the folder holding
+# the Uthernet2 plug-in jar; without them it's skipped.
 emutest: test
 	bash test/emutest.sh $(RUNS)
 
 test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest \
       build/test/reflowtest build/test/reflowvt build/test/reflowwin \
-      build/test/s70test build/test/cswstest build/test/reflows70
+      build/test/s70test build/test/cswstest build/test/reflows70 $(NET_TEST)
 
 build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -186,6 +196,12 @@ build/test/reflows70: test/reflowtest.c $(VTS70_LIB)
 build/test/timertest: test/timertest.c test/timerzp.s $(DOS33_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/timertest.c test/timerzp.s $(DOS33_LIB)
+
+# The IP65 timer driver with IP65 and the Uthernet II: linked ahead of
+# IP65's libraries, so it replaces IP65's own timer_read
+build/test/nettest: test/nettest.c $(IP65_OBJ) $(DOS33_LIB) $(IP65_LIBS)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -I $(IP65)/inc -m $@.map -o $@ test/nettest.c $(IP65_OBJ) $(IP65_LIBS) $(DOS33_LIB)
 
 # Regression tests that run in cc65's 6502 simulator, sim65, without an
 # Apple II: the timer modules and the window's gauge, built for sim6502.

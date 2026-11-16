@@ -158,6 +158,18 @@ VideoTerm, and reports each run's result; screens go to `build/emu/`.
 `RUNS="vttest s70test-vt"` runs only those; `RUNNER=` and `AC=` give the
 tools' paths if they aren't on `PATH`.
 
+`test/nettest.c` runs the IP65 timer driver with IP65 itself, on the
+Uthernet II: it leases an address, echoes a line through a server on the
+host, and times the server's two-second delay. `make emutest` includes it
+when given an IP65 checkout with its TCP library and Uthernet II driver
+built, and the folder holding the
+[Uthernet2](https://github.com/sbabcoc/Uthernet2) plug-in jar
+(ReplicApple2Plus 1.9.0 or later, and `python3` for the server):
+
+```sh
+make emutest MASTER=... IP65=path/to/ip65 UTHERNET2=path/to/plugins
+```
+
 `make simtest` runs regression tests for the timer, the window's gauge,
 the reflow filter and Soft-70 in cc65's 6502 simulator, `sim65`, with no
 Apple II needed.
