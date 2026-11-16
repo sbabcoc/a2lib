@@ -1637,11 +1637,26 @@ passed only because the offset was 0). They now test the loop end with
 
 ## 8. Testing
 
-- **Emulator:** ReplicApple2Plus. Its headless runner (1.8.0,
-  `replicapple2plus-run`) boots a disk, types into the emulated keyboard,
-  runs unthrottled until given text is on screen, and writes the screen's
-  text: the text page, the VideoTerm's 80 columns, or a Soft-70 screen
-  found by its text marker (3.9). `make emutest MASTER=...`
+- **Emulator:** ReplicApple2Plus. Its headless runner
+  (`replicapple2plus-run`, from 1.8.0) boots a disk, types into the
+  emulated keyboard, runs until given text is on screen, and writes the
+  screen's text: the text page, the VideoTerm's 80 columns, or a Soft-70
+  screen found by its text marker (3.9). 1.9.0 completed it for every
+  Apple II project: it builds the machine from a slot configuration and
+  plug-ins as the application does (`--config`, `--folder`, `--plugins`),
+  so a run can have the Uthernet II or SoftCard II installed; it can pace
+  a run at the II+'s 1.023 MHz (`--real-time`); and it takes the boot
+  prompt to wait for (`--prompt`, `A>` for CP/M).
+- **Speed (decision).** Runs are unthrottled by default, several times
+  faster than a II+, and that doesn't change what a program does: the
+  emulation counts cycles, and a II+ has no clock but its CPU, so delay
+  loops, disk rotation and a2lib's timer all see emulated time, and the
+  runner's own times (`--wait`, `--timeout`) are emulated seconds too.
+  `timertest` gives the same results headless as in the application. The
+  exception is anything the outside world paces in real time: a network
+  server answers in wall-clock time, so an unthrottled program's
+  timeouts would expire several times too soon. Such runs use
+  `--real-time` (the network run below; unthrottled, it fails). `make emutest MASTER=...`
   (`test/emutest.sh`) builds a test disk with AppleCommander, runs each
   test program with the DOS 3.3 System Master in drive 1 and the disk in
   drive 2, with and without the VideoTerm as each needs, and checks each
@@ -1719,7 +1734,12 @@ passed only because the offset was 0). They now test the loop end with
 - **cc65 maintainers are contacted with working code**, not before
   implementation. This covers the `dirent` header change, the
   OS-independent `write.s` refactor, the proposed separate target, and
-  the `$0A`/`$0D` swap for ProDOS TXT files.
+  the `$0A`/`$0D` swap for ProDOS TXT files. The proposal, written after
+  increment 10 and the headless test runs, is `docs/cc65-proposal.md`.
+  cc65's Contributing.md asks contributors to ask whether work is wanted
+  before preparing it and to keep one pull request per change, so it is
+  a question with the code linked, not a pull request. It also names the
+  `crt0` reordering (6.1).
 - ProDOS behavior is unchanged by default (backward compatibility); the
   swap is available as an opt-in module (section 5.1).
 
@@ -1989,8 +2009,9 @@ on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
 - Monochrome monitor setting in ReplicApple2Plus (3.8): done, in that
   project, with the half-pixel shift
 - Display backends: Soft-70 (3.8): increment 9, 10.12
-- Emulator test fixture (section 8): ReplicApple2Plus 1.8.0's headless
-  runner and `make emutest`
+- Emulator test fixture (section 8): done. ReplicApple2Plus 1.8.0's
+  headless runner and `make emutest`; with 1.9.0's slot configurations,
+  plug-ins and real-time pacing, the network run on the Uthernet II
 - Detect deleting or renaming an open file, as ProDOS does (5.5a): done,
   10.13
 

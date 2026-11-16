@@ -182,8 +182,9 @@ verified against.
 
 ## Upstream
 
-The DOS 3.3 file layer is intended for contribution to cc65 once it is
-working. a2lib keeps cc65's ProDOS behavior unchanged; proposed ProDOS
+The DOS 3.3 file layer is intended for contribution to cc65;
+[docs/cc65-proposal.md](docs/cc65-proposal.md) is the proposal to the
+cc65 maintainers. a2lib keeps cc65's ProDOS behavior unchanged; proposed ProDOS
 changes are raised with the cc65 maintainers instead.
 
 ## License
