@@ -851,6 +851,18 @@ zeros. Encoding 0 (the text screen's own codes) is reserved for the
 constructor must not write (10.12), and the text page already shows its
 visible 40 columns.
 
+**Encoding 2 (plain ASCII).** Each byte is the character itself,
+`$20`-`$7E`, in normal video; a blank is `$20`. Readers show anything
+else as a blank. This is how Uthernet2's TELNET and GOPHER keep their
+80 × 24 screen (github.com/sbabcoc/Uthernet2, `src/apple`), which they
+draw with Soft-70's techniques and font: the marker at `$0800`, the buffer
+at `$0810`, written only while Soft-70 is in use, as here.
+
+Readers check the encoding: a marker in an encoding they don't know is
+ignored, as one of another version is, rather than decoded as encoding 1.
+ReplicApple2Plus reads encodings 1 and 2 (in releases after 1.9.0; 1.9.0
+decodes every marker as encoding 1).
+
 **Limits.** A program that stops without running its destructors (a crash,
 RESET) leaves the marker in memory; a later hi-res program could then be
 mistaken for Soft-70 text. The VideoTerm build writes no marker when the
