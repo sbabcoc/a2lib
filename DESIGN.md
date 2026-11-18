@@ -1675,6 +1675,10 @@ passed only because the offset was 0). They now test the loop end with
   screen's summary line ("ALL n PASSED", or "0 FAILED" for the CSW
   tests). Screens are kept in `build/emu/`. `RUNS="..."` picks runs by
   name; `RUNNER` and `AC` name the tools if they aren't on `PATH`.
+  `SNAP=folder` adds the runner's `--snap` (ReplicApple2Plus 1.11.0) to
+  each run once its last screen shows, saving it as `<run>.png` on the
+  `MONITOR` given (default green); `make screenshots` uses it for the
+  README's Soft-70 picture.
   Scripted input: the CSW tests and `timertest` are typed a word at their
   prompt (`timertest` after a 0.2 s pause, since it checks that 100 ms
   pass during input). `filetest` and `timertest` end with their summary

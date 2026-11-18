@@ -109,6 +109,18 @@ Type `.70` sets). The default font's source is `tools/s70font.txt`;
 `tools/s70font.py` turns it into assembler source, a `.70` file or a
 preview image.
 
+![S70TEST's results on Soft-70, on a green monitor: the left 70 of 80 columns, the cursor after PRESS A KEY](docs/images/s70test.png)
+
+While a program waits for a key, the cursor is the cell drawn in inverse,
+blinking every 250 ms (steady if all four of a2lib's timer slots are in
+use). After each pan, whether the view followed the cursor or the
+program called `s70_pan`, a bar along the bottom scan line shows for a
+second which columns are in view: dotted across all 80, solid over the 70
+shown. And while Soft-70 runs, a marker in memory just before its 80 × 24
+buffer lets an emulator copy the screen's text, all 80 columns of it --
+ReplicApple2Plus's Copy Screen Text does -- since none of it is on the
+text page; DESIGN.md 3.9 describes the marker.
+
 Compiling with a2lib's `dirent.h` but linking without an a2lib library
 fails at link time, so the two can't be mixed up silently.
 
@@ -156,7 +168,12 @@ program on ReplicApple2Plus (1.8.0 or later) with its headless runner,
 `replicapple2plus-run`, and AppleCommander's `ac`, with and without the
 VideoTerm, and reports each run's result; screens go to `build/emu/`.
 `RUNS="vttest s70test-vt"` runs only those; `RUNNER=` and `AC=` give the
-tools' paths if they aren't on `PATH`.
+tools' paths if they aren't on `PATH`. `SNAP=folder` also saves a picture
+of each run's last screen there, as ReplicApple2Plus's window shows it,
+on the monitor `MONITOR=` names (`green` by default; `color`, `white` or
+`amber`), with ReplicApple2Plus 1.11.0 or later. `make screenshots`
+(with `MASTER=`, as for `make emutest`) captures the picture above that
+way, into `docs/images`.
 
 `test/nettest.c` runs the IP65 timer driver with IP65 itself, on the
 Uthernet II: it leases an address, echoes a line through a server on the

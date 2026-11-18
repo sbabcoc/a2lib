@@ -52,7 +52,7 @@ WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC)) \
 WIN_INC := $(wildcard libsrc/win/*.inc) $(S80_INC)
 VTWIN_LIB := lib/apple2-dos33-vtwin.lib
 
-.PHONY: emutest all test simtest clean
+.PHONY: emutest screenshots all test simtest clean
 
 S70_SRC := $(wildcard libsrc/s70/*.s)
 S70_OBJ := $(patsubst libsrc/s70/%.s,build/s70/%.o,$(S70_SRC)) \
@@ -144,6 +144,12 @@ S70_LINK := --start-addr 0x4000
 # the Uthernet2 plug-in jar; without them it's skipped.
 emutest: test
 	bash test/emutest.sh $(RUNS)
+
+# The README's screenshot: S70TEST's last screen on Soft-70, on a green
+# monitor, into docs/images. Takes what emutest takes, and ReplicApple2Plus
+# 1.11.0's runner or later (its --snap).
+screenshots: test
+	SNAP=docs/images bash test/emutest.sh s70test
 
 test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest \
       build/test/reflowtest build/test/reflowvt build/test/reflowwin \

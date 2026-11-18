@@ -23,6 +23,11 @@
 #   AC        AppleCommander's command-line tool (default: ac)
 #   ROMS      a ROM folder for the runner (default: the runner's own choice)
 #   UTHERNET2 the folder holding the Uthernet2 plug-in jar, for nettest
+#   SNAP      a folder to save a picture of each run's last screen in, as
+#             <run>.png, as ReplicApple2Plus's main window shows it (the
+#             runner's --snap: ReplicApple2Plus 1.11.0 or later)
+#   MONITOR   the monitor those pictures show: color, white, green or amber
+#             (default green, as hi-res text is drawn for)
 #
 # Exit status: 0 if every run passed, 1 otherwise. Runs in bash 3.2 (macOS)
 # and later.
@@ -112,6 +117,7 @@ if [[ -n "$net_missing" ]]; then
 fi
 
 mkdir -p "$OUT"
+[[ -n "${SNAP:-}" ]] && { mkdir -p "$SNAP" || die "couldn't create SNAP folder: $SNAP"; }
 printf '[3]\ntype=uthernet2\n\n[6]\ntype=disk2\n' > "$OUT/net.ini"
 
 # The test disks: the programs the runs use, as DOS 3.3 binary files. The
@@ -169,7 +175,10 @@ while IFS= read -r line; do
         [[ -s "$OUT/port" ]] || die "the echo server didn't start"
         script=("${script[@]//@PORT@/$(cat "$OUT/port")}")
     fi
-    args+=(${script[@]+"${script[@]}"} --until "$until_text" --timeout "$timeout" --screen "$OUT/$name.txt")
+    snap=()
+    [[ -n "${SNAP:-}" ]] && snap=(--expect "$until_text" --snap "$SNAP/$name.png" --monitor "${MONITOR:-green}")
+    args+=(${script[@]+"${script[@]}"} ${snap[@]+"${snap[@]}"} --until "$until_text" --timeout "$timeout" \
+        --screen "$OUT/$name.txt")
 
     "$RUNNER" "${args[@]}" >/dev/null 2>"$OUT/$name.err"
     status=$?
