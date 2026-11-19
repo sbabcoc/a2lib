@@ -5,6 +5,8 @@
 ; chapter 6 ("Calling the DOS File Manager"). See DESIGN.md, section 4.4.
 ;
 
+        .include        "machine.inc"
+
 ; ------------------------------------------------------------------------
 ; Page 3 vectors
 
@@ -23,7 +25,7 @@ DOS_SLOT        := $AA6A        ; 2 bytes
 RWTS_LOCATE     := $03E3
 RWTS_ENTRY      := $03D9
 
-IOB_TYPE        = $00           ; Table type, must be $01
+IOB_TYPE        = $00           ; Table type, must be IOB_TABLE
 IOB_SLOT        = $01           ; Slot * 16
 IOB_DRIVE       = $02           ; Drive (1 or 2)
 IOB_VOLUME      = $03           ; Volume expected (0 = any)
@@ -33,6 +35,11 @@ IOB_BUF         = $08           ; Address of 256-byte buffer (2)
 IOB_COUNT       = $0B           ; Byte count ($00 = 256)
 IOB_CMD         = $0C           ; Command ($01 = READ)
 IOB_RC          = $0D           ; Return code
+
+IOB_TABLE       = $01           ; IOB_TYPE value
+IOB_READ        = $01           ; IOB_CMD value
+RWTS_WPROT      = $10           ; IOB_RC: write protected
+RWTS_VOLUME     = $20           ; IOB_RC: volume mismatch (others: drive or read error)
 
 ; DOS 3.3 disk layout ("Beneath Apple DOS" ch. 4)
 VTOC_TRACK      = $11           ; VTOC: track 17, sector 0
@@ -89,10 +96,6 @@ FMS_POSRANGE    = $04           ; POSITION, then range
 ; adjustment can be changed if testing on real DOS shows otherwise.
 FM_WRITE_ADJUST = 1
 
-; Return codes used by this layer
-FMR_ENDDATA     = $05           ; End of data
-FMR_NOTFOUND    = $06           ; File not found (allocated if X=0)
-
 ; __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, as ONERR
 ; reports them and DOS's message table orders them ("Beneath Apple DOS"
 ; ch. 8, $A971); the File Manager's return codes are the first ten. The
@@ -102,8 +105,8 @@ DOSERR_LANG     = $01           ; Language not available
 DOSERR_RANGE    = $02           ; Range error (bad call type)
 DOSERR_SUBRANGE = $03           ; Range error (bad sub-call type)
 DOSERR_WPROT    = $04           ; Write protected
-DOSERR_ENDDATA  = $05           ; End of data
-DOSERR_NOTFOUND = $06           ; File not found
+DOSERR_ENDDATA  = $05           ; End of data (a read past the end)
+DOSERR_NOTFOUND = $06           ; File not found (OPEN with X = 0: allocated)
 DOSERR_VOLUME   = $07           ; Volume mismatch
 DOSERR_IO       = $08           ; I/O error
 DOSERR_FULL     = $09           ; Disk full
@@ -127,6 +130,12 @@ FMT_INTEGER     = $01
 FMT_APPLESOFT   = $02
 FMT_BINARY      = $04
 FMT_RELOC       = $08
+FMT_LOCKED      = $80           ; OPEN's type byte and catalog entries: locked
+FMT_TYPE_MASK   = $7F           ; AND mask: the type without the lock bit
+
+; File names: up to NAME_LEN characters, high bit set, padded with
+; HI_SPACE, as DOS's command parser stores them ("Beneath Apple DOS" ch. 8)
+NAME_LEN        = 30
 
 ; ------------------------------------------------------------------------
 ; Per-file control block, allocated with malloc() by open() and kept in
@@ -171,7 +180,7 @@ FCB_TEXT        = $80           ; FCB::KIND value for T files
 ; Directories. DIRENT must match struct dirent in include/dirent.h.
 
 .struct DIRENT
-        NAME    .res 31         ; 30 characters + NUL
+        NAME    .res ::NAME_LEN + 1 ; NAME_LEN characters + NUL
         INO     .word           ; T/S list track * 256 + sector
         BLOCKS  .word           ; 512-byte blocks
         TYPE    .byte           ; ProDOS-equivalent type

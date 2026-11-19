@@ -49,8 +49,8 @@ fm_name:
         jsr     defaults
 
         ; Blank the name buffer
-        ldx     #30-1
-        lda     #$A0
+        ldx     #NAME_LEN-1
+        lda     #HI_SPACE
 :       sta     fm_namebuf,x
         dex
         bpl     :-
@@ -70,7 +70,7 @@ copy:   lda     (ptr1),y
         beq     store
         cmp     #','
         beq     suffix
-        cpx     #30
+        cpx     #NAME_LEN
         bcs     bad             ; Too long
         jsr     upcase
         ora     #$80
@@ -238,7 +238,7 @@ LOCATION = $80                  ; mode: fm_location
 
         .bss
 
-fm_namebuf:     .res    30
+fm_namebuf:     .res    NAME_LEN
 fm_volume:      .res    1       ; Volume, slot and drive of the last name parsed
 fm_drive:       .res    1
 fm_slot:        .res    1

@@ -37,6 +37,8 @@
         .macpack        longbranch
         .import         a2_coutvec, a2_rawcout, a2_viewport, _wherex
 
+        .include        "machine.inc"
+
 REFLOW_MAX      = 81            ; Widest width; the word buffer holds 80
 
         .code
@@ -83,9 +85,9 @@ _reflow_off:
 filter: sta     savea
         stx     savex
         sty     savey
-        cmp     #$8D
+        cmp     #HI_CR
         jeq     cr
-        cmp     #$A0
+        cmp     #HI_SPACE
         jeq     space
         jcc     control
 
@@ -100,16 +102,16 @@ filter: sta     savea
 
         ; Move the word to the next line: back up over it, blank it,
         ; break the line, and print it again
-:       lda     #$88            ; Backspace
+:       lda     #HI_BS
         jsr     a2_rawcout
         dex
         bne     :-
         ldx     wlen
-:       lda     #$A0
+:       lda     #HI_SPACE
         jsr     a2_rawcout
         dex
         bne     :-
-        lda     #$8D
+        lda     #HI_CR
         jsr     a2_rawcout
         ldx     #$00
 :       lda     wbuf,x
@@ -120,7 +122,7 @@ filter: sta     savea
         stx     col
         jmp     put
 
-hard:   lda     #$8D
+hard:   lda     #HI_CR
         jsr     a2_rawcout
         lda     #$00
         sta     col
@@ -142,7 +144,7 @@ space:  lda     #$00
         lda     col
         cmp     maxlen
         bcc     :+
-        lda     #$8D            ; Ends a full line: becomes the break
+        lda     #HI_CR          ; Ends a full line: becomes the break
         jsr     a2_rawcout
         lda     #$00
         sta     col
@@ -153,7 +155,7 @@ space:  lda     #$00
         bne     :+
         bit     wrapped         ; Leading space on a line the filter began
         bmi     done
-:       lda     #$A0
+:       lda     #HI_SPACE
         jsr     a2_rawcout
         inc     col
         bne     done            ; Branch always
@@ -170,7 +172,7 @@ cr:     jsr     a2_rawcout
         ; the rest leave the column alone and end the word.
 control:
         jsr     a2_rawcout
-        cmp     #$88
+        cmp     #HI_BS
         bne     :+
         lda     col
         beq     done

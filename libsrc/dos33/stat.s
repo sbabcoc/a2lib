@@ -109,7 +109,7 @@ _stat:
 
         ; st_type
         lda     type
-        and     #$7F
+        and     #FMT_TYPE_MASK
         ldx     #NTYPES - 1
 :       cmp     ftypes,x
         beq     :+
@@ -194,11 +194,11 @@ cmpname:
 blank:  lda     #' '            ; Past the end of d_name: blanks
 :       sta     tmp1
         lda     fm_namebuf,x
-        and     #$7F
+        and     #HIBIT_OFF
         cmp     tmp1
         jne     find
         inx
-        cpx     #30
+        cpx     #NAME_LEN
         bcc     cmpname
 
         ; Found: st_blocks = d_blocks

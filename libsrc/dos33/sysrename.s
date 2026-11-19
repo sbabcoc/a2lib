@@ -4,7 +4,7 @@
 ; unsigned char __fastcall__ _sysrename (const char* oldname, const char* newname);
 ;
 ; Replaces libsrc/apple2/sysrename.s from cc65. rename() passes the result
-; to ___mappederrno, so it returns 0 or a ProDOS-equivalent error code.
+; to ___mappederrno, so it returns 0 or an __oserror value (DESIGN.md 5.6).
 ;
 ;   - The old name may carry suffixes (",S6,D2,V254"); the new name may
 ;     not, since the file stays where it is. A new name with a suffix
@@ -67,7 +67,7 @@ badname:
         ldx     newname+1
         jsr     fm_name
         bcs     free
-        ldx     #30-1
+        ldx     #NAME_LEN-1
 :       lda     fm_namebuf,x
         sta     newbuf,x
         dex
@@ -107,7 +107,7 @@ badname:
         jsr     fm_simple
         lda     #LIBERR_EXISTS  ; -> EEXIST
         bne     free            ; Branch always
-:       cmp     #FMR_NOTFOUND
+:       cmp     #DOSERR_NOTFOUND
         bne     fmerr
 
         ; RENAME: old name at FM_NAME, new name at FM_NEWNAME

@@ -225,7 +225,7 @@ trd:    jsr     fm_readbyte
         jcs     trdend
         tax                     ; $00 on disk: end of file
         jeq     teof
-        and     #$7F
+        and     #HIBIT_OFF
         jsr     swapnl
         jsr     putbyte
         php
@@ -234,7 +234,7 @@ trd:    jsr     fm_readbyte
         bne     trd
         jeq     ok              ; Branch always
 
-trdend: cmp     #FMR_ENDDATA
+trdend: cmp     #DOSERR_ENDDATA
         jne     fmerr
 teof:   ldy     #FCB::STATE
         lda     (ptr4),y
@@ -296,7 +296,7 @@ reject: lda     #EINVAL
 ; ------------------------------------------------------------------------
 ; Common exits
 
-rdend:  cmp     #FMR_ENDDATA    ; End of data ends a read
+rdend:  cmp     #DOSERR_ENDDATA ; End of data ends a read
         jeq     ok
 fmerr:  jsr     fm_maperr
         jsr     restore

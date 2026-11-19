@@ -72,7 +72,7 @@ text:   jsr     topos
         beq     found
         jsr     fm_incpos
         jmp     :-
-:       cmp     #FMR_ENDDATA
+:       cmp     #DOSERR_ENDDATA
         bne     fail
 
         ; Position on the terminator, so the next write replaces it

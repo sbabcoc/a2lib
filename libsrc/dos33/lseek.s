@@ -110,7 +110,7 @@ sloop:  jsr     fm_readbyte
         inc     base+1
         bne     sloop
         jmp     einval          ; Beyond 16 bits
-send:   cmp     #FMR_ENDDATA
+send:   cmp     #DOSERR_ENDDATA
         jne     fmerr
 
         ; New position = base + offset; must be 0..$FFFF

@@ -64,9 +64,9 @@ fm_simple:
         .segment        "LOWCODE"
 
 fm_call:
-        bit     $C082           ; ROM
+        bit     LC_ROM_RO
         jsr     FM_ENTRY
-        bit     $C080           ; LC bank 2, read only
+        bit     LC_BANK2_RO
         ldy     #FM_RC
         lda     (ptr3),y
         cmp     #$01            ; C = (return code <> 0)

@@ -2427,6 +2427,22 @@ Raised by polluks on cc65/cc65#3050. **Verified with `make emutest`:** all
 `errno` values are unchanged, so only `__oserror` and `_stroserror`
 differ for programs.
 
+### 10.16 Readability pass: the DOS 3.3 file layer
+
+Names and comments only: every module assembles to the same bytes, and
+every test program links to the same binary, as before the pass (checked
+against `732448c`: 230 module builds, 65 compiled test variants, 23
+programs, and the sim65 suites).
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/machine.inc` | New: names for the language-card switches, `MON_COUT`, `DOS_CONNECT`, the stack page and `BASIC_BUF`, and high-bit characters, beside cc65's `apple2.inc` |
+| `libsrc/dos33/fm.inc` | Includes `machine.inc`; names for the IOB's values and RWTS's codes, the lock bit and type mask, and `NAME_LEN`; `FMR_ENDDATA` and `FMR_NOTFOUND` folded into `DOSERR_*` |
+| `exec.s`, `fm.s`, `rwts.s`, `timer.s`, `reflow.s`, `dir.s`, `fmname.s`, `stat.s`, `open.s`, `rwcommon.s`, `lseek.s`, `seekend.s`, `sysremove.s`, `sysrename.s` | Those names in place of raw values; named labels in place of anonymous jumps two levels away; stale comments about ProDOS codes corrected |
+
+Vendored modules (`VENDORED.md`) keep their stock code untouched, so they
+stay easy to compare with cc65's.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

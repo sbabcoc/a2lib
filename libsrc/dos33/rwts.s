@@ -25,7 +25,7 @@ rwts_read:
         sta     ptr3+1
 
         ldy     #IOB_TYPE
-        lda     #$01
+        lda     #IOB_TABLE
         sta     (ptr3),y
         iny                     ; IOB_SLOT
         lda     rwts_slot
@@ -60,7 +60,7 @@ rwts_read:
         lda     #$00            ; 256 bytes
         sta     (ptr3),y
         ldy     #IOB_CMD
-        lda     #$01            ; READ
+        lda     #IOB_READ
         sta     (ptr3),y
 
         ldy     ptr3
@@ -72,9 +72,9 @@ rwts_read:
 
         .segment        "LOWCODE"
 
-call:   bit     $C082           ; ROM
+call:   bit     LC_ROM_RO
         jsr     RWTS_ENTRY
-        bit     $C080           ; LC bank 2, read only
+        bit     LC_BANK2_RO
         ldy     #IOB_RC
         lda     (ptr3),y
         cmp     #$01            ; C = (return code <> 0)
@@ -83,11 +83,11 @@ call:   bit     $C082           ; ROM
         .code
 
 rwts_maperr:
-        cmp     #$10
+        cmp     #RWTS_WPROT
         bne     :+
         lda     #DOSERR_WPROT   ; Write protected   -> EACCES
         rts
-:       cmp     #$20
+:       cmp     #RWTS_VOLUME
         bne     :+
         lda     #DOSERR_VOLUME  ; Volume mismatch   -> ENOENT
         rts

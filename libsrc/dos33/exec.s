@@ -69,7 +69,7 @@ _exec:
         bcs     fail
         ldy     #FM_TYPE
         lda     (ptr3),y
-        and     #$7F            ; Lock bit
+        and     #FMT_TYPE_MASK
         sta     type
         lda     #FMC_CLOSE
         jsr     fm_simple
@@ -109,7 +109,7 @@ stub:   ldx     #size - 1
         bpl     :-
 
         ldx     #$00
-        lda     #$84            ; Ctrl-D
+        lda     #HI_CTRL_D
         jsr     put
         ldy     #$00
         lda     type
@@ -123,11 +123,11 @@ stub:   ldx     #size - 1
         iny
         bne     :-              ; Branch always
 
-        ; The name, without its $A0 padding
-:       ldy     #30
+        ; The name, without its padding
+:       ldy     #NAME_LEN
 :       dey
         lda     fm_namebuf,y
-        cmp     #$A0
+        cmp     #HI_SPACE
         beq     :-
         sty     tmp1            ; Index of the last character
         ldy     #$00
@@ -158,7 +158,7 @@ stub:   ldx     #size - 1
         jsr     putlo
         lda     fm_volume
         jsr     putdec
-:       lda     #$8D
+:       lda     #HI_CR
         jsr     put
         stx     len_t           ; DOS stores ^D through CR: the tail goes after
         lda     #$00
@@ -171,20 +171,21 @@ stub:   ldx     #size - 1
         txs
         ldy     #$00
         lda     cmdline+1       ; NULL?
-        beq     :++             ; Yes, store as '\0'
+        beq     @store          ; Yes, store as '\0'
         sta     ptr1+1
         lda     cmdline
         sta     ptr1
-:       lda     (ptr1),y
-:       sta     $0100,y
-        beq     :+              ; '\0' stored, done
+@copy:  lda     (ptr1),y
+@store: sta     STACK_PAGE,y
+        beq     @handoff        ; '\0' stored, done
         iny
         cpy     #$7E
-        bcc     :--
+        bcc     @copy
         lda     #$00            ; '\0'
-        beq     :-              ; Branch always
+        beq     @store          ; Branch always
 
-:       lda     #<target
+@handoff:
+        lda     #<target
         ldx     #>target
         sta     done+1
         stx     done+2
@@ -219,20 +220,21 @@ putdec: sty     tmp2
 digit:  sta     tmp3            ; Place value
         lda     #$00
         sta     tmp4            ; This digit
-:       lda     tmp1
+@count: lda     tmp1
         cmp     tmp3
-        bcc     :+
+        bcc     @counted
         sbc     tmp3
         sta     tmp1
         inc     tmp4
-        bne     :-              ; Branch always
-:       lda     tmp4
-        bne     :+
+        bne     @count          ; Branch always
+@counted:
+        lda     tmp4
+        bne     @put
         cpy     #$00            ; Leading zero?
-        beq     :++
-:       jsr     putdigit
+        beq     @skip
+@put:   jsr     putdigit
         iny
-:       rts
+@skip:  rts
 
         .rodata
 
@@ -244,12 +246,12 @@ verbrun:
 ; relative branches inside it, and its data is addressed at target.
 
 source:
-        jsr     $03EA           ; Reconnect DOS's intercepts
+        jsr     DOS_CONNECT     ; Reconnect DOS's intercepts
 
         ; CR first, while DOS still sees a running program (initprompt):
         ; DOS's state 2 or 3 goes to state 0 on it without collecting it
-        lda     #$8D
-        jsr     $FDED
+        lda     #HI_CR
+        jsr     MON_COUT
 
         ; Then DOS's state as when the command is typed at the ] prompt,
         ; so a DOS error ends there instead of in Applesoft (DESIGN.md 5.10)
@@ -261,18 +263,18 @@ source:
         sta     ERRFLG
 
         ; The argument tail, after where DOS will store the command
-        lda     $0100
+        lda     STACK_PAGE
         beq     @send
         ldy     len_t
         lda     #$00            ; Marker
-        sta     $0200,y
+        sta     BASIC_BUF,y
         iny
         lda     #REM
-        sta     $0200,y
+        sta     BASIC_BUF,y
         iny
         ldx     #$00
-@tail:  lda     $0100,x
-        sta     $0200,y
+@tail:  lda     STACK_PAGE,x
+        sta     BASIC_BUF,y
         beq     @send
         inx
         iny
@@ -281,7 +283,7 @@ source:
 @send:  ldx     #$00
 @next:  lda     cmd_t,x
         beq     @done
-        jsr     $FDED           ; COUT; DOS restores the registers
+        jsr     MON_COUT        ; DOS restores the registers
         inx
         bne     @next
 @done:  jmp     DOSWARM         ; A B program that returns with RTS

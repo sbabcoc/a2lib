@@ -197,7 +197,7 @@ entry:  tax
         adc     #ENT_NAME
         tay
         lda     (ptr2),y
-        and     #$7F
+        and     #HIBIT_OFF
         pha
         txa
         clc
@@ -206,10 +206,10 @@ entry:  tax
         pla
         sta     (ptr1),y
         inx
-        cpx     #30
+        cpx     #NAME_LEN
         bne     :-
         lda     #$00
-        ldy     #DIR::ENT + DIRENT::NAME + 30
+        ldy     #DIR::ENT + DIRENT::NAME + NAME_LEN
         sta     (ptr1),y
 :       dey
         lda     (ptr1),y
@@ -246,14 +246,14 @@ entry:  tax
         ldy     #DIR::ENT + DIRENT::DOSTYPE
         sta     (ptr1),y
         ldx     #NTYPES - 1
-:       cmp     ctypes,x
-        beq     :+
+@find:  cmp     ctypes,x
+        beq     @found
         dex
-        bpl     :-
+        bpl     @find
         lda     #$00
-        beq     :++             ; Branch always
-:       lda     ptypes,x
-:       ldy     #DIR::ENT + DIRENT::TYPE
+        beq     @store          ; Branch always
+@found: lda     ptypes,x
+@store: ldy     #DIR::ENT + DIRENT::TYPE
         sta     (ptr1),y
 
         ; d_sectors; d_blocks = (d_sectors + 1) / 2

@@ -4,8 +4,8 @@
 ; unsigned char __fastcall__ _sysremove (const char* name);
 ;
 ; Replaces libsrc/apple2/sysremove.s from cc65. remove() passes the result
-; to ___mappederrno, so it returns 0 or a ProDOS-equivalent error code
-; (DESIGN.md 5.6). As under ProDOS, a locked file fails with EACCES, and
+; to ___mappederrno, so it returns 0 or an __oserror value (DESIGN.md
+; 5.6). As under ProDOS, a locked file fails with EACCES, and
 ; an open file with EINVAL (DESIGN.md 5.5a).
 ;
 

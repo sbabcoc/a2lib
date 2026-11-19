@@ -38,6 +38,7 @@
         .include        "zeropage.inc"
         .include        "apple2.inc"
         .include        "timer.inc"
+        .include        "machine.inc"
 
 ZPLEN = 18                      ; sreg, regsave, ptr1-ptr4, tmp1-tmp4
         .assert tmp4 = sreg + ZPLEN - 1, lderror, "C zero page not contiguous"
@@ -135,12 +136,13 @@ a2_tick:
         ldx     #TICK_MS
         lda     t_err
         cmp     #TICK_DEN - TICK_NUM
-        bcc     :+
+        bcc     @nocarry
         sbc     #TICK_DEN - TICK_NUM    ; C set
         inx
-        bne     :++                     ; Branch always
-:       adc     #TICK_NUM               ; C clear
-:       sta     t_err
+        bne     @err                    ; Branch always
+@nocarry:
+        adc     #TICK_NUM               ; C clear
+@err:   sta     t_err
 
         ; t_ms += X
         txa
@@ -205,17 +207,18 @@ sl:     lda     s_flag,x
         ora     #TF_DUE
         sta     s_flag,x
         and     #TF_PERIODIC
-        beq     :+
+        beq     @oneshot
         lda     s_ivlo,x
         sta     s_remlo,x
         lda     s_ivhi,x
         sta     s_remhi,x
-        jmp     :++
-:       lda     s_flag,x
+        jmp     @due
+@oneshot:
+        lda     s_flag,x
         and     #<~TF_ACTIVE
         sta     s_flag,x
         dec     nact
-:       lda     #$01
+@due:   lda     #$01
         sta     anydue
 next:   dex
         bpl     sl
@@ -256,12 +259,13 @@ dl:     lda     s_flag,x
         beq     dn
         lda     s_flag,x
         and     #TF_PERIODIC
-        bne     :+
+        bne     @periodic
         lda     #$00            ; One-shot: free the slot
-        beq     :++             ; Branch always
-:       lda     s_flag,x
+        beq     @flag           ; Branch always
+@periodic:
+        lda     s_flag,x
         and     #<~TF_DUE
-:       sta     s_flag,x
+@flag:  sta     s_flag,x
         lda     s_fnlo,x
         sta     dvec+1
         lda     s_fnhi,x
@@ -308,12 +312,12 @@ _a2_millis:
 ; timing); keys are left alone.
 
 _a2_idle:
-:       inc     RNDL
-        bne     :+
+@wait:  inc     RNDL
+        bne     @key
         inc     RNDH
         jmp     a2_tick
-:       bit     KBD
-        jmp     :--
+@key:   bit     KBD
+        jmp     @wait
 
 _a2_timer_start:
         sta     tmr_per
@@ -440,15 +444,15 @@ a2_timer_restart:
 
 _a2_timer_stop:
         cmp     #NSLOT
-        bcs     :++
+        bcs     @done
         tax
         lda     s_flag,x
         and     #TF_ACTIVE
-        beq     :+
+        beq     @free
         dec     nact
-:       lda     #$00
+@free:  lda     #$00
         sta     s_flag,x
-:       rts
+@done:  rts
 
 ; ------------------------------------------------------------------------
 ; keyin: the KSW input routine, mirroring the Autostart ROM's KEYIN
@@ -459,12 +463,12 @@ _a2_timer_stop:
         .segment        "LOWCODE"
 
 keyin:
-:       inc     RNDL
-        bne     :+
+@wait:  inc     RNDL
+        bne     @key
         inc     RNDH
         jsr     kswtick
-:       bit     KBD
-        bpl     :--
+@key:   bit     KBD
+        bpl     @wait
         sta     (BASL),y
         lda     KBD
         bit     KBDSTRB
@@ -479,9 +483,9 @@ kswtick:
         pha
         tya
         pha
-        bit     $C080           ; LC bank 2, read only
+        bit     LC_BANK2_RO
         jsr     a2_tick
-        bit     $C082           ; ROM
+        bit     LC_ROM_RO
         pla
         tay
         pla

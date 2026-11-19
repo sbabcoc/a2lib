@@ -124,14 +124,14 @@ doopen: jsr     fmopen
         bcc     exists
 
         ; "File not found" with X=0 means DOS allocated it, and it's open
-        cmp     #FMR_NOTFOUND
+        cmp     #DOSERR_NOTFOUND
         bne     jerrfreefm
         lda     flags
         and     #O_CREAT
         beq     :+
         inc     created
         bne     opened          ; Branch always
-:       lda     #FMR_NOTFOUND
+:       lda     #DOSERR_NOTFOUND
 jerrfreefm:
         jmp     errfreefm
 
@@ -147,7 +147,7 @@ opened: ldy     #FM_TYPE
         lda     (ptr3),y
         ldy     #FCB::TYPE      ; Keep the lock bit for stat
         sta     (ptr4),y
-        and     #$7F            ; Lock bit
+        and     #FMT_TYPE_MASK
         sta     type
         jsr     classify
 
@@ -171,7 +171,7 @@ oldfile:
         lda     #FMC_READ
         jsr     fm_rangeio
         bcc     :+
-        cmp     #FMR_ENDDATA    ; Empty file: header written on close
+        cmp     #DOSERR_ENDDATA ; Empty file: header written on close
         bne     errclosefm
         lda     #$00            ; No load address
         sta     hdrbuf
@@ -288,7 +288,7 @@ truncate:
         ldx     #$00
         jsr     fmopen
         bcc     :+
-        cmp     #FMR_NOTFOUND   ; Allocated
+        cmp     #DOSERR_NOTFOUND ; Allocated
         bne     tfreefm
 :       lda     created
         bne     :+
@@ -457,16 +457,16 @@ freebuffer:
 
 closeallfiles:
         ldy     #$00
-:       lda     fdtab + FD::REF_NUM,y
-        beq     :+
-        bmi     :+              ; Device
+@slot:  lda     fdtab + FD::REF_NUM,y
+        beq     @next
+        bmi     @next           ; Device
         jsr     closedirect     ; Preserves Y
-:       iny
+@next:  iny
         iny
         iny
         iny
         cpy     #MAX_FDS * .sizeof(FD)
-        bcc     :--
+        bcc     @slot
         rts
 
 ; ------------------------------------------------------------------------
