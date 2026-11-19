@@ -19,8 +19,8 @@
 ; ".,S6,D2"). Sets fm_slot, fm_drive and fm_volume, but no parameter
 ; list fields, so it doesn't need fm_begin.
 ;
-; Both return carry clear on success, or carry set with A = $40 (ProDOS
-; "Invalid pathname", which maps to EINVAL). Uses ptr1, tmp1-tmp4.
+; Both return carry clear on success, or carry set with A = DOSERR_SYNTAX
+; (DOS's SYNTAX ERROR, which maps to EINVAL). Uses ptr1, tmp1-tmp4.
 ;
 
         .include        "zeropage.inc"
@@ -130,7 +130,7 @@ next:   lda     (ptr1),y
         beq     suffix
         ; Anything else is invalid
 
-bad:    lda     #$40            ; ProDOS "Invalid pathname"
+bad:    lda     #DOSERR_SYNTAX  ; -> EINVAL
         sec
         rts
 

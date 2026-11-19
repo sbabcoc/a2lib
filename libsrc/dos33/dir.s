@@ -110,7 +110,7 @@ dir_at:
         ldx     ptr1+1
         rts
 
-notdos: lda     #$52            ; ProDOS "Not a ProDOS volume" -> ENODEV
+notdos: lda     #LIBERR_NOTDOS  ; -> ENODEV
 freemapped:
         pha
         lda     ptr1

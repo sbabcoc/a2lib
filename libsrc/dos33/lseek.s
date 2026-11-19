@@ -140,7 +140,7 @@ add:    clc
         lda     (ptr4),y
         sbc     newpos+1
         bcs     :+
-        lda     #$4D            ; ProDOS "Position out of range" -> ESPIPE
+        lda     #LIBERR_POSITION ; -> ESPIPE
         jmp     oserr
 :       ldy     #FCB::HDRLEN
         lda     (ptr4),y

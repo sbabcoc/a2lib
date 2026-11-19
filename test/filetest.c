@@ -24,6 +24,14 @@
 #define MAX_SHOWN   8
 #define MAX_GROUP   10          /* Most checks in one group */
 
+/* __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, then
+** the library's codes for conditions DOS 3.3 has no number for */
+#define DOSERR_NOTFOUND 0x06
+#define DOSERR_SYNTAX   0x0B
+#define LIBERR_EXISTS   0x10
+#define LIBERR_OPEN     0x11
+#define LIBERR_POSITION 0x14
+
 static unsigned char passed, total;         /* All groups */
 static unsigned char gpassed, gtotal;       /* Current group */
 static const char* gfailed[MAX_GROUP];      /* Current group's failures */
@@ -165,14 +173,18 @@ static void open_flags_names (void)
     int fd;
 
     errno = 0;
-    check ("missing file", open ("NO.SUCH.FILE", O_RDONLY) == -1 && errno == ENOENT);
+    check ("missing file", open ("NO.SUCH.FILE", O_RDONLY) == -1 && errno == ENOENT
+                           && _oserror == DOSERR_NOTFOUND);
 
     errno = 0;
     fd = open ("T.TEST", O_WRONLY | O_CREAT | O_EXCL);
-    check ("O_EXCL existing", fd == -1 && errno == EEXIST);
+    check ("O_EXCL existing", fd == -1 && errno == EEXIST && _oserror == LIBERR_EXISTS);
 
     errno = 0;
-    check ("name must start with a letter", open ("1ABC", O_RDONLY) == -1 && errno == EINVAL);
+    check ("name must start with a letter", open ("1ABC", O_RDONLY) == -1 && errno == EINVAL
+                                            && _oserror == DOSERR_SYNTAX);
+    check ("DOS 3.3 messages", strcmp (_stroserror (DOSERR_NOTFOUND), "File not found") == 0
+                               && strcmp (_stroserror (LIBERR_EXISTS), "File exists") == 0);
     errno = 0;
     check ("bad slot", open ("T.TEST,S9", O_RDONLY) == -1 && errno == EINVAL);
     errno = 0;
@@ -241,7 +253,8 @@ static void seek_tests (void)
     fd = open ("B.SEEK", O_RDONLY);
     check ("B seek", lseek (fd, 3, SEEK_SET) == 3 && byte_at (fd) == 4);
     errno = 0;
-    check ("B past end", lseek (fd, 6, SEEK_SET) == -1 && errno == ESPIPE);
+    check ("B past end", lseek (fd, 6, SEEK_SET) == -1 && errno == ESPIPE
+                         && _oserror == LIBERR_POSITION);
     close (fd);
 }
 
@@ -264,20 +277,22 @@ static void remove_rename (void)
     check ("renamed file", fd >= 0 && open ("T.OLD", O_RDONLY) == -1);
     close (fd);
     errno = 0;
-    check ("rename onto existing", rename ("T.TEST", "T.NEW") == -1 && errno == EEXIST);
+    check ("rename onto existing", rename ("T.TEST", "T.NEW") == -1 && errno == EEXIST
+                                   && _oserror == LIBERR_EXISTS);
     errno = 0;
     check ("rename new suffix", rename ("T.NEW", "T.X,D1") == -1 && errno == EINVAL);
     errno = 0;
     check ("rename missing", rename ("T.OLD", "T.Y") == -1 && errno == ENOENT);
 
-    /* An open file can't be removed or renamed, as under ProDOS ($50,
-    ** EINVAL); other files can */
+    /* An open file can't be removed or renamed (EINVAL, as under ProDOS);
+    ** other files can */
     remove ("T.OPEN2");         /* Left over from an earlier run */
     make_file ("T.OPEN", "X", 1);
     fd = open ("T.OPEN", O_RDONLY);
     errno = 0;
     check ("remove open file", fd >= 0 && remove ("T.OPEN") == -1 && errno == EINVAL
-                               && rename ("T.OPEN", "T.OPEN2") == -1 && errno == EINVAL);
+                               && rename ("T.OPEN", "T.OPEN2") == -1 && errno == EINVAL
+                               && _oserror == LIBERR_OPEN);
     check ("others while one is open", remove ("T.NEW") == 0);
     close (fd);
     check ("remove after close", remove ("T.OPEN") == 0);

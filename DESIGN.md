@@ -34,14 +34,27 @@ Section 9 lists the sources.
   **link time**, never by runtime switches that keep unused code
   resident.
 
-### Guiding principle: consistency with ProDOS, respecting DOS 3.3 idioms
+### Guiding principle: cc65's generic interface, DOS 3.3's own specifics
 
-> Data is stored in DOS 3.3's own on-disk format, and C programs get the
-> same view of it they get under ProDOS. Where DOS 3.3 cannot express
-> something ProDOS can, the operation fails **visibly**. The library
-> never silently behaves differently.
+> Data is stored in DOS 3.3's own on-disk format. C programs get cc65's
+> generic interface (POSIX calls, paths and `errno` values) as on any
+> cc65 target. Everything OS-specific (`__oserror` values, file names,
+> file types) is DOS 3.3's own, written as if there were no ProDOS
+> library. Where DOS 3.3 cannot express something, the operation fails
+> **visibly**. The library never silently behaves differently.
 
 Every file-layer decision below follows from this rule.
+
+**Revised after review (cc65/cc65#3050).** The first version of this
+principle was "consistency with ProDOS": C programs were to get the same
+view of DOS 3.3 they get under ProDOS, down to ProDOS error codes in
+`__oserror`. Oliver Schmidt, who wrote much of cc65's Apple II library,
+pointed out that cc65's OS-specific codes are what the name says, so one
+OS shouldn't emulate another's. He also said the generic, POSIX side is
+what matters to a cc65 program, including path names. The principle now
+follows that. Sections not yet brought in line say so: names (5.5, 5.9)
+still take DOS's suffixes, and file types (5.4, 5.8, 5.9) still use
+ProDOS's codes.
 
 ---
 
@@ -1123,11 +1136,10 @@ some mechanism is required. **Decision:** use DOS 3.3's own syntax.
   the new name without allocating it.
 - Both need the File Manager's work area and buffers even without an
   open file, so they allocate a temporary control block (557 bytes).
-  If that fails, they return ProDOS code `$25`, which maps to `ENOMEM`;
-  the ProDOS table has no closer code, because stock cc65 allocates
-  nothing for these calls.
-- **An open file can't be deleted or renamed, as under ProDOS** (`$50`,
-  `EINVAL`). DOS 3.3 itself doesn't check. Before DELETE or RENAME, both
+  If that fails, they return DOS's NO BUFFERS AVAILABLE (`$0C`), which
+  maps to `ENOMEM` (5.6).
+- **An open file can't be deleted or renamed** (library code `$11`,
+  `EINVAL`, 5.6), as ProDOS refuses too. DOS 3.3 itself doesn't check. Before DELETE or RENAME, both
   OPEN the file in the temporary control block without allocating it,
   CLOSE it, and compare the work area's first T/S list (track, sector),
   slot and drive ("Beneath Apple DOS" ch. 6, work area offsets `$00`-`$01`,
@@ -1142,26 +1154,62 @@ some mechanism is required. **Decision:** use DOS 3.3's own syntax.
 
 ### 5.6 Error mapping
 
-**Decision (made during implementation):** File Manager return codes are
-translated into the **equivalent ProDOS 8 error codes** at the boundary
-(`fm_maperr` in `fm.s`). The stock `close.s` passes errors to
-`___mappederrno`, which uses the ProDOS table in `oserror.s`, so this
-translation lets the whole stock errno machinery, including `_stroserror`
-messages, work unchanged. It also means `__oserror` holds the same value
-under both DOSes for the same failure, which follows the guiding
-principle. No DOS 3.3 message table is needed.
+**Decision (revised in increment 12):** `__oserror` holds **DOS 3.3's own
+error numbers**, the ones `ONERR` reports, with DOS's messages from
+`_stroserror`. a2lib has its own `oserror.s` (the number → `errno` table)
+and `oserrlist.s` (the messages), which replace the stock ProDOS
+modules. The File Manager's return codes are DOS's error numbers 1–10
+already (*Beneath Apple DOS* ch. 6, ch. 8 `$A971`), so `fm_maperr` only
+sends unknown codes to I/O ERROR. RWTS codes go to the numbers DOS itself
+reports for them. The `errno` values programs see are unchanged from the
+first version, which translated everything into ProDOS codes.
 
-| File Manager code | Meaning | `errno` | ProDOS analog |
+| `__oserror` | DOS 3.3 message | `errno` | Produced by |
 |---|---|---|---|
-| `02` / `03` | Bad call / sub-call type | `EINVAL` | — |
-| `04` | Write protected | `EACCES` | `$2B` |
-| `05` | End of data | (end of file, not an error) | `$4C` (unmapped) |
-| `06` | File not found | `ENOENT` | `$46` |
-| `07` | Volume mismatch | `ENOENT` | `$45` |
-| `08` | I/O error | `EIO` | `$27` |
-| `09` | Disk full | `ENOSPC` | `$48` |
-| `0A` | File locked | `EACCES` | `$4E` |
+| `$01` | LANGUAGE NOT AVAILABLE | `ENOSYS` | (File Manager; not produced) |
+| `$02`, `$03` | RANGE ERROR | `EINVAL` | File Manager: bad call or sub-call |
+| `$04` | WRITE PROTECTED | `EACCES` | File Manager; RWTS `$10` |
+| `$05` | END OF DATA | (end of file, not an error) | File Manager, handled by `read` |
+| `$06` | FILE NOT FOUND | `ENOENT` | File Manager |
+| `$07` | VOLUME MISMATCH | `ENOENT` | File Manager; RWTS `$20` |
+| `$08` | I/O ERROR | `EIO` | File Manager; other RWTS errors; unknown codes |
+| `$09` | DISK FULL | `ENOSPC` | File Manager |
+| `$0A` | FILE LOCKED | `EACCES` | File Manager |
+| `$0B` | SYNTAX ERROR | `EINVAL` | A bad name (`fmname.s`, `rename`) |
+| `$0C` | NO BUFFERS AVAILABLE | `ENOMEM` | No memory for a temporary control block |
+| `$0D` | FILE TYPE MISMATCH | `ENOEXEC` | `exec()` of a file that isn't B or A |
+| `$0E`, `$0F` | PROGRAM TOO LARGE, NOT DIRECT COMMAND | `ENOMEM`, `EINVAL` | (DOS commands; not produced) |
 
+**Library codes (decision).** Some failures have no DOS 3.3 number,
+because DOS itself doesn't refuse them. DOS's RENAME, for instance,
+accepts a name that already exists. `remove` and `rename` must still
+return an OS code: cc65's `remove.s` and `rename.s` pass the
+`__sysremove`/`__sysrename` result to `___mappederrno`. So these get
+codes of the library's own, numbered after DOS's range and mapped in the
+same table. That is the precedent of Atari's `oserror.s`, whose code 183
+is "used by cc65 rtl". Modules that already failed through
+`___directerrno` (`EMFILE`, `ENOMEM` from `open`, `EINVAL` for flags
+DOS 3.3 lacks) still do.
+
+| `__oserror` | Message | `errno` | Produced by |
+|---|---|---|---|
+| `$10` | File exists | `EEXIST` | `open` with `O_CREAT \| O_EXCL`, `rename` onto an existing name |
+| `$11` | File is open | `EINVAL` | `remove`, `rename` of an open file (5.5a) |
+| `$12` | Not running under DOS 3.3 | `ENOSYS` | `remove`, `rename`, `exec` under ProDOS |
+| `$13` | Not a DOS 3.3 disk | `ENODEV` | `opendir` of a disk without a DOS 3.3 VTOC (5.9) |
+| `$14` | Position out of range | `ESPIPE` | `lseek` past a B file's recorded length (5.7) |
+| `$15` | No recorded end of file | `EINVAL` | `O_APPEND` to a raw file (5.3) |
+
+The numbers are in `fm.inc` (`DOSERR_*`, `LIBERR_*`). The messages use
+cc65's sentence case, as the CBM and Atari lists do.
+
+**Verified:** `oserror.s` and `oserrlist.s` were linked into a test
+program and run on cc65's `sim65`. All 18 codes map to their `errno` and
+message, and a ProDOS code (`$46`) maps to `EUNKNOWN`. sim65 supplies its
+own `___osmaperrno` as a paravirtual call, so the test called the module
+under another name. `filetest` checks `__oserror` alongside `errno` for
+each failure it provokes, and `_stroserror` for one DOS and one library
+code.
 
 ### 5.7 lseek
 
@@ -1227,7 +1275,7 @@ the catalog is read directly through RWTS (*Beneath Apple DOS* ch. 4, 6):
 - `opendir` reads the VTOC (track 17, sector 0) and checks that it is a
   DOS 3.3 VTOC: 16 sectors per track, 122 track/sector pairs per list
   sector, and a first catalog sector on the disk. Otherwise it fails
-  with ProDOS code `$52`, which maps to `ENODEV`, so a disk that isn't
+  with the library code `$13` (5.6), which maps to `ENODEV`, so a disk that isn't
   DOS 3.3 fails at `opendir` instead of producing garbage entries.
 - `readdir` follows the catalog chain one sector at a time (seven entries
   per sector). As in DOS's own search (ch. 8, `B1C9`), deleted entries
@@ -1240,8 +1288,10 @@ the catalog is read directly through RWTS (*Beneath Apple DOS* ch. 4, 6):
 - RWTS is called through DOS's own IOB (from `$3E3`), so the device
   characteristics table and last-access fields that DOS maintains stay
   valid, and with ROM banked in, as the File Manager is. RWTS return
-  codes are translated to ProDOS codes (`rwts_maperr`): write protect →
-  `EACCES`, volume mismatch → `ENOENT`, drive or read errors → `EIO`.
+  codes are translated to the DOS error numbers DOS reports for them
+  (`rwts_maperr`, 5.6): write protect → WRITE PROTECTED (`EACCES`),
+  volume mismatch → VOLUME MISMATCH (`ENOENT`), drive or read errors →
+  I/O ERROR (`EIO`).
 
 **`struct dirent`** (`include/dirent.h`):
 
@@ -1313,7 +1363,7 @@ as stock `exec()` does:
    resident for nothing.
 2. **Name:** `fm_tempfcb`, `fm_begin`, `fm_name`. Suffixes (`,S`, `,D`,
    `,V`) work as in `open` (5.5), and explicit S and D stay sticky.
-   Errors: `$25` → `ENOMEM`, `$40` → `EINVAL`.
+   Errors: NO BUFFERS AVAILABLE → `ENOMEM`, SYNTAX ERROR → `EINVAL`.
 3. **Exists, and its type:** OPEN without allocating (X ≠ 0, as
    `fm_isopen` does), take `FM_TYPE` and mask the lock bit (as `open.s`
    does), CLOSE, `fm_freefcb`. OPEN errors are mapped by `fm_maperr`
@@ -1324,7 +1374,7 @@ as stock `exec()` does:
    |---|---|---|
    | `$04` B | `BRUN` | The counterpart of stock's BIN path |
    | `$02` A | `RUN` | A DOS 3.3 idiom; stock has no BASIC case. `cmdline` must be NULL or `""`, otherwise `EINVAL` (an Applesoft program can't receive it, and the guiding principle rules out dropping it silently) |
-   | others | — | `$4A` → `ENOEXEC`, the code stock `typerr` uses |
+   | others | — | FILE TYPE MISMATCH (`$0D`) → `ENOEXEC`, the errno stock `typerr` gives |
 
    I files are rejected. Whether Integer BASIC is present can't be known
    until DOS tries, which would be after the hand-off.
@@ -2362,6 +2412,20 @@ checks, and the other 14 runs still pass.
 
 Raised by polluks on cc65/cc65#3050. **Verified with `make emutest`:** all
 22 runs pass (5.10).
+
+### 10.15 Increment 12: DOS 3.3 error numbers
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/oserror.s`, `oserrlist.s` | New: replace the stock ProDOS tables with DOS 3.3's numbers and messages, plus the library's codes (5.6) |
+| `libsrc/dos33/fm.inc` | `DOSERR_*` and `LIBERR_*` |
+| `libsrc/dos33/fm.s`, `rwts.s` | `fm_maperr` passes DOS's numbers through; `rwts_maperr` gives DOS's numbers |
+| `dir.s`, `exec.s`, `fmname.s`, `fmtemp.s`, `lseek.s`, `open.s`, `seekend.s`, `sysremove.s`, `sysrename.s` | DOS or library codes in place of ProDOS codes |
+| `test/filetest.c` | `__oserror` checked with `errno`; `_stroserror` for one DOS and one library code |
+| `DESIGN.md` | Guiding principle revised (cc65/cc65#3050); 5.6 rewritten |
+
+`errno` values are unchanged, so only `__oserror` and `_stroserror`
+differ for programs.
 
 ## 11. Sources
 

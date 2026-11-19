@@ -24,7 +24,7 @@ __sysremove:
         ; Under ProDOS the page 3 vectors aren't the File Manager
         lda     __dos_type
         beq     :+
-        lda     #$01            ; ProDOS "Bad system call number" -> ENOSYS
+        lda     #LIBERR_NODOS   ; -> ENOSYS
         rts
 
 :       jsr     fm_tempfcb

@@ -45,7 +45,7 @@ _exec:
         ; Under ProDOS the page 3 vectors aren't the File Manager
         lda     __dos_type
         beq     :+
-        lda     #$01            ; ProDOS "Bad system call number" -> ENOSYS
+        lda     #LIBERR_NODOS   ; -> ENOSYS
         jmp     ___mappederrno
 
         ; The file: name, existence and type, as sysremove.s does it
@@ -87,7 +87,7 @@ verb:   lda     type
         beq     stub
         cmp     #FMT_APPLESOFT
         beq     :+
-        lda     #$4A            ; ProDOS "Incompatible file format" -> ENOEXEC
+        lda     #DOSERR_TYPE    ; FILE TYPE MISMATCH -> ENOEXEC
         bne     oserr           ; Branch always
 :       lda     cmdline+1       ; NULL?
         beq     stub

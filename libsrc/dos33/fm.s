@@ -182,30 +182,15 @@ fm_incpos:
         rts
 
 ; ------------------------------------------------------------------------
-; fm_maperr: translate a File Manager return code (A) into the equivalent
-; ProDOS 8 error code, so the stock ___mappederrno, ___oserror values and
-; _stroserror messages work unchanged and match the ProDOS build.
+; fm_maperr: translate a File Manager return code (A) into the
+; __oserror value. The File Manager's codes are DOS 3.3's own error
+; numbers (fm.inc), so they pass through; anything else is an I/O error.
 
 fm_maperr:
-        cmp     #ERRTAB_LEN
+        cmp     #DOSERR_LOCKED + 1
         bcc     :+
-        lda     #$08            ; Unknown: treat as I/O error
-:       tax
-        lda     errtab,x
-        rts
-
-errtab: .byte   $00             ; 00 No error
-        .byte   $01             ; 01 Language not available -> ENOSYS
-        .byte   $04             ; 02 Bad call type          -> EINVAL
-        .byte   $04             ; 03 Bad sub-call type      -> EINVAL
-        .byte   $2B             ; 04 Write protected        -> EACCES
-        .byte   $4C             ; 05 End of data            (handled by callers)
-        .byte   $46             ; 06 File not found         -> ENOENT
-        .byte   $45             ; 07 Volume mismatch        -> ENOENT
-        .byte   $27             ; 08 Disk I/O error         -> EIO
-        .byte   $48             ; 09 Disk full              -> ENOSPC
-        .byte   $4E             ; 0A File locked            -> EACCES
-ERRTAB_LEN = * - errtab
+        lda     #DOSERR_IO      ; Unknown: treat as I/O error
+:       rts
 
         .bss
 

@@ -2,7 +2,7 @@
 ; DOS 3.3 file I/O for the cc65 apple2 target
 ;
 ; seekend: move the file in fdtab slot Y to its end, for O_APPEND.
-; Preserves Y. Returns carry clear, or carry set with a ProDOS error code
+; Preserves Y. Returns carry clear, or carry set with an __oserror value
 ; in A (for ___mappederrno).
 ;
 ;   Header files: the end is the length recorded in the header.
@@ -36,7 +36,7 @@ seekend:
         ldy     #FCB::HDRLEN
         lda     (ptr4),y
         bne     header
-        lda     #$04            ; ProDOS "Bad parameter count" -> EINVAL
+        lda     #LIBERR_NOEND   ; -> EINVAL
         sec
         bcs     out             ; Branch always
 

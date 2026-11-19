@@ -39,7 +39,7 @@ __sysrename:
         ; Under ProDOS the page 3 vectors aren't the File Manager
         lda     __dos_type
         beq     :+
-        lda     #$01            ; ProDOS "Bad system call number" -> ENOSYS
+        lda     #LIBERR_NODOS   ; -> ENOSYS
         rts
 
         ; The new name takes no suffixes
@@ -55,7 +55,7 @@ __sysrename:
         iny
         bne     :-
 badname:
-        lda     #$40            ; ProDOS "Invalid pathname" -> EINVAL
+        lda     #DOSERR_SYNTAX  ; -> EINVAL
         rts
 
 :       jsr     fm_tempfcb
@@ -105,7 +105,7 @@ badname:
         bcs     :+
         lda     #FMC_CLOSE      ; It exists
         jsr     fm_simple
-        lda     #$47            ; ProDOS "Duplicate filename" -> EEXIST
+        lda     #LIBERR_EXISTS  ; -> EEXIST
         bne     free            ; Branch always
 :       cmp     #FMR_NOTFOUND
         bne     fmerr

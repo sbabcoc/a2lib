@@ -93,6 +93,33 @@ FM_WRITE_ADJUST = 1
 FMR_ENDDATA     = $05           ; End of data
 FMR_NOTFOUND    = $06           ; File not found (allocated if X=0)
 
+; __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, as ONERR
+; reports them and DOS's message table orders them ("Beneath Apple DOS"
+; ch. 8, $A971); the File Manager's return codes are the first ten. The
+; library's own codes follow, for conditions DOS 3.3 has no number for,
+; as Atari's oserror.s does with code 183. oserror.s maps them all.
+DOSERR_LANG     = $01           ; Language not available
+DOSERR_RANGE    = $02           ; Range error (bad call type)
+DOSERR_SUBRANGE = $03           ; Range error (bad sub-call type)
+DOSERR_WPROT    = $04           ; Write protected
+DOSERR_ENDDATA  = $05           ; End of data
+DOSERR_NOTFOUND = $06           ; File not found
+DOSERR_VOLUME   = $07           ; Volume mismatch
+DOSERR_IO       = $08           ; I/O error
+DOSERR_FULL     = $09           ; Disk full
+DOSERR_LOCKED   = $0A           ; File locked
+DOSERR_SYNTAX   = $0B           ; Syntax error
+DOSERR_NOBUFS   = $0C           ; No buffers available
+DOSERR_TYPE     = $0D           ; File type mismatch
+DOSERR_TOOLARGE = $0E           ; Program too large
+DOSERR_NOTDIRECT = $0F          ; Not direct command
+LIBERR_EXISTS   = $10           ; File exists (O_EXCL, rename)
+LIBERR_OPEN     = $11           ; File is open (remove, rename)
+LIBERR_NODOS    = $12           ; Not running under DOS 3.3
+LIBERR_NOTDOS   = $13           ; Not a DOS 3.3 disk (opendir)
+LIBERR_POSITION = $14           ; Position out of range (lseek)
+LIBERR_NOEND    = $15           ; File has no recorded end (O_APPEND)
+
 ; File types in the File Manager's coding (OPEN byte 07). These differ
 ; from catalog entry codes for R and S files; see DESIGN.md 4.4.
 FMT_TEXT        = $00

@@ -139,7 +139,7 @@ exists: lda     flags
         and     #O_CREAT | O_EXCL
         cmp     #O_CREAT | O_EXCL
         bne     opened
-        lda     #$47            ; ProDOS "Duplicate filename" -> EEXIST
+        lda     #LIBERR_EXISTS  ; -> EEXIST
         jmp     errclose
 
         ; Set up the control block from the type of the file opened
@@ -237,7 +237,7 @@ done:   ldy     #FCB::HDRLEN
 
 errclosefm:                     ; A = File Manager code, file open
         jsr     fm_maperr
-errclose:                       ; A = ProDOS code, file open
+errclose:                       ; A = __oserror value, file open
         sta     errcode
         lda     #FMC_CLOSE
         jsr     fm_simple
@@ -245,7 +245,7 @@ errclose:                       ; A = ProDOS code, file open
         bne     errfree         ; Branch always
 errfreefm:                      ; A = File Manager code, file not open
         jsr     fm_maperr
-errfree:                        ; A = ProDOS code, file not open
+errfree:                        ; A = __oserror value, file not open
         pha
         ldy     slot
         jsr     freebuffer
@@ -396,7 +396,7 @@ text:   lda     #FCB_TEXT
 ; ------------------------------------------------------------------------
 ; closedirect: close the file in fdtab slot Y (A = REF_NUM, unused).
 ; Rewrites the hidden header's length if it changed. Preserves Y.
-; Returns carry clear, or carry set with a ProDOS error code in A.
+; Returns carry clear, or carry set with an __oserror value in A.
 
 closedirect:
         sty     cslot

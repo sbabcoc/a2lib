@@ -10,8 +10,8 @@
 ; and last-access fields that DOS maintains stay valid ("Beneath Apple
 ; DOS" ch. 6). Uses ptr3.
 ;
-; rwts_maperr: translate an RWTS return code (A) into the equivalent
-; ProDOS 8 error code, as fm_maperr does for the File Manager.
+; rwts_maperr: translate an RWTS return code (A) into the DOS 3.3 error
+; number DOS itself reports for it, as fm_maperr does for the File Manager.
 ;
 
         .include        "zeropage.inc"
@@ -85,13 +85,13 @@ call:   bit     $C082           ; ROM
 rwts_maperr:
         cmp     #$10
         bne     :+
-        lda     #$2B            ; Write protected   -> EACCES
+        lda     #DOSERR_WPROT   ; Write protected   -> EACCES
         rts
 :       cmp     #$20
         bne     :+
-        lda     #$45            ; Volume mismatch   -> ENOENT
+        lda     #DOSERR_VOLUME  ; Volume mismatch   -> ENOENT
         rts
-:       lda     #$27            ; Drive, read, init -> EIO
+:       lda     #DOSERR_IO      ; Drive, read, init -> EIO
         rts
 
         .bss

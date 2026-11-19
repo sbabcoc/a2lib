@@ -27,6 +27,12 @@ explaining the change:
   arguments `exec()` leaves after its command in page 2 (DESIGN.md 5.10);
   otherwise unchanged.
 
+- `oserror.s` (from `libsrc/apple2/oserror.s`): the stock search, with a
+  table for DOS 3.3's error numbers and the library's codes (DESIGN.md
+  5.6) in place of ProDOS's.
+- `oserrlist.s` (from `libsrc/apple2/oserrlist.s`): the stock macros, with
+  DOS 3.3's messages in place of ProDOS's.
+
 `exec.s` replaces `libsrc/apple2/exec.s` but isn't a copy of it: it keeps
 the stock module's structure (its command-line copy and shutdown) with a
 DOS 3.3 command in place of the ProDOS loader.

@@ -5,16 +5,15 @@
 ; file (DELETE, RENAME): they need the work area and buffers as OPEN does.
 ;
 ; fm_tempfcb: allocate one into ptr4. Returns carry clear, or carry set
-;             with A = $25 (maps to ENOMEM; the ProDOS table has no closer
-;             code, since stock cc65 allocates nothing for these calls).
+;             with A = DOSERR_NOBUFS (DOS's NO BUFFERS AVAILABLE, ENOMEM).
 ; fm_freefcb: free the one in ptr4. Preserves A.
 ; fm_isopen:  whether the file named in the parameter list (by fm_name) is
-;             open, as ProDOS checks before DELETE and RENAME (DESIGN.md
+;             open, before DELETE and RENAME (DESIGN.md
 ;             5.5a). OPENs it in the control block in ptr4 without
 ;             allocating it, CLOSEs it, and compares the work area's first
 ;             T/S list, slot and drive with each open file's. Returns carry
-;             clear if it isn't open, or carry set with A = a ProDOS code:
-;             $50 if it is open (maps to EINVAL), or the OPEN's error.
+;             clear if it isn't open, or carry set with A = an __oserror value:
+;             LIBERR_OPEN if it is open (EINVAL), or the OPEN's error.
 ;             Set up the parameter list again before the next call
 ;             (fm_begin, fm_name). Uses ptr2.
 ;
@@ -44,7 +43,7 @@ fm_tempfcb:
         beq     :+
         clc
         rts
-:       lda     #$25
+:       lda     #DOSERR_NOBUFS
         sec
         rts
 
@@ -96,7 +95,7 @@ file:   lda     fdtab + FD::REF_NUM,x
         iny                     ; WA_DRIVE
         jsr     same
         bne     next
-        lda     #$50            ; ProDOS "File is open" -> EINVAL
+        lda     #LIBERR_OPEN    ; -> EINVAL
         sec
         rts
 next:   inx
