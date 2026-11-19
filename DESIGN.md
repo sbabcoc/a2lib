@@ -2474,8 +2474,8 @@ with and without `UTHERNET2`, and an unknown name).
 | `test/emutest.sh` | The exec disk's names: `EXEC_DISK`, `EXEC_PROGS`, `EXEC_EXTRA`, `on_exec_disk` (they hold the exec tests, not only the probes); the card field read into `card`, not `vt`; the run format described field by field |
 | `Makefile` | Comments only: the header lists every target and the Soft-70 library; the sim65 comment names all four suites |
 
-Not changed: `tools/emutest.sh`, the original runner script, which
-nothing has used since `test/emutest.sh` replaced it.
+`tools/emutest.sh`, the original runner script, which nothing had used
+since `test/emutest.sh` replaced it, was removed afterwards (`aba82d7`).
 
 ## 11. Sources
 
