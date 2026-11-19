@@ -32,6 +32,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <apple2.h>
+#include "dos33_filetype.h"
 
 #define TOTAL   4
 
@@ -82,8 +83,8 @@ int main (void)
     printf ("TYPE A WORD, PRESS RETURN:\n");
     fgets (line, sizeof (line), stdin);
 
-    make_file ("EXECT,D2", PRODOS_T_TXT, "TEXT\r", 5);
-    make_file ("EXECA,D2", PRODOS_T_BAS, execa, sizeof (execa));
+    make_file ("EXECT,D2", DOS33_T_TXT, "TEXT\r", 5);
+    make_file ("EXECA,D2", DOS33_T_BAS, execa, sizeof (execa));
 
     check ("MISSING FILE", fails_with ("NOSUCH,D2", NULL, ENOENT));
     check ("T FILE", fails_with ("EXECT,D2", NULL, ENOEXEC));

@@ -25,6 +25,8 @@
 #error "a2lib's dirent.h is for the cc65 apple2 target"
 #endif
 
+#include "dos33_filetype.h"     /* d_type and d_access values */
+
 typedef struct DIR DIR;
 
 /* Fields DOS 3.3 can't supply from the catalog (byte size, dates, aux
@@ -37,14 +39,11 @@ struct dirent {
                                 ** removed, bit 7 cleared */
     unsigned        d_ino;      /* T/S list location: track * 256 + sector */
     unsigned        d_blocks;   /* 512-byte blocks, (d_sectors + 1) / 2,
-                                ** the unit of POSIX and ProDOS */
-    unsigned char   d_type;     /* ProDOS-equivalent type: T $04, B $06,
-                                ** A $FC, I $FA, R $FE; others $00 */
-    unsigned char   d_access;   /* $01 (read only) if locked, else $C3 */
+                                ** the unit of POSIX */
+    unsigned char   d_type;     /* DOS 3.3's type, as the catalog codes
+                                ** it (DOS33_T_*, dos33_filetype.h) */
+    unsigned char   d_access;   /* DOS33_LOCKED if locked, else 0 */
     unsigned        d_sectors;  /* Length in sectors, as CATALOG shows */
-    unsigned char   d_dostype;  /* DOS type, catalog coding without the
-                                ** lock bit: T $00, I $01, A $02, B $04,
-                                ** S $08, R $10, A $20, B $40 */
 };
 
 #define _DE_ISREG(t)  (1)

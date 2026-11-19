@@ -123,13 +123,16 @@ LIBERR_NOTDOS   = $13           ; Not a DOS 3.3 disk (opendir)
 LIBERR_POSITION = $14           ; Position out of range (lseek)
 LIBERR_NOEND    = $15           ; File has no recorded end (O_APPEND)
 
-; File types in the File Manager's coding (OPEN byte 07). These differ
-; from catalog entry codes for R and S files; see DESIGN.md 4.4.
+; File types, as OPEN takes and returns them and the catalog stores them:
+; one coding (DESIGN.md 4.4), DOS 3.3's own, which C programs see too
+; (include/dos33_filetype.h). OPEN copies the type between the parameter
+; list and the directory entry unchanged ("Beneath Apple DOS" ch. 8, $ABA6).
 FMT_TEXT        = $00
 FMT_INTEGER     = $01
 FMT_APPLESOFT   = $02
 FMT_BINARY      = $04
-FMT_RELOC       = $08
+FMT_SPECIAL     = $08           ; S
+FMT_RELOC       = $10           ; R
 FMT_LOCKED      = $80           ; OPEN's type byte and catalog entries: locked
 FMT_TYPE_MASK   = $7F           ; AND mask: the type without the lock bit
 
@@ -183,10 +186,9 @@ FCB_TEXT        = $80           ; FCB::KIND value for T files
         NAME    .res ::NAME_LEN + 1 ; NAME_LEN characters + NUL
         INO     .word           ; T/S list track * 256 + sector
         BLOCKS  .word           ; 512-byte blocks
-        TYPE    .byte           ; ProDOS-equivalent type
-        ACCESS  .byte           ; $01 locked, $C3 otherwise
+        TYPE    .byte           ; Catalog type without the lock bit
+        ACCESS  .byte           ; FMT_LOCKED if locked, else $00
         SECTORS .word           ; Length in sectors
-        DOSTYPE .byte           ; Catalog type without the lock bit
 .endstruct
 
 .struct DIR

@@ -52,9 +52,9 @@ view of DOS 3.3 they get under ProDOS, down to ProDOS error codes in
 pointed out that cc65's OS-specific codes are what the name says, so one
 OS shouldn't emulate another's. He also said the generic, POSIX side is
 what matters to a cc65 program, including path names. The principle now
-follows that. Sections not yet brought in line say so: names (5.5, 5.9)
-still take DOS's suffixes, and file types (5.4, 5.8, 5.9) still use
-ProDOS's codes.
+follows that: DOS 3.3's error numbers (5.6, increment 12) and file types
+(5.4, 5.8, 5.9, increment 13). Not yet brought in line: names (5.5, 5.9)
+still take DOS's suffixes.
 
 ---
 
@@ -950,11 +950,12 @@ gives the fields). This is the one public-header change (see section 2).
 It's the change most likely to need discussion upstream; it goes to the
 cc65 maintainers together with working code (section 9).
 
-**Revised in increment 3:** the first draft had `d_type` hold the DOS
-file type. Following the guiding principle, `d_type` instead holds the
-ProDOS-equivalent type, as `stat`'s `st_type` does, so code that tests
-file types works under both DOSes; the DOS type is in a separate
-`d_dostype` field.
+**Revised in increment 3, and back in increment 13:** the first draft had
+`d_type` hold the DOS file type. Increment 3 changed it to the
+ProDOS-equivalent type, following the guiding principle as it then was,
+with the DOS type in a separate `d_dostype` field. Under the revised
+principle, `d_type` holds DOS 3.3's own type again, and `d_dostype`, now
+the same value, is gone.
 
 ### 4.4 File Manager facts (verified, *Beneath Apple DOS* ch. 5–6)
 
@@ -973,9 +974,17 @@ file types works under both DOSes; the DOS type is in a separate
   and catalog sectors directly through RWTS (`$3D9`).**
 - Catalog entries store the type byte (bit 7 = locked), a 30-character
   name, and a length **in sectors only**. No byte length is stored.
-- **File-type codes differ:** the File Manager uses `$08`=R and `$10`=S,
-  while catalog entries use `$08`=S and `$10`=R. The type mapping must
-  use the right table in each place.
+- **File-type codes: one coding (corrected in increment 13).** OPEN
+  stores the type it's given in a new file's directory entry, and copies
+  the entry's type back to the parameter list, unchanged (ch. 8, `$ABA6`).
+  CATALOG names `$08` S and `$10` R (its table at `$B3A7`), and so do the
+  catalog entry layout (ch. 4). Ch. 6's parameter list table gives them
+  the other way round (`$08`=R, `$10`=S); that table is wrong. This
+  section first said the two codings differ, from ch. 6. So `FMT_RELOC`
+  was `$08`, the code for S: `_filetype = PRODOS_T_REL` created S files,
+  and `stat` reported S files as REL. No test created an R file until
+  increment 13's, which caught it on the emulator: `stat` said R and
+  `readdir` didn't.
 - `$3EA` reconnects DOS's keyboard and screen hooks.
 
 ---
@@ -1087,10 +1096,31 @@ aux type and its length in the EOF, with no header in the data.
 
 ### 5.4 File types on create
 
-Reuse `__filetype` with ProDOS codes so source stays portable: `$04`→T,
-`$06`→B, `$FC`→A, `$FA`→I, `$FE`→R. The default stays `$06` (B), as in
-stock cc65. Any other `__filetype` has no DOS 3.3 equivalent, so
-`open(..., O_CREAT)` fails with `EINVAL`.
+**Decision (revised in increment 13):** `_filetype` takes **DOS 3.3's own
+type codes**, as a catalog entry stores them and `CATALOG` lists them.
+`include/dos33_filetype.h` names them, after cc65's `PRODOS_T_*` and
+`CBM_T_*`:
+
+| Constant | Type | Code | Created |
+|---|---|---|---|
+| `DOS33_T_TXT` | T | `$00` | yes |
+| `DOS33_T_INT` | I | `$01` | yes |
+| `DOS33_T_BAS` | A | `$02` | yes |
+| `DOS33_T_BIN` | B | `$04` | yes (the default, as stock defaults to BIN) |
+| `DOS33_T_S` | S | `$08` | yes |
+| `DOS33_T_REL` | R | `$10` | yes |
+| `DOS33_T_NEWA`, `DOS33_T_NEWB` | "new" A, B | `$20`, `$40` | no: `EINVAL` |
+
+OPEN takes the same codes, so `open` passes `_filetype` through (4.4).
+Nothing verified shows the File Manager creating the "new" A and B types,
+so they fail with `EINVAL`, as any other code does. `stat` and `readdir`
+report the same codes (5.8, 5.9).
+
+**Before increment 13**, `_filetype` took ProDOS's codes (`$04`→T,
+`$06`→B, `$FC`→A, `$FA`→I, `$FE`→R), so source written for ProDOS would
+create the same kinds of files. Under the revised guiding principle a
+DOS 3.3 program uses DOS 3.3's codes. Note that ProDOS's TXT code, `$04`,
+is DOS 3.3's B: code that still sets `PRODOS_T_TXT` now creates a B file.
 
 Files of types other than T, A, I and B (R, S, and the "new" A and B
 types) are transferred raw. They have no end recorded below sector
@@ -1251,8 +1281,8 @@ seeks.
 | `st_dev` | `slot \| (drive - 1) << 3`, the encoding stock `stat` derives from ProDOS's unit number |
 | `st_mode` | `S_IFREG` (DOS 3.3 has no directories) |
 | `st_size` | T: bytes before the first `$00`; A, I, B: the header's length; others: bytes to the end of the data |
-| `st_access` | `$01` (read only) if locked, else `$C3` (cc65's default for new ProDOS files) |
-| `st_type` | ProDOS equivalent: T `$04`, B `$06`, A `$FC`, I `$FA`, R `$FE`; others `$00` |
+| `st_access` | `DOS33_LOCKED` (`$80`) if the file is locked, else 0: DOS 3.3's only access attribute (increment 13; it was ProDOS's access byte, `$01` or `$C3`) |
+| `st_type` | DOS 3.3's type (`DOS33_T_*`, 5.4), as OPEN returns it: the catalog's coding (4.4; increment 13) |
 | `st_auxtype` | B: the load address; others 0 |
 | `st_blocks` | 512-byte blocks, `(sectors + 1) / 2`, from the file's catalog entry: the same value `readdir` gives in `d_blocks` (5.9) |
 | others | 0. DOS 3.3 keeps no dates. |
@@ -1299,11 +1329,10 @@ the catalog is read directly through RWTS (*Beneath Apple DOS* ch. 4, 6):
 |---|---|
 | `d_name[31]` | Up to 30 characters; bit 7 cleared, trailing blanks removed |
 | `d_ino` | T/S list location, track × 256 + sector (unique on the disk) |
-| `d_blocks` | 512-byte blocks, `(d_sectors + 1) / 2`: the unit of POSIX and ProDOS |
-| `d_type` | ProDOS-equivalent type, as `st_type`: T `$04`, B `$06`, A `$FC`, I `$FA`, R `$FE`; others `$00` |
-| `d_access` | `$01` (read only) if locked, else `$C3`, as `st_access` |
+| `d_blocks` | 512-byte blocks, `(d_sectors + 1) / 2`: the unit of POSIX |
+| `d_type` | DOS 3.3's type, as the catalog stores it, without the lock bit (`DOS33_T_*`, 5.4), as `st_type` |
+| `d_access` | `DOS33_LOCKED` if locked, else 0, as `st_access` |
 | `d_sectors` | Length in sectors, as CATALOG shows (the DOS idiom) |
-| `d_dostype` | DOS type in catalog coding, without the lock bit |
 
 **Fields left out (decision).** cc65's ProDOS `struct dirent` also has
 `d_size`, `d_ctime`, `d_mtime` and `d_auxtype`. The catalog has no byte
@@ -2476,6 +2505,28 @@ with and without `UTHERNET2`, and an unknown name).
 
 `tools/emutest.sh`, the original runner script, which nothing had used
 since `test/emutest.sh` replaced it, was removed afterwards (`aba82d7`).
+
+### 10.19 Increment 13: DOS 3.3 file types
+
+| File | Change |
+|---|---|
+| `include/dos33_filetype.h` | New: `DOS33_T_*` (the catalog's codes) and `DOS33_LOCKED` |
+| `include/dirent.h` | `d_type` holds DOS 3.3's type; `d_access` the lock bit; `d_dostype` removed; includes `dos33_filetype.h` |
+| `libsrc/dos33/fm.inc` | `FMT_SPECIAL`; `FMT_RELOC` corrected from `$08` (S) to `$10` (R): one coding for OPEN and the catalog (4.4) |
+| `libsrc/dos33/open.s` | `_filetype` in DOS 3.3's codes (T, I, A, B, S, R), default B; the "new" A and B fail with `EINVAL` |
+| `libsrc/dos33/stat.s`, `dir.s` | `st_type`/`d_type` in DOS 3.3's codes, `st_access`/`d_access` the lock bit; the ProDOS translation tables removed |
+| `test/filetest.c`, `test/exectest.c` | `DOS33_T_*`; new checks: an R file created and reported as R by `stat` and `readdir`, and the "new" A type refused |
+| `README.md`, `docs/cc65-proposal.md` | README brought up to date (types, and errors since increment 12); a note on what the posted proposal no longer describes |
+
+Raised by Oliver Schmidt's review on cc65/cc65#3050 ("as if there were no
+ProDOS library yet").
+
+**Found on the emulator:** the first version followed 4.4 as it stood,
+converting between two codings for S and R. Its R check failed in
+`readdir` (`stat` passed, since it converted OPEN's byte back). DOS's own
+code (ch. 8) shows one coding, so the conversion went, 4.4 was corrected,
+and `FMT_RELOC` was fixed: a bug since increment 1, found because this
+increment added the first R file test.
 
 ## 11. Sources
 

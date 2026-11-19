@@ -18,6 +18,7 @@
 #include <conio.h>
 #include <sys/stat.h>
 #include <dirent.h>             /* a2lib's DOS 3.3 dirent.h (-I include) */
+#include "dos33_filetype.h"     /* DOS33_T_* (-I include) */
 
 /* Failure lines shown: 24 rows less the BRUN line, the title, 11 groups,
 ** the overflow line, the summary and the prompt after exit. */
@@ -76,7 +77,7 @@ static void text_roundtrip (void)
     int fd;
     int n;
 
-    _filetype = PRODOS_T_TXT;
+    _filetype = DOS33_T_TXT;
     fd = open ("T.TEST", O_WRONLY | O_CREAT | O_TRUNC);
     check ("T create", fd >= 0);
     n = write (fd, data, sizeof (data));
@@ -98,7 +99,7 @@ static void text_reject (void)
     static const unsigned char bad[] = { 'O', 'K', 0x80 };
     int fd;
 
-    _filetype = PRODOS_T_TXT;
+    _filetype = DOS33_T_TXT;
     fd = open ("T.REJECT", O_WRONLY | O_CREAT | O_TRUNC);
     errno = 0;
     check ("T reject 8-bit", write (fd, bad, sizeof (bad)) == -1 && errno == EINVAL);
@@ -115,7 +116,7 @@ static void text_append_truncate (void)
     int fd;
     int n;
 
-    _filetype = PRODOS_T_TXT;
+    _filetype = DOS33_T_TXT;
     fd = open ("T.APPEND", O_WRONLY | O_CREAT | O_TRUNC);
     write (fd, "ONE", 3);
     close (fd);
@@ -144,7 +145,7 @@ static void binary_header (void)
     int fd;
     int n;
 
-    _filetype = PRODOS_T_BIN;
+    _filetype = DOS33_T_BIN;
     _auxtype = 0x2000;
     fd = open ("B.TEST", O_WRONLY | O_CREAT | O_TRUNC);
     check ("B create", fd >= 0);
@@ -193,6 +194,13 @@ static void open_flags_names (void)
     fd = open ("t.test", O_RDONLY);
     check ("names are case-insensitive", fd >= 0);
     close (fd);
+
+    /* DOS 3.3 lists "new" A files, but nothing shows the File Manager
+    ** creates them (DESIGN.md 5.4) */
+    _filetype = DOS33_T_NEWA;
+    errno = 0;
+    check ("type DOS can't create", open ("X.NEWA", O_WRONLY | O_CREAT) == -1
+                                    && errno == EINVAL);
 }
 
 /* Write a file of the current _filetype with the given contents */
@@ -219,7 +227,7 @@ static void seek_tests (void)
     int fd;
 
     /* T files: each whence; any position; 16-bit limit */
-    _filetype = PRODOS_T_TXT;
+    _filetype = DOS33_T_TXT;
     make_file ("T.SEEK", "ABCDEFG", 7);
     fd = open ("T.SEEK", O_RDWR);
     check ("T seek end", lseek (fd, 0, SEEK_END) == 7);
@@ -248,7 +256,7 @@ static void seek_tests (void)
     close (fd);
 
     /* B files: not past the recorded length */
-    _filetype = PRODOS_T_BIN;
+    _filetype = DOS33_T_BIN;
     make_file ("B.SEEK", bdata, sizeof (bdata));
     fd = open ("B.SEEK", O_RDONLY);
     check ("B seek", lseek (fd, 3, SEEK_SET) == 3 && byte_at (fd) == 4);
@@ -263,7 +271,7 @@ static void remove_rename (void)
 {
     int fd;
 
-    _filetype = PRODOS_T_TXT;
+    _filetype = DOS33_T_TXT;
     make_file ("T.GONE", "X", 1);
     check ("remove", remove ("T.GONE") == 0
                      && open ("T.GONE", O_RDONLY) == -1 && errno == ENOENT);
@@ -304,12 +312,19 @@ static void stat_tests (void)
     static struct stat st;
 
     check ("stat T", stat ("T.TEST", &st) == 0);
-    check ("stat T fields", st.st_mode == S_IFREG && st.st_type == PRODOS_T_TXT
-                            && st.st_access == 0xC3);
+    check ("stat T fields", st.st_mode == S_IFREG && st.st_type == DOS33_T_TXT
+                            && st.st_access == 0);
     check ("stat T size", st.st_size == 7);
-    check ("stat B", stat ("B.TEST", &st) == 0 && st.st_type == PRODOS_T_BIN);
+    check ("stat B", stat ("B.TEST", &st) == 0 && st.st_type == DOS33_T_BIN);
     check ("stat B load address", st.st_auxtype == 0x2000);
     check ("stat B size", st.st_size == 6);
+
+    /* R and S: "Beneath Apple DOS" ch. 6 gives the File Manager's codes
+    ** for them swapped; OPEN in fact stores and returns the catalog's
+    ** (DESIGN.md 4.4). An R file must be R in stat and in readdir. */
+    _filetype = DOS33_T_REL;
+    make_file ("R.TEST", "X", 1);
+    check ("stat R type", stat ("R.TEST", &st) == 0 && st.st_type == DOS33_T_REL);
     errno = 0;
     check ("stat missing", stat ("NO.SUCH.FILE", &st) == -1 && errno == ENOENT);
 }
@@ -321,7 +336,7 @@ static void dir_tests (void)
     static char first[31];
     DIR* d;
     struct dirent* e;
-    unsigned char entries = 0, found_t = 0, found_b = 0, gone = 0;
+    unsigned char entries = 0, found_t = 0, found_b = 0, found_r = 0, gone = 0;
     unsigned t_blocks = 0;
 
     d = opendir ("");
@@ -334,18 +349,21 @@ static void dir_tests (void)
             strcpy (first, e->d_name);
         }
         if (strcmp (e->d_name, "T.TEST") == 0) {
-            found_t = e->d_type == PRODOS_T_TXT && e->d_dostype == 0x00
-                      && e->d_access == 0xC3 && e->d_sectors > 0
+            found_t = e->d_type == DOS33_T_TXT
+                      && e->d_access == 0 && e->d_sectors > 0
                       && e->d_blocks == (e->d_sectors + 1) / 2;
             t_blocks = e->d_blocks;
         } else if (strcmp (e->d_name, "B.TEST") == 0) {
-            found_b = e->d_type == PRODOS_T_BIN && e->d_dostype == 0x04;
+            found_b = e->d_type == DOS33_T_BIN;
+        } else if (strcmp (e->d_name, "R.TEST") == 0) {
+            found_r = e->d_type == DOS33_T_REL;
         } else if (strcmp (e->d_name, "T.GONE") == 0) {
             gone = 1;
         }
     }
     check ("readdir T entry", found_t);
     check ("readdir B entry", found_b);
+    check ("readdir R entry", found_r);
     check ("removed file not listed", !gone);
     rewinddir (d);
     e = readdir (d);
@@ -389,7 +407,7 @@ static void stdio_layer (void)
 {
     FILE* f;
 
-    _filetype = PRODOS_T_TXT;
+    _filetype = DOS33_T_TXT;
     f = fopen ("T.STDIO", "w");
     check ("fopen w", f != NULL);
     if (f) {

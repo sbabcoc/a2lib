@@ -230,30 +230,16 @@ entry:  tax
         ldy     #DIR::ENT + DIRENT::INO + 1
         sta     (ptr1),y
 
-        ; d_access, d_dostype, d_type
+        ; d_access (the lock bit) and d_type (the catalog's type, as is)
         ldy     #ENT_TYPE
         lda     (ptr2),y
-        ldx     #$C3
-        asl                     ; Lock bit into C
-        bcc     :+
-        ldx     #$01
-:       lsr                     ; Type without the lock bit
         pha
-        txa
+        and     #FMT_LOCKED
         ldy     #DIR::ENT + DIRENT::ACCESS
         sta     (ptr1),y
         pla
-        ldy     #DIR::ENT + DIRENT::DOSTYPE
-        sta     (ptr1),y
-        ldx     #NTYPES - 1
-@find:  cmp     ctypes,x
-        beq     @found
-        dex
-        bpl     @find
-        lda     #$00
-        beq     @store          ; Branch always
-@found: lda     ptypes,x
-@store: ldy     #DIR::ENT + DIRENT::TYPE
+        and     #FMT_TYPE_MASK
+        ldy     #DIR::ENT + DIRENT::TYPE
         sta     (ptr1),y
 
         ; d_sectors; d_blocks = (d_sectors + 1) / 2
@@ -364,8 +350,3 @@ entryofs:
         .repeat CAT_PERSECTOR, i
         .byte   i * CAT_ENTRYLEN
         .endrepeat
-
-; Catalog type (lock bit cleared) -> ProDOS type
-ctypes: .byte   $00, $04, $02, $01, $10 ; T, B, A, I, R
-NTYPES = * - ctypes
-ptypes: .byte   $04, $06, $FC, $FA, $FE

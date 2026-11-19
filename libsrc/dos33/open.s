@@ -103,20 +103,20 @@ found:  sty     slot
         jmp     errfree
 
 :
-        ; Choose the File Manager type for a new file from _filetype
+        ; The type for a new file: _filetype, if it's one the File Manager
+        ; creates
         lda     flags
         and     #O_CREAT
         beq     old
+        lda     __filetype
         ldx     #NTYPES - 1
-:       lda     __filetype
-        cmp     ptypes,x
+:       cmp     ctypes,x
         beq     :+
         dex
         bpl     :-
-        lda     #EINVAL         ; No DOS 3.3 equivalent
+        lda     #EINVAL         ; Not a type the File Manager creates
         jmp     errfreedirect
-:       lda     ftypes,x
-        sta     type
+:       sta     type
         ldx     #$00            ; Allocate the file if it isn't found
         beq     doopen          ; Branch always
 old:    ldx     #$01
@@ -476,23 +476,17 @@ TRUNCATED = 2
 
         .rodata
 
-; _filetype (ProDOS codes) -> File Manager type for new files
-ptypes: .byte   $04             ; TXT
-        .byte   $06             ; BIN
-        .byte   $FC             ; BAS
-        .byte   $FA             ; INT
-        .byte   $FE             ; REL
-NTYPES = * - ptypes
-ftypes: .byte   FMT_TEXT
-        .byte   FMT_BINARY
-        .byte   FMT_APPLESOFT
-        .byte   FMT_INTEGER
-        .byte   FMT_RELOC
+; The types a new file can have.
+; Not the "new" A and B ($20, $40): DOS 3.3 lists them, but nothing shows
+; that the File Manager creates them.
+ctypes: .byte   FMT_TEXT, FMT_INTEGER, FMT_APPLESOFT, FMT_BINARY
+        .byte   FMT_SPECIAL, FMT_RELOC
+NTYPES = * - ctypes
 
         .data
 
 __filetype:
-        .byte   $06             ; Default: binary file, as in stock cc65
+        .byte   FMT_BINARY      ; Default: B, as stock cc65 defaults to BIN
 __auxtype:
         .word   $0000           ; B files: load address
 __datetime:

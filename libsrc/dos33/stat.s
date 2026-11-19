@@ -12,10 +12,8 @@
 ;   st_mode     S_IFREG (DOS 3.3 has no directories)
 ;   st_size     T: bytes before the first $00; A, I, B: the header's
 ;               length; others: bytes up to the end of the data
-;   st_access   $01 (read only) if locked, else $C3 (cc65's default for
-;               new ProDOS files)
-;   st_type     ProDOS equivalent: T $04, B $06, A $FC, I $FA, R $FE;
-;               others $00
+;   st_access   DOS33_LOCKED ($80) if the file is locked, else 0
+;   st_type     DOS 3.3's type, in the catalog's coding (DOS33_T_*)
 ;   st_auxtype  B: load address; others 0
 ;   st_blocks   512-byte blocks, (sectors + 1) / 2, from the file's catalog
 ;               entry; the same value readdir() gives in d_blocks
@@ -95,30 +93,17 @@ _stat:
         ldy     #stat::st_mode
         sta     (ptr1),y
 
-        ; st_access
+        ; st_access: the lock bit
         ldy     #FCB::TYPE
         lda     (ptr4),y
         sta     type
-        ldx     #$C3
-        asl                     ; Lock bit into C
-        bcc     :+
-        ldx     #$01
-:       txa
+        and     #FMT_LOCKED
         ldy     #stat::st_access
         sta     (ptr1),y
 
-        ; st_type
+        ; st_type: OPEN's type, as the catalog has it
         lda     type
         and     #FMT_TYPE_MASK
-        ldx     #NTYPES - 1
-:       cmp     ftypes,x
-        beq     :+
-        dex
-        bpl     :-
-        lda     #$00
-        beq     settype         ; Branch always
-:       lda     ptypes,x
-settype:
         ldy     #stat::st_type
         sta     (ptr1),y
 
@@ -241,11 +226,6 @@ fail:   lda     ___errno
         rts
 
         .rodata
-
-; File Manager type (lock bit cleared) -> ProDOS type
-ftypes: .byte   FMT_TEXT, FMT_BINARY, FMT_APPLESOFT, FMT_INTEGER, FMT_RELOC
-NTYPES = * - ftypes
-ptypes: .byte   $04,      $06,        $FC,           $FA,         $FE
 
         .bss
 

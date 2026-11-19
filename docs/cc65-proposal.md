@@ -1,5 +1,12 @@
 # Proposal: DOS 3.3 file I/O for the apple2 target
 
+> **Note (2026-11-19):** this is the proposal as posted on cc65/cc65#3050.
+> After Oliver Schmidt's review there, a2lib no longer emulates ProDOS's
+> OS-specific behavior: `_oserror` holds DOS 3.3's own error numbers
+> (DESIGN.md 5.6), and file types are DOS 3.3's own codes (5.4). Paths are
+> next (5.5). DESIGN.md is current; this text is not.
+
+
 *Draft for an issue on cc65/cc65. a2lib's DESIGN.md has the full
 reasoning; section numbers below refer to it.*
 
