@@ -24,8 +24,9 @@ explaining the change:
 - `cout.s` (from `libsrc/apple2/cout.s`): `COUT` is a vector, so the
   reflow filter can be switched in; the stock routine is `a2_rawcout`.
 - `mainargs.s` (from `libsrc/apple2/mainargs.s`): under DOS 3.3, takes the
-  arguments `exec()` leaves after its command in page 2 (DESIGN.md 5.10);
-  otherwise unchanged.
+  arguments `exec()` leaves after its command in page 2 (DESIGN.md 5.10),
+  and includes `machine.inc` for that code's characters; otherwise
+  unchanged.
 
 - `oserror.s` (from `libsrc/apple2/oserror.s`): the stock search, with a
   table for DOS 3.3's error numbers and the library's codes (DESIGN.md

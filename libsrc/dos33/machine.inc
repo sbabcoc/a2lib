@@ -19,11 +19,14 @@ DOS_CONNECT     := $03EA        ; Reconnect DOS's I/O intercepts (page 3 vector)
 
 ; Pages exec() uses after the C library has shut down
 STACK_PAGE      := $0100        ; Hardware stack page: exec()'s saved cmdline
+.ifndef BASIC_BUF                       ; Stock mainargs.s defines it too
 BASIC_BUF       := $0200        ; GETLN's buffer: where DOS collects a command
+.endif
 
 ; Characters as the monitor and DOS use them: high bit set
 HI_CTRL_D       = $84           ; Starts a DOS command in output
 HI_BS           = $88           ; Backspace
+HI_LF           = $8A           ; Line feed
 HI_CR           = $8D           ; Carriage return
 HI_SPACE        = $A0           ; Space; DOS pads names with it
 HIBIT_OFF       = $7F           ; AND mask: high-bit character to plain ASCII

@@ -59,6 +59,8 @@ FNAM_LEN  = $280
 FNAM      = $281
 REM       = $B2                 ; BASIC token-code
 
+        .include        "machine.inc"   ; a2lib: execargs' characters
+
 ; Get possible command-line arguments. Goes into the special ONCE segment,
 ; which may be reused after the startup code is run.
 
@@ -194,20 +196,20 @@ done:   lda     #<argv
 
 execargs:
         lda     BASIC_BUF       ; The command begins with Ctrl-D
-        cmp     #$84
+        cmp     #HI_CTRL_D
         bne     none
         ldx     #$00
 :       inx
         bmi     none            ; exec()'s command is far shorter
         lda     BASIC_BUF,x
-        cmp     #$8D            ; Its CR
+        cmp     #HI_CR          ; Its CR
         bne     :-
         lda     BASIC_BUF+1,x   ; Then $00 and REM
         bne     none
         lda     BASIC_BUF+2,x
         cmp     #REM
         bne     none
-        lda     #$A0            ; Clear the marker
+        lda     #HI_SPACE       ; Clear the marker
         sta     BASIC_BUF+1,x
         lda     #<empty
         sta     argv

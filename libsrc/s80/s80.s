@@ -48,6 +48,7 @@
         .include        "display.inc"
         .include        "vt.inc"
         .include        "timer.inc"
+        .include        "machine.inc"
 
         .export         .ident(.concat(S80_API, "pan"))
         .export         .ident(.concat(S80_API, "follow"))
@@ -389,20 +390,20 @@ s80_cout:
         pha
         tsx
         lda     $0103,x
-        cmp     #$8D            ; Return: CR + LF
+        cmp     #HI_CR          ; Return: CR + LF
         bne     :+
         jsr     s80_cr
         jsr     s80_lf
         jmp     out
-:       cmp     #$8A            ; Line feed
+:       cmp     #HI_LF
         bne     :+
         jsr     s80_lf
         jmp     out
-:       cmp     #$88            ; Backspace
+:       cmp     #HI_BS
         bne     :+
         jsr     back
         jmp     out
-:       cmp     #$A0            ; Other controls: ignored
+:       cmp     #HI_SPACE       ; Other controls: ignored
         bcc     out
         S80_ATTR                ; As the monitor's COUT does
         jsr     s80_put
