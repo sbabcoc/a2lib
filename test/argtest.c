@@ -5,7 +5,8 @@
 ** Started by exectest, it expects argv[1] "PRE=4/4" (exectest's own
 ** checks), then ONE, TWO 2 (quoted), THREE and 100 X's, and ends with the
 ** summary. Started from the keyboard (BRUN ARGTEST,D2) it must get no
-** arguments, and prints DIRECT OK.
+** arguments, and prints DIRECT OK, then ARGTEST DONE: the runner waits
+** for that last line, so the screen it saves has the result whole.
 **
 ** Built with apple2-dos33.lib. Run under DOS 3.3 with the test disk in
 ** drive 2, by exectest.
@@ -52,6 +53,7 @@ int main (int argc, char* argv[])
 {
     if (argc == 1) {
         printf ("DIRECT %s\n", argv[0][0] == '\0' ? "OK" : "ARGV[0] NOT EMPTY");
+        printf ("ARGTEST DONE\n");
         return 0;
     }
 

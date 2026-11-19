@@ -84,8 +84,8 @@ nettest|nettest|net|--expect|SERVER PORT|--type|@PORT@\r|PRESS A KEY|ALL [0-9]* 
 bloadprobe|bloadprobe|-||PASSED|ALL [0-9]* PASSED
 errprobe|errprobe|-|--expect|FILE NOT FOUND|--type|PRINT 6*7\r|42|FILE NOT FOUND && ^42 && ! IN [0-9]
 errproberaw|errproberaw|-|--expect|FILE NOT FOUND|--type|PRINT 6*7\r|42|.
-exectest|exectest|-|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|DIRECT|ALL [0-9]* PASSED && DIRECT OK$
-exectest-vt|exectestvt|vt|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|DIRECT|ALL [0-9]* PASSED && DIRECT OK$
+exectest|exectest|-|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|ARGTEST DONE|ALL [0-9]* PASSED && DIRECT OK$
+exectest-vt|exectestvt|vt|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|ARGTEST DONE|ALL [0-9]* PASSED && DIRECT OK$
 execatest|execatest|-|--expect|TYPE A WORD|--type|HELLO\r|EXECA OK|^EXECA OK && ! ERROR
 '
 
