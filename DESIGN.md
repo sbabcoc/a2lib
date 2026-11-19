@@ -52,9 +52,8 @@ view of DOS 3.3 they get under ProDOS, down to ProDOS error codes in
 pointed out that cc65's OS-specific codes are what the name says, so one
 OS shouldn't emulate another's. He also said the generic, POSIX side is
 what matters to a cc65 program, including path names. The principle now
-follows that: DOS 3.3's error numbers (5.6, increment 12) and file types
-(5.4, 5.8, 5.9, increment 13). Not yet brought in line: names (5.5, 5.9)
-still take DOS's suffixes.
+follows that: DOS 3.3's error numbers (5.6, increment 12), file types
+(5.4, 5.8, 5.9, increment 13) and POSIX paths (5.5, 5.9, increment 14).
 
 ### Code conventions
 
@@ -1175,36 +1174,62 @@ granularity, so reads return data up to the end of the last sector, and
 ### 5.5 Names and locations
 
 ProDOS addresses files by pathname (`/VOLUME/NAME`). DOS 3.3 names carry
-no location, but the File Manager needs slot and drive in every call, so
-some mechanism is required. **Decision:** use DOS 3.3's own syntax.
+no location, but the File Manager needs slot and drive in every call.
 
-- **Default:** a plain `"MYFILE"` uses DOS's last-used values. On 48K DOS
-  3.3 these are at `$AA66` (volume), `$AA68` (drive), and `$AA6A` (slot),
-  each 2 bytes (verified, *Beneath Apple DOS* ch. 8).
-- **Explicit:** `"MYFILE,S6,D2,V254"`, with any combination of suffixes,
-  as typed at the DOS prompt, in `open`, `remove`, `rename`, and `stat`.
-- **Directories:** `opendir(",D2")` lists drive 2. `chdir(",S6,D2")`
-  changes the defaults, which corresponds to ProDOS's prefix.
-- Names are up to 30 characters and must start with a letter; there are
-  no subdirectories. When no fdtab slot is free, `open` fails with
+**Decision (revised in increment 14): POSIX paths**, as Oliver Schmidt
+proposed on cc65/cc65#3050: cc65 is about POSIX, and targets whose OS has
+no paths still map their devices to them. A DOS 3.3 path names at most a
+slot, a drive and a file:
+
+| Path | Meaning |
+|---|---|
+| `"/6/2/NAME"` | slot 6 (1–7), drive 2 (1–2) |
+| `"2/NAME"` | drive 2 in the current slot |
+| `"NAME"`, `"./NAME"` | the current slot and drive |
+
+- **The current directory is DOS's last-used slot and drive**, at `$AA6A`
+  (slot) and `$AA68` (drive), 2 bytes each (*Beneath Apple DOS* ch. 8).
+  `getcwd` gives `"/6/2"` (`initcwd.s`). `chdir` sets them
+  (`syschdir.s`), so the setting stays after the program exits, as
+  ProDOS's prefix does. A plain name works as it always has.
+- **A path's own slot and drive don't change the current directory.**
+  (The first version made an explicit `,S` or `,D` the new default, as DOS
+  commands do.)
+- **Directories,** for `opendir` and `chdir`: `"/6/2"`, `"2"`, `"."` and
+  `""`, each optionally ending in `/`. `"/"` and `"/6"` aren't
+  directories: they fail with `EINVAL`, as any malformed path does (cc65
+  has no `ENOTDIR`). `chdir`, like DOS's own `,D2`, doesn't read the
+  drive; the first file access on it does.
+- **No volume number.** Paths match any volume, as a DOS command without
+  `,V` does. The first version took `,V254`.
+- **Names** start with a letter, so a leading digit is always a drive and
+  never part of a name. They're up to 30 characters, and may hold any
+  character but `/`, commas included. The File Manager takes any name;
+  only DOS's command parser stops at a comma. `exec` therefore refuses a
+  name with a comma (5.10). When no fdtab slot is free, `open` fails with
   `EMFILE`.
-- **Case (decision):** names are converted to uppercase, because ProDOS
-  treats names case-insensitively, so `open("hello")` finds `HELLO` under
-  both DOSes.
+- **Case (decision):** names are converted to uppercase, so
+  `open("hello")` finds `HELLO`, as names are case-insensitive under
+  ProDOS.
 - **Storage:** names are stored with the high bit set and padded with
   `$A0` to 30 bytes, the way DOS's own command parser fills its name
   buffer (*Beneath Apple DOS* ch. 8, `A095`).
-- **Sticky S and D:** an explicit `S` or `D` suffix becomes the new
-  default, as it does for DOS commands. `V` is not sticky; DOS resets it
-  to 0 for every command (ch. 8, `A0D1`).
+- Any malformed path fails with SYNTAX ERROR (`EINVAL`).
+
+**Before increment 14**, names took DOS's own suffixes,
+`"MYFILE,S6,D2,V254"`, as typed at the DOS prompt, with `opendir(",D2")`
+for directories. That followed the first guiding principle's "respecting
+DOS 3.3 idioms"; the revised principle puts cc65's generic interface, and
+so paths, first.
 
 ### 5.5a remove and rename
 
 - `remove` uses the File Manager's DELETE. A locked file fails with
   `EACCES`, as under ProDOS.
-- `rename` uses RENAME. The old name may carry suffixes; **the new name
-  may not**, since the file stays where it is. A new name with a suffix
-  fails with `EINVAL`, so the location is never ambiguous.
+- `rename` uses RENAME. Either path may give the slot and drive, but
+  **the new one must be where the old one is**: DOS's RENAME can't move a
+  file. Another slot or drive fails with `EINVAL` (cc65 has no `EXDEV`).
+  (Before increment 14, the new name took no suffixes at all.)
 - DOS's RENAME doesn't check whether the new name is already in use and
   would leave two files with the same name. **As under ProDOS, an
   existing new name fails with `EEXIST`**: `rename` first tries to OPEN
@@ -1339,10 +1364,9 @@ bytes more in programs that use `stat` (increment 3).
 ### 5.9 Directories
 
 DOS 3.3 has no subdirectories, so a "directory" is a disk's catalog.
-`opendir` takes a **location instead of a path**: `""` or `"."` for the
-last-used slot and drive, optionally followed by suffixes as at the DOS
-prompt (`",D2"`, `".,S6,D2"`, `",V254"`). An explicit S or D becomes
-DOS's default, as for file names (5.5). Anything else fails with `EINVAL`.
+`opendir` takes a directory path (5.5): `"/6/2"`, `"2"`, `"."` or `""`
+(the current directory), each optionally ending in `/`. Anything else
+fails with `EINVAL`.
 
 **Reading the catalog.** The File Manager's CATALOG call only prints, so
 the catalog is read directly through RWTS (*Beneath Apple DOS* ch. 4, 6):
@@ -1435,9 +1459,10 @@ as stock `exec()` does:
 1. **Under ProDOS:** `ENOSYS`, as `open.s` does (a2lib's file layer is
    DOS 3.3 only). Keeping stock's ProDOS path would keep its loader
    resident for nothing.
-2. **Name:** `fm_tempfcb`, `fm_begin`, `fm_name`. Suffixes (`,S`, `,D`,
-   `,V`) work as in `open` (5.5), and explicit S and D stay sticky.
-   Errors: NO BUFFERS AVAILABLE → `ENOMEM`, SYNTAX ERROR → `EINVAL`.
+2. **Name:** `fm_tempfcb`, `fm_begin`, `fm_name`. Paths work as in
+   `open` (5.5). Errors: NO BUFFERS AVAILABLE → `ENOMEM`, SYNTAX ERROR →
+   `EINVAL`, and SYNTAX ERROR for a name with a comma, which DOS's command
+   parser would end there (increment 14).
 3. **Exists, and its type:** OPEN without allocating (X ≠ 0, as
    `fm_isopen` does), take `FM_TYPE` and mask the lock bit (as `open.s`
    does), CLOSE, `fm_freefcb`. OPEN errors are mapped by `fm_maperr`
@@ -1454,10 +1479,10 @@ as stock `exec()` does:
    until DOS tries, which would be after the hand-off.
 5. **Build the command** in the stub's buffer: `$84`, verb, space, the
    name from `fm_namebuf` with its `$A0` padding trimmed, then
-   `,S<slot>,D<drive>`, plus `,V<n>` if a volume was given, then `$8D`.
-   Slot and drive are written out explicitly, so DOS opens the file that
-   was just checked. Worst case is 48 bytes: `^D` + `BRUN` + space + 30 +
-   `,S7,D2,V254` + CR.
+   `,S<slot>,D<drive>`, then `$8D`. Slot and drive are written out
+   explicitly, so DOS opens the file that was just checked. Worst case is
+   43 bytes: `^D` + `BRUN` + space + 30 + `,S7,D2` + CR. (Until increment
+   14, a `,V<n>` suffix could follow, making 48.)
 6. **Copy the stub** to page 3 (`target = DOSWARM - size`, with stock's
    `.assert target >= $300`). a2lib uses nothing else in `$300`–`$3CF`
    (checked by grep).
@@ -1498,8 +1523,9 @@ The stub, entered from `done` with ROM banked in:
     (`$9FB3`) restores the S it had on entry, which returns into this
     stub.
 
-The stub is 120 bytes, at `$358`–`$3CF`: 70 bytes of code, a length
-byte, and 49 bytes for the command and its terminator.
+The stub is 115 bytes, at `$35D`–`$3CF` (120 at `$358` before increment
+14 dropped the volume suffix): 70 bytes of code, a length
+byte, and 44 bytes for the command and its terminator.
 
 #### Passing `cmdline` (decision)
 
@@ -1525,7 +1551,7 @@ $200: $84 "BRUN NAME,S6,D1" $8D   $00 $B2 cmdline… $00
   `FNAM` (`$281`). Under DOS 3.3, stock makes argv[0] `""` by writing `$00`
   to `$281`, *before* copying the arguments. That is deliberate and fits
   stock's documented 127-character limit (`BUF_LEN`), so it isn't a cc65
-  bug. But a 48-byte command plus a 129-byte tail can reach `$2B1`, and
+  bug. But a 43-byte command plus a 129-byte tail can reach `$2AC`, and
   that write would corrupt exec()'s tail.
 - **Other programs** (stock `mainargs`, Applesoft) see no arguments.
   Stock's scan for `$B2` stops at the `$00`. One exception: a high-bit
@@ -2587,6 +2613,27 @@ Found by auditing increments 11 to 13 against the conventions. Verified
 with `tools/samebytes.sh` against `7a11bbe`: identical. The tool itself
 was checked the other way too: a one-byte change in `s80.s` was reported
 in all seven programs that link it, with exit status 1.
+
+### 10.21 Increment 14: POSIX paths
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/fmname.s` | Rewritten: `/S/D/NAME`, `D/NAME`, `NAME`; directories `/S/D`, `D`, `.`; no suffixes, no sticky defaults, no volume; commas allowed in names |
+| `libsrc/dos33/syschdir.s` | New: `chdir` sets DOS's last-used slot and drive |
+| `libsrc/dos33/initcwd.s` | New (modified copy): `__cwd` is `"/S/D"` under DOS 3.3, so `getcwd` works |
+| `libsrc/dos33/sysrename.s` | The new path must be at the old one's slot and drive |
+| `libsrc/dos33/exec.s` | No volume suffix (`putdec` gone); a name with a comma fails with `EINVAL`; stub 115 bytes at `$35D` |
+| `libsrc/dos33/dir.s`, `include/dirent.h` | `opendir` takes directory paths |
+| `libsrc/dos33/VENDORED.md` | Lists `initcwd.s` |
+| `test/filetest.c` | New group PATHS (10 checks: absolute, drive and `./` paths; bad drive; `getcwd`; `chdir` there and back; `chdir` to a non-directory; a comma in a name; `opendir` of a drive); paths in place of suffixes elsewhere |
+| `test/exectest.c`, `test/argtest.c` | Paths for exec's names; a fifth pre-exec check: a name with a comma |
+| `README.md`, `docs/cc65-proposal.md` | Paths |
+
+Raised by Oliver Schmidt's review on cc65/cc65#3050. The parser was run in
+a 6502 simulator (py65) before the emulator, on 42 paths for `fm_name` and
+`fm_location`: every valid form, and malformed ones (slot 0 or 8, drive 3,
+`/6`, `/`, a missing name, a slash in a name, 31 characters, a name with a
+leading digit), each giving SYNTAX ERROR. All passed.
 
 ## 11. Sources
 

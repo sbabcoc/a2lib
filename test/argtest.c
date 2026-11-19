@@ -2,7 +2,7 @@
 ** The program exectest execs (DESIGN.md 5.10): checks the arguments
 ** exec() passed through page 2, and that mainargs cleared their marker.
 **
-** Started by exectest, it expects argv[1] "PRE=4/4" (exectest's own
+** Started by exectest, it expects argv[1] "PRE=5/5" (exectest's own
 ** checks), then ONE, TWO 2 (quoted), THREE and 100 X's, and ends with the
 ** summary. Started from the keyboard (BRUN ARGTEST,D2) it must get no
 ** arguments, and prints DIRECT OK, then ARGTEST DONE: the runner waits
@@ -61,7 +61,7 @@ int main (int argc, char* argv[])
     check ("ARGC 6", argc == 6);
     check ("ARGV[0] EMPTY", argv[0][0] == '\0');
     if (argc == 6) {
-        check ("PRE-EXEC CHECKS", strcmp (argv[1], "PRE=4/4") == 0);
+        check ("PRE-EXEC CHECKS", strcmp (argv[1], "PRE=5/5") == 0);
         check ("ONE", strcmp (argv[2], "ONE") == 0);
         check ("QUOTED TWO 2", strcmp (argv[3], "TWO 2") == 0);
         check ("THREE", strcmp (argv[4], "THREE") == 0);

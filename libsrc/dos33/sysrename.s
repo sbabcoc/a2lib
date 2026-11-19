@@ -6,9 +6,10 @@
 ; Replaces libsrc/apple2/sysrename.s from cc65. rename() passes the result
 ; to ___mappederrno, so it returns 0 or an __oserror value (DESIGN.md 5.6).
 ;
-;   - The old name may carry suffixes (",S6,D2,V254"); the new name may
-;     not, since the file stays where it is. A new name with a suffix
-;     fails with EINVAL.
+;   - Either path may give the slot and drive ("/6/2/NAME", "2/NAME"),
+;     but the new one must be where the old one is: DOS's RENAME can't
+;     move a file. Another slot or drive fails with EINVAL (cc65 has no
+;     EXDEV).
 ;   - DOS's RENAME doesn't check whether the new name is already in use
 ;     and would leave two files with the same name. As under ProDOS, an
 ;     existing new name fails with EEXIST.
@@ -42,36 +43,24 @@ __sysrename:
         lda     #LIBERR_NODOS   ; -> ENOSYS
         rts
 
-        ; The new name takes no suffixes
-:       lda     newname
-        sta     ptr1
-        lda     newname+1
-        sta     ptr1+1
-        ldy     #$00
-:       lda     (ptr1),y
-        beq     :+
-        cmp     #','
-        beq     badname
-        iny
-        bne     :-
-badname:
-        lda     #DOSERR_SYNTAX  ; -> EINVAL
-        rts
-
 :       jsr     fm_tempfcb
         jcs     done
         jsr     fm_begin
 
-        ; Parse the new name and keep it
+        ; Parse the new name and keep it, with its slot and drive
         lda     newname
         ldx     newname+1
         jsr     fm_name
-        bcs     free
+        jcs     free
         ldx     #NAME_LEN-1
 :       lda     fm_namebuf,x
         sta     newbuf,x
         dex
         bpl     :-
+        lda     fm_slot
+        sta     newslot
+        lda     fm_drive
+        sta     newdrive
 
         ; Parse the old name: sets the name, volume, drive and slot. An
         ; open file can't be renamed; the check leaves the parameter list
@@ -80,6 +69,15 @@ badname:
         ldx     oldname+1
         jsr     fm_name
         bcs     free
+
+        ; The new path must be where the old one is
+        lda     fm_slot
+        cmp     newslot
+        bne     elsewhere
+        lda     fm_drive
+        cmp     newdrive
+        bne     elsewhere
+
         jsr     fm_isopen
         bcs     free
         jsr     fm_begin
@@ -123,12 +121,15 @@ badname:
         lda     #FMC_RENAME
         jsr     fm_simple
         bcc     free            ; A = 0
+elsewhere:
+        lda     #DOSERR_SYNTAX  ; -> EINVAL
+        bne     free            ; Branch always
 fmerr:  jsr     fm_maperr
 free:   jsr     fm_freefcb      ; Preserves A
 done:   ldx     #$00
         rts
 
-; setname: point FM_NAME at the 30-byte name buffer in AX.
+; setname: point FM_NAME at the name buffer in AX.
 
 setname:
         ldy     #FM_NAME
@@ -142,4 +143,6 @@ setname:
 
 oldname:        .res    2
 newname:        .res    2
-newbuf:         .res    30
+newbuf:         .res    NAME_LEN
+newslot:        .res    1
+newdrive:       .res    1

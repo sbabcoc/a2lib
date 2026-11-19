@@ -9,11 +9,12 @@
 **   - a missing file (ENOENT)
 **   - a T file (ENOEXEC)
 **   - a bad name (EINVAL)
+**   - a name with a comma, which a DOS command can't carry (EINVAL)
 **   - an A file with a cmdline (EINVAL)
 **
 ** and execs:
 **
-**   exectest, exectestvt  ARGTEST,D2 with "PRE=<passed>/<total>" and four
+**   exectest, exectestvt  /6/2/ARGTEST with "PRE=<passed>/<total>" and four
 **                         more arguments, one quoted, the last 100
 **                         characters long, so the argument tail runs most
 **                         of the way through page 2. argtest checks them
@@ -34,7 +35,7 @@
 #include <apple2.h>
 #include "dos33_filetype.h"
 
-#define TOTAL   4
+#define TOTAL   5
 
 static unsigned char passed;
 static char line[40];
@@ -83,21 +84,23 @@ int main (void)
     printf ("TYPE A WORD, PRESS RETURN:\n");
     fgets (line, sizeof (line), stdin);
 
-    make_file ("EXECT,D2", DOS33_T_TXT, "TEXT\r", 5);
-    make_file ("EXECA,D2", DOS33_T_BAS, execa, sizeof (execa));
+    make_file ("2/EXECT", DOS33_T_TXT, "TEXT\r", 5);
+    make_file ("2/EXECA", DOS33_T_BAS, execa, sizeof (execa));
+    make_file ("2/EXEC,B", DOS33_T_BIN, "X", 1);
 
-    check ("MISSING FILE", fails_with ("NOSUCH,D2", NULL, ENOENT));
-    check ("T FILE", fails_with ("EXECT,D2", NULL, ENOEXEC));
+    check ("MISSING FILE", fails_with ("2/NOSUCH", NULL, ENOENT));
+    check ("T FILE", fails_with ("/6/2/EXECT", NULL, ENOEXEC));
     check ("BAD NAME", fails_with ("1BAD", NULL, EINVAL));
-    check ("A FILE WITH CMDLINE", fails_with ("EXECA,D2", "X", EINVAL));
+    check ("A FILE WITH CMDLINE", fails_with ("2/EXECA", "X", EINVAL));
+    check ("COMMA IN THE NAME", fails_with ("EXEC,B", NULL, EINVAL));
     printf ("PRE-EXEC %u/%u\n", passed, TOTAL);
 
 #ifdef EXECA
-    exec ("EXECA,D2", NULL);
+    exec ("/6/2/EXECA", NULL);
 #else
     sprintf (cmdline, "PRE=%u/%u ONE \"TWO 2\" THREE ", passed, TOTAL);
     memset (cmdline + strlen (cmdline), 'X', 100);
-    exec ("ARGTEST,D2", cmdline);
+    exec ("/6/2/ARGTEST", cmdline);
 #endif
     printf ("EXEC RETURNED (ERRNO %d)\n", errno);
     return 0;

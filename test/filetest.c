@@ -20,9 +20,9 @@
 #include <dirent.h>             /* a2lib's DOS 3.3 dirent.h (-I include) */
 #include "dos33_filetype.h"     /* DOS33_T_* (-I include) */
 
-/* Failure lines shown: 24 rows less the BRUN line, the title, 11 groups,
+/* Failure lines shown: 24 rows less the BRUN line, the title, 12 groups,
 ** the overflow line, the summary and the prompt after exit. */
-#define MAX_SHOWN   8
+#define MAX_SHOWN   7
 #define MAX_GROUP   10          /* Most checks in one group */
 
 /* __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, then
@@ -187,9 +187,9 @@ static void open_flags_names (void)
     check ("DOS 3.3 messages", strcmp (_stroserror (DOSERR_NOTFOUND), "File not found") == 0
                                && strcmp (_stroserror (LIBERR_EXISTS), "File exists") == 0);
     errno = 0;
-    check ("bad slot", open ("T.TEST,S9", O_RDONLY) == -1 && errno == EINVAL);
+    check ("bad slot", open ("/9/2/T.TEST", O_RDONLY) == -1 && errno == EINVAL);
     errno = 0;
-    check ("bad suffix", open ("T.TEST,X1", O_RDONLY) == -1 && errno == EINVAL);
+    check ("slash in a name", open ("T/X", O_RDONLY) == -1 && errno == EINVAL);
 
     fd = open ("t.test", O_RDONLY);
     check ("names are case-insensitive", fd >= 0);
@@ -266,6 +266,57 @@ static void seek_tests (void)
     close (fd);
 }
 
+/* Paths and the current directory (DESIGN.md 5.5). The test disk is in
+** slot 6, drive 2, the current directory after BRUN ...,D2; the DOS 3.3
+** System Master in drive 1 has no T.TEST. */
+static int cwd_is (const char* want)
+{
+    static char buf[16];
+
+    return getcwd (buf, sizeof (buf)) != NULL && strcmp (buf, want) == 0;
+}
+
+static void paths (void)
+{
+    int fd;
+    DIR* d;
+
+    fd = open ("/6/2/T.TEST", O_RDONLY);
+    check ("absolute path", fd >= 0);
+    close (fd);
+    fd = open ("2/T.TEST", O_RDONLY);
+    check ("drive path", fd >= 0);
+    close (fd);
+    fd = open ("./T.TEST", O_RDONLY);
+    check ("./ path", fd >= 0);
+    close (fd);
+    errno = 0;
+    check ("bad drive, no name", open ("/6/3/T.TEST", O_RDONLY) == -1 && errno == EINVAL
+                                 && open ("/6/2", O_RDONLY) == -1 && errno == EINVAL);
+    check ("getcwd", cwd_is ("/6/2"));
+
+    /* chdir moves where plain names are found; set it back either way */
+    errno = 0;
+    check ("chdir to drive 1", chdir ("1") == 0 && cwd_is ("/6/1")
+                               && open ("T.TEST", O_RDONLY) == -1 && errno == ENOENT);
+    check ("chdir back", chdir ("/6/2/") == 0 && cwd_is ("/6/2"));
+    errno = 0;
+    check ("chdir not a directory", chdir ("/6") == -1 && errno == EINVAL
+                                    && chdir ("/") == -1 && cwd_is ("/6/2"));
+
+    /* The File Manager takes commas in names; only "/" separates */
+    _filetype = DOS33_T_TXT;
+    make_file ("A,B", "X", 1);
+    fd = open ("A,B", O_RDONLY);
+    check ("comma in a name", fd >= 0 && close (fd) == 0 && remove ("A,B") == 0);
+
+    d = opendir ("2");
+    check ("opendir drive", d != NULL);
+    if (d) {
+        closedir (d);
+    }
+}
+
 /* remove and rename (DESIGN.md 5.5) */
 static void remove_rename (void)
 {
@@ -288,7 +339,7 @@ static void remove_rename (void)
     check ("rename onto existing", rename ("T.TEST", "T.NEW") == -1 && errno == EEXIST
                                    && _oserror == LIBERR_EXISTS);
     errno = 0;
-    check ("rename new suffix", rename ("T.NEW", "T.X,D1") == -1 && errno == EINVAL);
+    check ("rename to another drive", rename ("T.NEW", "1/T.X") == -1 && errno == EINVAL);
     errno = 0;
     check ("rename missing", rename ("T.OLD", "T.Y") == -1 && errno == ENOENT);
 
@@ -370,8 +421,8 @@ static void dir_tests (void)
     check ("rewinddir", e != NULL && strcmp (e->d_name, first) == 0);
     check ("closedir", closedir (d) == 0);
 
-    d = opendir (",V0");
-    check ("opendir suffix", d != NULL);
+    d = opendir ("/6/2");
+    check ("opendir path", d != NULL);
     if (d) {
         closedir (d);
     }
@@ -441,6 +492,7 @@ int main (void)
     stdio_layer ();             group ("STDIO");
     seek_tests ();              group ("LSEEK");
     remove_rename ();           group ("REMOVE, RENAME");
+    paths ();                   group ("PATHS");
     stat_tests ();              group ("STAT");
     dir_tests ();               group ("DIRECTORY");
     irq_tests ();               group ("INTERRUPTS");

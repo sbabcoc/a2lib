@@ -13,8 +13,9 @@
 ; a2lib's mainargs.s; an A file takes no cmdline (EINVAL).
 ;
 ; Fails, returning -1 with errno set, before anything is shut down: ENOSYS
-; under ProDOS (a2lib's file layer is DOS 3.3 only), EINVAL for a bad name
-; or an A file with a cmdline, ENOENT and the other OPEN errors, ENOEXEC
+; under ProDOS (a2lib's file layer is DOS 3.3 only), EINVAL for a bad path,
+; a name with a comma (which a DOS command can't carry) or an A file with
+; a cmdline, ENOENT and the other OPEN errors, ENOEXEC
 ; for a file that isn't B or A, ENOMEM if the temporary control block
 ; can't be allocated. After the hand-off, failures are DOS's.
 ;
@@ -30,7 +31,7 @@
 
 ERRFLG  := $D8                  ; Applesoft: bit 7 set while ONERR is active
 REM     = $B2                   ; Applesoft's REM token: mainargs' marker
-CMDMAX  = 1 + 4 + 1 + 30 + 11 + 1   ; ^D BRUN sp name ,S7,D2,V254 CR
+CMDMAX  = 1 + 4 + 1 + NAME_LEN + 6 + 1 ; ^D BRUN sp name ,S7,D2 CR
 
         .code
 
@@ -81,13 +82,25 @@ free:   jsr     fm_freefcb      ; Preserves A
         bcc     verb
 oserr:  jmp     ___mappederrno
 
+        ; A name with a comma can't be given to a DOS command: its parser
+        ; ends the name there. The File Manager accepts one (DESIGN.md 5.5).
+verb:   ldx     #NAME_LEN-1
+@comma: lda     fm_namebuf,x
+        cmp     #',' | $80
+        beq     @syntax
+        dex
+        bpl     @comma
+
         ; BRUN for B, RUN for A (without a cmdline)
-verb:   lda     type
+        lda     type
         cmp     #FMT_BINARY
         beq     stub
         cmp     #FMT_APPLESOFT
         beq     :+
         lda     #DOSERR_TYPE    ; FILE TYPE MISMATCH -> ENOEXEC
+        bne     oserr           ; Branch always
+@syntax:
+        lda     #DOSERR_SYNTAX  ; -> EINVAL
         bne     oserr           ; Branch always
 :       lda     cmdline+1       ; NULL?
         beq     stub
@@ -101,7 +114,7 @@ verb:   lda     type
         jmp     ___directerrno
 
         ; From here on nothing fails. Copy the stub, then build the
-        ; command in it: $84, verb, space, name, slot, drive, volume, $8D.
+        ; command in it: $84, verb, space, name, slot, drive, $8D.
 stub:   ldx     #size - 1
 :       lda     source,x
         sta     target,x
@@ -150,15 +163,7 @@ stub:   ldx     #size - 1
         jsr     putlo
         lda     fm_drive
         jsr     putdigit
-        lda     fm_volume       ; 0: any volume
-        beq     :+
-        lda     #','
-        jsr     putlo
-        lda     #'V'
-        jsr     putlo
-        lda     fm_volume
-        jsr     putdec
-:       lda     #HI_CR
+        lda     #HI_CR
         jsr     put
         stx     len_t           ; DOS stores ^D through CR: the tail goes after
         lda     #$00
@@ -199,42 +204,11 @@ put:    sta     cmd_t,x
         inx
         rts
 
-; putdigit: a decimal digit (0-9) in A. putdec: a number (1-255) in A,
-; without leading zeros. Preserve Y.
+; putdigit: put the decimal digit (0-9) in A. Preserves Y.
 
 putdigit:
         ora     #'0' | $80
         bne     put             ; Branch always
-
-putdec: sty     tmp2
-        ldy     #$00            ; Digits put so far
-        sta     tmp1
-        lda     #100
-        jsr     digit
-        lda     #10
-        jsr     digit
-        lda     tmp1
-        ldy     tmp2
-        jmp     putdigit
-
-digit:  sta     tmp3            ; Place value
-        lda     #$00
-        sta     tmp4            ; This digit
-@count: lda     tmp1
-        cmp     tmp3
-        bcc     @counted
-        sbc     tmp3
-        sta     tmp1
-        inc     tmp4
-        bne     @count          ; Branch always
-@counted:
-        lda     tmp4
-        bne     @put
-        cpy     #$00            ; Leading zero?
-        beq     @skip
-@put:   jsr     putdigit
-        iny
-@skip:  rts
 
         .rodata
 

@@ -1,26 +1,33 @@
 ;
-; DOS 3.3 file name handling for the cc65 apple2 target
+; DOS 3.3 path names for the cc65 apple2 target (DESIGN.md 5.5)
 ;
-; fm_name: parse the C string in AX into the File Manager parameter list
-; (ptr3, set by fm_begin): the 30-byte name buffer and name address, and
-; the volume, drive and slot fields. See DESIGN.md, section 5.5.
+; DOS 3.3 has a slot and drive for every file, and no subdirectories, so a
+; path names at most a slot, a drive and a file, as POSIX paths do:
 ;
-;   "NAME"              Last-used slot and drive, any volume
-;   "NAME,S6,D2,V254"   Any combination and order of suffixes
+;   "/6/2/NAME"         slot 6, drive 2
+;   "2/NAME"            drive 2 in the current slot
+;   "NAME", "./NAME"    the current slot and drive
 ;
-; The name must start with a letter, has at most 30 characters and is
-; converted to uppercase (ProDOS treats names case-insensitively too).
-; It is stored with the high bit set and padded with $A0, the way DOS's
-; own command parser fills its name buffer. As with DOS commands, an
-; explicit S or D becomes the new default.
+; The current directory is DOS's last-used slot and drive ($AA6A, $AA68):
+; chdir() sets them (syschdir.s), and getcwd() gives "/6/2" (initcwd.s).
+; A path's own slot and drive don't change it. The volume is always 0, any
+; volume, as for a DOS command without ",V".
 ;
-; fm_location: parse a location only, for opendir: "" or "." for the
-; last-used slot and drive, optionally followed by suffixes (",D2",
-; ".,S6,D2"). Sets fm_slot, fm_drive and fm_volume, but no parameter
-; list fields, so it doesn't need fm_begin.
+; A name starts with a letter (so a leading digit is a drive, never part
+; of a name), has at most NAME_LEN characters, and may hold any character
+; but "/". It is converted to uppercase and stored with the high bit set,
+; padded with HI_SPACE, as DOS's command parser stores names.
 ;
-; Both return carry clear on success, or carry set with A = DOSERR_SYNTAX
-; (DOS's SYNTAX ERROR, which maps to EINVAL). Uses ptr1, tmp1-tmp4.
+; fm_name:     parse the path in AX into the File Manager parameter list
+;              (ptr3, from fm_begin): the name buffer and its address, and
+;              the volume, drive and slot fields.
+; fm_location: parse a directory, for opendir() and chdir(): "", ".",
+;              "2", "/6/2", each optionally ending in "/". Sets fm_slot,
+;              fm_drive and fm_volume but no parameter list fields, so it
+;              doesn't need fm_begin.
+;
+; Both return carry clear, or carry set with A = DOSERR_SYNTAX (EINVAL).
+; Uses ptr1.
 ;
 
         .include        "zeropage.inc"
@@ -29,24 +36,16 @@
         .code
 
 fm_location:
-        sta     ptr1
-        stx     ptr1+1
-        lda     #LOCATION
-        sta     mode
-        jsr     defaults
-        ldy     #$00
-        lda     (ptr1),y
-        cmp     #'.'
-        bne     :+
-        iny
-:       jmp     next
+        jsr     location
+        bcs     bad
+        lda     (ptr1),y        ; Nothing may follow
+        bne     bad
+        clc
+        rts
 
 fm_name:
-        sta     ptr1
-        stx     ptr1+1
-        lda     #$00
-        sta     mode
-        jsr     defaults
+        jsr     location
+        bcs     bad
 
         ; Blank the name buffer
         ldx     #NAME_LEN-1
@@ -56,7 +55,6 @@ fm_name:
         bpl     :-
 
         ; The name must start with a letter
-        ldy     #$00
         lda     (ptr1),y
         jsr     upcase
         cmp     #'A'
@@ -64,12 +62,12 @@ fm_name:
         cmp     #'Z'+1
         bcs     bad
 
-        ; Copy the name up to the end or the first comma
+        ; Copy it to the end of the string; no "/" in it
         ldx     #$00
-copy:   lda     (ptr1),y
+@copy:  lda     (ptr1),y
         beq     store
-        cmp     #','
-        beq     suffix
+        cmp     #'/'
+        beq     bad
         cpx     #NAME_LEN
         bcs     bad             ; Too long
         jsr     upcase
@@ -77,67 +75,14 @@ copy:   lda     (ptr1),y
         sta     fm_namebuf,x
         inx
         iny
-        bne     copy
-        beq     bad             ; Branch always: string too long
-
-        ; ",<letter><number>"
-suffix: iny                     ; Skip the comma
-        lda     (ptr1),y
-        jsr     upcase
-        sta     tmp2            ; Keyword letter
-        iny
-        jsr     getnum          ; Value in tmp3
-        bcs     bad
-        lda     tmp2
-        cmp     #'S'
-        beq     is_s
-        cmp     #'D'
-        beq     is_d
-        cmp     #'V'
-        bne     bad
-
-        ; V: 0 (any) to 254
-        lda     tmp3
-        cmp     #255
-        bcs     bad
-        sta     fm_volume
-        bcc     next            ; Branch always
-
-        ; S: 1 to 7
-is_s:   lda     tmp3
-        beq     bad
-        cmp     #8
-        bcs     bad
-        sta     fm_slot
-        lda     given
-        ora     #GIVEN_S
-        bne     setgiven        ; Branch always
-
-        ; D: 1 or 2
-is_d:   lda     tmp3
-        beq     bad
-        cmp     #3
-        bcs     bad
-        sta     fm_drive
-        lda     given
-        ora     #GIVEN_D
-setgiven:
-        sta     given
-
-next:   lda     (ptr1),y
-        beq     store
-        cmp     #','
-        beq     suffix
-        ; Anything else is invalid
+        bne     @copy           ; Branch always: Y < 256 for a valid path
 
 bad:    lda     #DOSERR_SYNTAX  ; -> EINVAL
         sec
         rts
 
-        ; Set the parameter list fields (names only)
-store:  bit     mode
-        bmi     sticky
-        ldy     #FM_NAME
+        ; Set the parameter list fields
+store:  ldy     #FM_NAME
         lda     #<fm_namebuf
         sta     (ptr3),y
         iny
@@ -155,73 +100,108 @@ store:  bit     mode
         iny
         lda     fm_slot
         sta     (ptr3),y
-
-        ; Explicit S and D become DOS's defaults
-sticky: lda     given
-        and     #GIVEN_S
-        beq     :+
-        lda     fm_slot
-        sta     DOS_SLOT
-        lda     #$00
-        sta     DOS_SLOT+1
-:       lda     given
-        and     #GIVEN_D
-        beq     :+
-        lda     fm_drive
-        sta     DOS_DRIVE
-        lda     #$00
-        sta     DOS_DRIVE+1
-:       clc
+        clc
         rts
 
 ; ------------------------------------------------------------------------
-; defaults: any volume, last-used drive and slot, no suffixes given.
+; location: parse the slot and drive at the start of the path in AX into
+; fm_slot and fm_drive (the current ones if the path doesn't give them),
+; with fm_volume 0. Returns carry clear with Y indexing what follows (the
+; name, or the end), or carry set on a syntax error.
+;
+;   "/S/D"  "/S/D/..."  "D"  "D/..."  "."  "./..."  anything else: Y = 0
 
-defaults:
+location:
+        sta     ptr1
+        stx     ptr1+1
         lda     #$00
         sta     fm_volume
-        sta     given
         lda     DOS_DRIVE
         sta     fm_drive
         lda     DOS_SLOT
         sta     fm_slot
-        rts
 
-; ------------------------------------------------------------------------
-; getnum: parse 1 to 3 decimal digits at (ptr1),y into tmp3 (at most 255).
-; Advances Y. Returns carry set if there are no digits or on overflow.
+        ldy     #$00
+        lda     (ptr1),y
+        cmp     #'/'
+        beq     @absolute
+        cmp     #'.'
+        beq     @dot
 
-getnum: lda     #$00
-        sta     tmp3
-        ldx     #$00            ; Digit count
-digit:  lda     (ptr1),y
-        sec
-        sbc     #'0'
-        cmp     #10
-        bcs     endnum
-        sta     tmp1
-        lda     tmp3            ; tmp3 = tmp3 * 10 + digit
-        asl
-        bcs     ovf
-        sta     tmp4            ; * 2
-        asl
-        bcs     ovf
-        asl
-        bcs     ovf             ; * 8
-        adc     tmp4
-        bcs     ovf             ; * 10
-        adc     tmp1
-        bcs     ovf
-        sta     tmp3
-        inx
+        ; "D" or "D/": a drive digit, then the end or "/"
+        jsr     drive
+        bcs     @plain
         iny
-        bne     digit
-endnum: txa
-        beq     ovf             ; No digits
+        jmp     endpart
+@plain: ldy     #$00            ; Not a drive: a name
         clc
         rts
-ovf:    sec
+
+        ; "." or "./"
+@dot:   iny
+        jmp     endpart
+
+        ; "/S/D" or "/S/D/"
+@absolute:
+        iny
+        lda     (ptr1),y
+        sec
+        sbc     #'1'
+        cmp     #NSLOTS         ; Slots 1-7
+        bcs     @bad
+        adc     #1
+        sta     fm_slot
+        iny
+        lda     (ptr1),y
+        cmp     #'/'
+        bne     @bad
+        iny
+        jsr     drive
+        bcs     @bad
+        iny
+        jmp     endpart
+@bad:   sec
         rts
+
+; endpart: after a location component, the end of the string, or "/"
+; followed by more (skipped). Returns as location.
+
+endpart:
+        lda     (ptr1),y
+        beq     @done
+        cmp     #'/'
+        bne     @bad
+        iny
+@done:  clc
+        rts
+@bad:   sec
+        rts
+
+; drive: the drive digit at (ptr1),y ('1' or '2'), followed by the end of
+; the string or "/", into fm_drive. Carry set (and fm_drive unchanged) if
+; it isn't one.
+
+drive:  lda     (ptr1),y
+        sec
+        sbc     #'1'
+        cmp     #NDRIVES        ; Drives 1-2
+        bcs     @no
+        pha
+        iny
+        lda     (ptr1),y        ; What follows the digit
+        beq     @yes            ; End of the string
+        cmp     #'/'
+        beq     @yes
+        dey
+        pla
+        sec
+@no:    rts
+@yes:   dey
+        pla
+        clc
+        adc     #1              ; 1 or 2
+        sta     fm_drive
+        rts                     ; C clear
 
 ; ------------------------------------------------------------------------
 
@@ -232,15 +212,9 @@ upcase: cmp     #'a'
         and     #$DF
 :       rts
 
-GIVEN_S  = $01
-GIVEN_D  = $02
-LOCATION = $80                  ; mode: fm_location
-
         .bss
 
 fm_namebuf:     .res    NAME_LEN
-fm_volume:      .res    1       ; Volume, slot and drive of the last name parsed
+fm_volume:      .res    1       ; Volume, slot and drive of the last path parsed
 fm_drive:       .res    1
 fm_slot:        .res    1
-given:          .res    1
-mode:           .res    1

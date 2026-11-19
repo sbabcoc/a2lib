@@ -11,9 +11,9 @@
 ** and linking without the library fails to link, rather than mixing this
 ** struct dirent with cc65's ProDOS implementation (DESIGN.md section 2).
 **
-** opendir() takes a location instead of a path: "" or "." for the
-** last-used slot and drive, optionally followed by suffixes as at the DOS
-** prompt (",D2", ".,S6,D2", ",V254"). DOS 3.3 has no subdirectories.
+** opendir() takes a directory path: "/6/2" (slot 6, drive 2), "2" (drive
+** 2 in the current slot), "." or "" (the current directory). DOS 3.3 has
+** no subdirectories. See DESIGN.md 5.5.
 **
 ** Copyright (c) 2026 Scott Babcock. zlib license; see LICENSE.
 */

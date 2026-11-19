@@ -133,13 +133,13 @@ fails visibly where it can't:
 
 | Topic | Behavior |
 |---|---|
-| File names | `"NAME"` uses the last-used slot and drive; `"NAME,S6,D2,V254"` selects them, as at the DOS prompt. Names are case-insensitive. |
+| File names | POSIX paths: `"/6/2/NAME"` (slot 6, drive 2), `"2/NAME"` (drive 2 in the current slot), `"NAME"`. The current directory is DOS's last-used slot and drive: `getcwd` gives `"/6/2"`, `chdir("1")` moves it. Names are case-insensitive. |
 | New files | Type from `_filetype`, in DOS 3.3's own codes (`include/dos33_filetype.h`): `DOS33_T_TXT`, `DOS33_T_BIN` (the default), `DOS33_T_BAS`, `DOS33_T_INT`, `DOS33_T_S`, `DOS33_T_REL`. ProDOS's codes don't apply: `PRODOS_T_TXT` is DOS 3.3's B. |
 | T files | Stored as DOS 3.3 text (high bit set, CR line endings) and read back byte-for-byte as written. Bytes `$80`–`$FF` are rejected with `EINVAL`; use B files for 8-bit data. |
 | B files | The 4-byte address/length header is hidden. `_auxtype` sets the load address; the length is exact. Files still `BLOAD` and `BRUN`. |
 | Seeking | As under ProDOS, except that T files can be positioned past their end, to reach records of random-access files. Positions are limited to 16 bits. |
-| Rename | The new name takes no suffixes, and an existing new name fails with `EEXIST`, as under ProDOS. |
-| Directories | `opendir` takes a location, not a path: `""` or `"."` for the default drive, optionally with suffixes (`",D2"`). `struct dirent` has the name, DOS 3.3 type, lock bit and size in blocks and sectors; it omits the byte size, dates and aux type, which the catalog doesn't record (use `stat`). |
+| Rename | The new path must be at the old one's slot and drive, and an existing new name fails with `EEXIST`, as under ProDOS. |
+| Directories | `opendir` takes a directory: `"/6/2"`, `"2"`, `"."` or `""`. `struct dirent` has the name, DOS 3.3 type, lock bit and size in blocks and sectors; it omits the byte size, dates and aux type, which the catalog doesn't record (use `stat`). |
 | Clock | `time()` and `clock_gettime` count the up-time until `clock_settime` sets the clock; `a2_clock_age` tells whether, and how long ago, it was set. |
 | Errors | The same `errno` values as under ProDOS; `_oserror` holds DOS 3.3's own error numbers (the ones `ONERR` reports), and `_stroserror` gives DOS's messages. |
 

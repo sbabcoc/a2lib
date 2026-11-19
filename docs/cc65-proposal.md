@@ -3,8 +3,9 @@
 > **Note (2026-11-19):** this is the proposal as posted on cc65/cc65#3050.
 > After Oliver Schmidt's review there, a2lib no longer emulates ProDOS's
 > OS-specific behavior: `_oserror` holds DOS 3.3's own error numbers
-> (DESIGN.md 5.6), and file types are DOS 3.3's own codes (5.4). Paths are
-> next (5.5). DESIGN.md is current; this text is not.
+> (DESIGN.md 5.6), file types are DOS 3.3's own codes (5.4), and names are
+> POSIX paths, `/6/2/NAME`, with `chdir` and `getcwd` (5.5). DESIGN.md is
+> current; this text is not.
 
 
 *Draft for an issue on cc65/cc65. a2lib's DESIGN.md has the full

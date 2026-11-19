@@ -28,6 +28,9 @@ explaining the change:
   and includes `machine.inc` for that code's characters; otherwise
   unchanged.
 
+- `initcwd.s` (from `libsrc/apple2/initcwd.s`): under DOS 3.3, sets
+  `__cwd` to `"/S/D"`, DOS's last-used slot and drive (DESIGN.md 5.5); the
+  ProDOS code is unchanged.
 - `oserror.s` (from `libsrc/apple2/oserror.s`): the stock search, with a
   table for DOS 3.3's error numbers and the library's codes (DESIGN.md
   5.6) in place of ProDOS's.

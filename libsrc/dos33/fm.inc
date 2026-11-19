@@ -25,6 +25,9 @@ DOS_SLOT        := $AA6A        ; 2 bytes
 RWTS_LOCATE     := $03E3
 RWTS_ENTRY      := $03D9
 
+NSLOTS          = 7             ; Slots 1-7
+NDRIVES         = 2             ; Drives 1-2
+
 IOB_TYPE        = $00           ; Table type, must be IOB_TABLE
 IOB_SLOT        = $01           ; Slot * 16
 IOB_DRIVE       = $02           ; Drive (1 or 2)

@@ -48,7 +48,7 @@ __dos33_opendir:
         ldx     ptr1+1
         jsr     fm_location
         bcc     dir_at
-        jmp     nullmapped      ; A = $40 -> EINVAL
+        jmp     nullmapped      ; A = DOSERR_SYNTAX -> EINVAL
 
 dir_at:
         lda     #<.sizeof(DIR)
