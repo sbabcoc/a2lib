@@ -2460,6 +2460,23 @@ The backends' modules based on stock ones (`cgetc.s`, `rdkey.s`,
 `cout.s` and the like) keep their stock code; `s70/font.s` is generated
 from `tools/s70font.txt`.
 
+### 10.18 Readability pass: tests and tooling
+
+No change in what anything does, checked by what each file produces:
+the C tests compile to the same assembly; `make -n` gives the same
+commands for every target; and `test/emutest.sh`, run against stand-ins
+for the runner and AppleCommander, makes the same calls and exits the same
+way in six cases (every run, named runs, a VideoTerm run, the network run
+with and without `UTHERNET2`, and an unknown name).
+
+| File | Change |
+|---|---|
+| `test/emutest.sh` | The exec disk's names: `EXEC_DISK`, `EXEC_PROGS`, `EXEC_EXTRA`, `on_exec_disk` (they hold the exec tests, not only the probes); the card field read into `card`, not `vt`; the run format described field by field |
+| `Makefile` | Comments only: the header lists every target and the Soft-70 library; the sim65 comment names all four suites |
+
+Not changed: `tools/emutest.sh`, the original runner script, which
+nothing has used since `test/emutest.sh` replaced it.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

@@ -41,14 +41,14 @@ AC="${AC:-ac}"
 OUT=build/emu
 DISK="$OUT/a2libtests.dsk"
 NET_DISK="$OUT/a2libnet.dsk"
-PROBE_DISK="$OUT/a2libexec.dsk"
+EXEC_DISK="$OUT/a2libexec.dsk"
 
 # The exec() probes and tests (DESIGN.md 5.10) have a disk of their own:
 # with the probes on the main disk, filetest ran out of space (12 sectors
 # were left free). argtest is on it too: the exec tests start it.
-PROBES=" bloadprobe errprobe errproberaw exectest exectestvt execatest "
-PROBE_EXTRA="argtest"
-is_probe() { [[ "$PROBES" == *" $1 "* ]]; }
+EXEC_PROGS=" bloadprobe errprobe errproberaw exectest exectestvt execatest "
+EXEC_EXTRA="argtest"
+on_exec_disk() { [[ "$EXEC_PROGS" == *" $1 "* ]]; }
 
 die() { echo "emutest: $*" >&2; exit 1; }
 upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }
@@ -57,13 +57,20 @@ upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }
 command -v "$RUNNER" >/dev/null || die "runner not found: $RUNNER (set RUNNER)"
 command -v "$AC" >/dev/null || die "AppleCommander not found: $AC (set AC)"
 
-# The runs: name | program | card (vt for the VideoTerm, net for the
-# Uthernet II, or -) | script | --until text | text that marks a pass: an
-# ERE, or several joined by " && ", where one starting with ! must not
-# match. The
-# script is --type/--expect/--wait steps after BRUN; @PORT@ in it is the
-# echo server's port. Programs that end with "PRESS A KEY" wait there; the
-# others end with their summary, and a failing one runs to the timeout.
+# The runs, one per line, fields separated by "|":
+#
+#   name | program | card | script | --until text | pass condition
+#
+#   card            vt for the VideoTerm, net for the Uthernet II, or -
+#   script          --type/--expect/--wait steps after BRUN, each step and
+#                   its argument a field of its own; @PORT@ in it is the
+#                   echo server's port; empty for none
+#   --until text    the runner stops when it is on the screen
+#   pass condition  an ERE the saved screen must match, or several joined
+#                   by " && "; one starting with ! must not match
+#
+# Programs that end with "PRESS A KEY" wait there; the others end with
+# their summary, and a failing one runs to the timeout.
 RUNS='
 filetest|filetest|-||PASSED|ALL [0-9]* PASSED
 timertest|timertest|-|--expect|TYPE A WORD|--wait|0.2|--type|HELLO\r|PASSED|ALL [0-9]* PASSED
@@ -170,12 +177,12 @@ make_disk() {
             || die "couldn't put $prog on $disk"
     done
 }
-main_progs=() probe_progs=()
+main_progs=() exec_progs=()
 for prog in $(printf '%s\n' "$RUNS" | grep -v '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u); do
-    if is_probe "$prog"; then probe_progs+=("$prog"); else main_progs+=("$prog"); fi
+    if on_exec_disk "$prog"; then exec_progs+=("$prog"); else main_progs+=("$prog"); fi
 done
 make_disk "$DISK" ${main_progs[@]+"${main_progs[@]}"}
-(( ${#probe_progs[@]} > 0 )) && make_disk "$PROBE_DISK" "${probe_progs[@]}" $PROBE_EXTRA
+(( ${#exec_progs[@]} > 0 )) && make_disk "$EXEC_DISK" "${exec_progs[@]}" $EXEC_EXTRA
 printf '%s\n' "$RUNS" | grep -q '^[^|]*|[^|]*|net|' \
     && make_disk "$NET_DISK" $(printf '%s\n' "$RUNS" | grep '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u)
 
@@ -184,7 +191,7 @@ ran=0
 while IFS= read -r line; do
     [[ -n "$line" ]] || continue
     IFS='|' read -r -a f <<< "$line"
-    name="${f[0]}" prog="${f[1]}" vt="${f[2]}"
+    name="${f[0]}" prog="${f[1]}" card="${f[2]}"
     n=${#f[@]}
     until_text="${f[n-2]}" pass_re="${f[n-1]}"
     script=("${f[@]:3:n-5}")
@@ -198,11 +205,11 @@ while IFS= read -r line; do
 
     args=(--d1 "$MASTER" --d2 "$DISK" --type "BRUN $(upper "$prog"),D2\\r")
     [[ -n "${ROMS:-}" ]] && args=(--roms "$ROMS" "${args[@]}")
-    [[ "$vt" == vt ]] && args+=(--videoterm)
-    is_probe "$prog" && args=("${args[@]/#$DISK/$PROBE_DISK}")
+    [[ "$card" == vt ]] && args+=(--videoterm)
+    on_exec_disk "$prog" && args=("${args[@]/#$DISK/$EXEC_DISK}")
     timeout=300
     server=
-    if [[ "$vt" == net ]]; then
+    if [[ "$card" == net ]]; then
         # real time: the server's delay is real, and IP65's timeouts are counted
         args=("${args[@]/#$DISK/$NET_DISK}")
         args+=(--config "$OUT/net.ini" --plugins "$UTHERNET2" --real-time)

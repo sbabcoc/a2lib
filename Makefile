@@ -1,7 +1,11 @@
 # Apple II+ C library for cc65
 #
-#   make            build lib/apple2-dos33.lib
+#   make            build the libraries (below)
 #   make test       also build the test programs
+#   make simtest    build and run the sim65 tests (no Apple II needed)
+#   make emutest    run the test programs on ReplicApple2Plus (below)
+#   make screenshots  the README's screenshot, from an emutest run
+#   make clean      remove build/ and lib/
 #
 # lib/apple2-dos33.lib is a complete replacement for cc65's apple2.lib:
 # a copy of the installed one with the DOS 3.3 modules in place of the
@@ -16,6 +20,10 @@
 #
 # lib/apple2-dos33-vtwin.lib uses the VideoTerm when present and, without
 # it, a 40-column window onto an 80 x 24 screen (include/c40win.h).
+#
+# lib/apple2-dos33-vts70.lib uses the VideoTerm when present and, without
+# it, Soft-70: 70 columns of the 80 x 24 screen in hi-res (include/soft70.h).
+# Programs that use it are linked with --start-addr 0x4000.
 #
 # A library of only the replacement modules isn't enough: ld65 scans each
 # library once, so a stock module reached through another stock module
@@ -212,7 +220,8 @@ build/test/nettest: test/nettest.c $(IP65_OBJ) $(DOS33_LIB) $(IP65_LIBS)
 	$(CL65) -t $(TARGET) -O -I include -I $(IP65)/inc -m $@.map -o $@ test/nettest.c $(IP65_OBJ) $(IP65_LIBS) $(DOS33_LIB)
 
 # Regression tests that run in cc65's 6502 simulator, sim65, without an
-# Apple II: the timer modules and the window's gauge, built for sim6502.
+# Apple II: the timer modules, the window's gauge, the reflow filter and
+# Soft-70's drawing, built for sim6502.
 SIM_DIR  := build/sim
 SIM_MODS := timer tick kbhit gettime settime
 SIM_REFLOW := $(SIM_DIR)/reflow.o
