@@ -200,7 +200,7 @@ store:  pha
         ldy     s80_x
         pla
         pha
-        eor     #$A0
+        eor     #S80_BUF_XOR
         sta     (BAS2L),y
         jsr     s80_cursorcol
         tax                     ; Screen column
@@ -234,16 +234,16 @@ s80_lf: inc     s80_y
 ; scroll: move rows 1-23 up, clear row 23, update the display.
 
 scroll: ldx     #$00
-:       txa
+@row:   txa
         jsr     rowptrs         ; BASL = row X, BAS2L = row X + 1
         ldy     #S80_COLS-1
-:       lda     (BAS2L),y
+@col:   lda     (BAS2L),y
         sta     (BASL),y
         dey
-        bpl     :-
+        bpl     @col
         inx
         cpx     #S80_ROWS-1
-        bne     :--
+        bne     @row
         lda     #S80_ROWS-1
         jsr     s80_setbuf      ; BAS2L = row 23
         lda     #$00            ; Blank
@@ -352,16 +352,16 @@ s80_clear:
 
 clearbuf:
         ldx     #$00
-:       txa
+@row:   txa
         jsr     s80_setbuf
         lda     #$00            ; Blank
         ldy     #S80_COLS-1
-:       sta     (BAS2L),y
+@col:   sta     (BAS2L),y
         dey
-        bpl     :-
+        bpl     @col
         inx
         cpx     #S80_ROWS
-        bne     :--
+        bne     @row
         rts
 
 ; s80_bufptr / s80_setbuf: BAS2L = the cursor's buffer row / buffer row A.
@@ -468,16 +468,16 @@ gauge_hide:
 
 .ident(.concat(S80_API, "pan")):
         bit     vt_active
-        bmi     :++
+        bmi     @done
         cmp     #S80_COLS-S80_VIEW+1
-        bcc     :+
+        bcc     @set
         lda     #S80_COLS-S80_VIEW
-:       sta     s80_left
+@set:   sta     s80_left
         lda     #$00            ; Stop following
         sta     s80_follow
         jsr     disp_redraw
         jmp     gauge_show
-:       rts
+@done:  rts
 
 .ident(.concat(S80_API, "follow")):
         bit     vt_active

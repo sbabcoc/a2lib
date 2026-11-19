@@ -28,7 +28,10 @@ BAS2L           := $2A          ; Monitor zero page, used as a second pointer
         .global         s80_put, s80_putnoadv, s80_cr, s80_lf
         .global         s80_goto, s80_show, s80_clear, s80_cout
         .global         s80_bufptr, s80_setbuf, s80_cursorcol
-        .global         s80_buf         ; 80 x 24, screen codes XOR $A0
+        .global         s80_buf         ; 80 x 24, screen codes XOR S80_BUF_XOR
+
+S80_BUF_XOR     = $A0           ; s80_buf holds screen code XOR this, so a
+                                ; blank (screen code $A0) is stored as $00
 
         ; The display. Each may use A, X, Y, BASL and BAS2L, and no other
         ; zero page (cputs keeps ptr1, chline tmp1 and tmp2).

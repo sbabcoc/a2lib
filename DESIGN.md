@@ -2443,6 +2443,23 @@ programs, and the sim65 suites).
 Vendored modules (`VENDORED.md`) keep their stock code untouched, so they
 stay easy to compare with cc65's.
 
+### 10.17 Readability pass: the display backends
+
+Names and comments only, checked the same way as 10.16: identical bytes
+for every module (each backend's flags, and `sim6502`) and every program.
+
+| File | Change |
+|---|---|
+| `libsrc/s80/s80.inc` | `S80_BUF_XOR`: the buffer holds screen codes XOR `$A0`, so a blank is `$00` |
+| `libsrc/s80/s80.s`, `libsrc/win/win.s`, `libsrc/s70/s70.s` | `S80_BUF_XOR` in place of `eor #$A0`; named labels for nested loops (row and column) and other two-level jumps |
+| `libsrc/win/win.s` | `TEXT_PAGE1` for the text screen's `$0400` |
+| `libsrc/s70/s70.s` | `SCANLINE` for the `$0400` step between a text row's scanlines; `BARLINE` from `ROW23` |
+| `libsrc/vt/vt.s` | `vtdone`'s branches name `mode` instead of an anonymous label just before it |
+
+The backends' modules based on stock ones (`cgetc.s`, `rdkey.s`,
+`cout.s` and the like) keep their stock code; `s70/font.s` is generated
+from `tools/s70font.txt`.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

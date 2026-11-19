@@ -53,8 +53,9 @@
         .assert __LOW_LAST__ <= $2000, lderror, "Soft-70: LOWBSS overlaps the hi-res page"
 
 HGR             = $2000         ; Hi-res page 1
-BARLINE         = HGR + $03D0 + 7 * $0400 ; Row 23, scanline 7
-ROW23           = HGR + $03D0
+SCANLINE        = $0400         ; From one scanline of a text row to the next
+ROW23           = HGR + $03D0   ; Row 23, scanline 0
+BARLINE         = ROW23 + 7 * SCANLINE ; Row 23, scanline 7
 BLINK_TICKS     = MS_TICKS(250)
 
         .segment        "ONCE"
@@ -180,7 +181,7 @@ o1:     ora     #$00
         sta     (BAS2L),y
         lda     BAS2L+1
         clc
-        adc     #>$0400
+        adc     #>SCANLINE
         sta     BAS2L+1
         inx
 end1:   cpx     #$00
@@ -216,7 +217,7 @@ o3:     ora     #$00
         sta     (BAS2L),y
         lda     BAS2L+1
         clc
-        adc     #>$0400
+        adc     #>SCANLINE
         sta     BAS2L+1
         inx
 end2:   cpx     #$00
@@ -260,17 +261,17 @@ row:    lda     rrow
         sta     BASL+1
         lda     #$00
         sta     rcol
-:       ldy     rcol
+@col:   ldy     rcol
         lda     (BASL),y
-        beq     :+              ; Blank
-        eor     #$A0
+        beq     @next           ; Blank
+        eor     #S80_BUF_XOR
         ldx     rcol
         ldy     rrow
         jsr     disp_cell       ; Leaves BASL alone
-:       inc     rcol
+@next:  inc     rcol
         lda     rcol
         cmp     #S80_VIEW
-        bne     :--
+        bne     @col
         inc     rrow
         lda     rrow
         cmp     #S80_ROWS
@@ -325,7 +326,7 @@ srow:   lda     sext,x
         sta     .ident(.sprintf("src%d", k))+2
         .if k < 7
         clc
-        adc     #>$0400
+        adc     #>SCANLINE
         .endif
         .endrepeat
         lda     rowhi,x
@@ -333,7 +334,7 @@ srow:   lda     sext,x
         sta     .ident(.sprintf("dst%d", k))+2
         .if k < 7
         clc
-        adc     #>$0400
+        adc     #>SCANLINE
         .endif
         .endrepeat
 
@@ -355,16 +356,16 @@ snext:  lda     sext+1,x
 
         ; Clear row 23
         ldy     sext+S80_ROWS-1
-        beq     :++
+        beq     @bar
         dey
         lda     #$00
-:       .repeat 8, k
-        sta     ROW23 + k * $0400,y
+@clear: .repeat 8, k
+        sta     ROW23 + k * SCANLINE,y
         .endrepeat
         dey
-        bpl     :-
+        bpl     @clear
         sta     sext+S80_ROWS-1
-:       bit     baron
+@bar:   bit     baron
         bpl     :+
         jsr     barxor
 :       rts
@@ -387,16 +388,16 @@ disp_gauge_draw:
         sta     tend
         ldy     #39
 gbyte:  cpy     tstart
-        bcc     :+
+        bcc     @track
         cpy     tend
-        bcs     :+
+        bcs     @track
         lda     #$7F            ; Thumb
-        bne     :++             ; Branch always
-:       tya                     ; Track: alternate pixels
+        bne     @store          ; Branch always
+@track: tya                     ; Track: alternate pixels
         and     #$01
         tax
         lda     track,x
-:       sta     barpat,y
+@store: sta     barpat,y
         dey
         bpl     gbyte
         jsr     barxor
@@ -477,7 +478,7 @@ curdraw:
         adc     s80_left
         tay
         lda     (BAS2L),y
-        eor     #$A0            ; Screen code
+        eor     #S80_BUF_XOR    ; Screen code
         ldx     cshown
         cpx     #$80
         bne     :+
@@ -501,21 +502,21 @@ _s70_font:
         lda     #3              ; 768 bytes
         sta     pages
         ldy     #$00
-:       lda     (ptr1),y
+@byte:  lda     (ptr1),y
         ldx     nibble
-        beq     :+
+        beq     @low
         lsr
         lsr
         lsr
         lsr
-:       and     #$0F
+@low:   and     #$0F
         sta     (ptr2),y
         iny
-        bne     :--
+        bne     @byte
         inc     ptr1+1
         inc     ptr2+1
         dec     pages
-        bne     :--
+        bne     @byte
         lda     #$00            ; Blank cells are skipped, not drawn
         ldy     #7
 :       sta     font,y

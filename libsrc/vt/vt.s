@@ -142,20 +142,19 @@ vtdone:
         lda     savecsw+1
         sta     CSWL+1
         lda     __dos_type
-        bne     :+
+        bne     mode
         lda     DOS_CSW
         cmp     #<vt_write
-        bne     :+
+        bne     mode
         lda     DOS_CSW+1
         cmp     #>vt_write
-        bne     :+
+        bne     mode
         lda     savedos
         sta     DOS_CSW
         lda     savedos+1
         sta     DOS_CSW+1
 
         ; Back to 40 columns, unless output went to the card before
-:
 mode:   bit     prior80
         bmi     :+
         sta     VT_AN0OFF

@@ -20,6 +20,8 @@
         .include        "s80.inc"
         .include        "display.inc"
 
+TEXT_PAGE1      := $0400        ; Text screen, page 1
+
 GAUGE_COL       = S80_VIEW - 10 ; Gauge in columns 30-39 of row 0
 
         .segment        "ONCE"
@@ -57,7 +59,7 @@ disp_clear      := disp_redraw
 
 disp_redraw:
         ldx     #$00
-:       txa
+@row:   txa
         jsr     win_scrptr      ; BASL = screen row
         txa
         jsr     s80_setbuf      ; BAS2L = buffer row
@@ -65,17 +67,17 @@ disp_redraw:
         lda     BAS2L
         adc     s80_left
         sta     BAS2L
-        bcc     :+
+        bcc     @copy
         inc     BAS2L+1
-:       ldy     #S80_VIEW-1
-:       lda     (BAS2L),y
-        eor     #$A0
+@copy:  ldy     #S80_VIEW-1
+@col:   lda     (BAS2L),y
+        eor     #S80_BUF_XOR
         sta     (BASL),y
         dey
-        bpl     :-
+        bpl     @col
         inx
         cpx     #S80_ROWS
-        bne     :---
+        bne     @row
         rts
 
 ; win_scrptr: BASL = text screen row A (page 1).
@@ -106,24 +108,24 @@ disp_gauge_draw:
         bcs     :-
         stx     gcell
         lda     #'[' & $3F      ; Inverse
-        sta     $0400 + GAUGE_COL
+        sta     TEXT_PAGE1 + GAUGE_COL
         lda     #']' & $3F
-        sta     $0400 + GAUGE_COL + 9
+        sta     TEXT_PAGE1 + GAUGE_COL + 9
         ldy     #$00
-:       lda     #'.' & $3F
+@cell:  lda     #'.' & $3F
         cpy     gcell
-        bcc     :+
+        bcc     @store
         tya
         sec
         sbc     gcell
         cmp     #4
         lda     #'.' & $3F
-        bcs     :+
+        bcs     @store
         lda     #'=' & $3F
-:       sta     $0400 + GAUGE_COL + 1,y
+@store: sta     TEXT_PAGE1 + GAUGE_COL + 1,y
         iny
         cpy     #8
-        bne     :--
+        bne     @cell
         rts
 
 ; disp_gauge_erase: restore the gauge's corner from the buffer.
@@ -139,8 +141,8 @@ disp_gauge_erase:
         inc     BAS2L+1
 :       ldy     #GAUGE_COL
 :       lda     (BAS2L),y
-        eor     #$A0
-        sta     $0400,y
+        eor     #S80_BUF_XOR
+        sta     TEXT_PAGE1,y
         iny
         cpy     #S80_VIEW
         bne     :-
@@ -150,7 +152,7 @@ disp_gauge_erase:
 
 ; Text screen page 1 rows: $400 + (row & 7) * $80 + (row >> 3) * $28
 scrrow: .repeat S80_ROWS, i
-        .word   $0400 + (i .mod 8) * $80 + (i / 8) * $28
+        .word   TEXT_PAGE1 + (i .mod 8) * $80 + (i / 8) * $28
         .endrepeat
 
         .bss
