@@ -18,7 +18,6 @@
         .export         __filetype, __auxtype, __datetime
         .destructor     closeallfiles, 5
 
-        .import         __dos_type
         .import         _malloc, _free
         .import         addysp, popax
 
@@ -50,14 +49,8 @@ _open:
         sta     name
         stx     name+1
 
-        ; Under ProDOS the page 3 vectors aren't the File Manager
-        lda     __dos_type
-        beq     :+
-        lda     #ENOSYS
-        jmp     ___directerrno
-
         ; Find a free fdtab slot
-:       ldy     #$00
+        ldy     #$00
 :       lda     fdtab + FD::REF_NUM,y
         beq     found
         .assert .sizeof(FD) = 4, error

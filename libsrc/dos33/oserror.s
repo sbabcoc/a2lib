@@ -51,7 +51,6 @@ ErrTab: .byte   DOSERR_LANG,      ENOSYS        ; Language not available
         .byte   DOSERR_NOTDIRECT, EINVAL        ; Not direct command
         .byte   LIBERR_EXISTS,    EEXIST        ; File exists
         .byte   LIBERR_OPEN,      EINVAL        ; File is open
-        .byte   LIBERR_NODOS,     ENOSYS        ; Not running under DOS 3.3
         .byte   LIBERR_NOTDOS,    ENODEV        ; Not a DOS 3.3 disk
         .byte   LIBERR_POSITION,  ESPIPE        ; Position out of range
         .byte   LIBERR_NOEND,     EINVAL        ; No recorded end

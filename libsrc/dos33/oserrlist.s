@@ -63,7 +63,6 @@ __sys_oserrlist:
         sys_oserr_entry         DOSERR_NOTDIRECT, "Not direct command"
         sys_oserr_entry         LIBERR_EXISTS,    "File exists"
         sys_oserr_entry         LIBERR_OPEN,      "File is open"
-        sys_oserr_entry         LIBERR_NODOS,     "Not running under DOS 3.3"
         sys_oserr_entry         LIBERR_NOTDOS,    "Not a DOS 3.3 disk"
         sys_oserr_entry         LIBERR_POSITION,  "Position out of range"
         sys_oserr_entry         LIBERR_NOEND,     "No recorded end of file"

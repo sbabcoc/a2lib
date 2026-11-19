@@ -127,9 +127,10 @@ fails at link time, so the two can't be mixed up silently.
 Rebuild a2lib after updating cc65, so the stock modules it contains match
 your toolchain.
 
-Programs run on a 48K II+ under stock DOS 3.3 (ProDOS builds need 64K).
-Behavior matches cc65 under ProDOS wherever DOS 3.3 can represent it, and
-fails visibly where it can't:
+Programs run on a 48K II+ under stock DOS 3.3, and only under DOS 3.3:
+build with stock `apple2.lib` for ProDOS. Behavior matches cc65 under
+ProDOS wherever DOS 3.3 can represent it, and fails visibly where it
+can't:
 
 | Topic | Behavior |
 |---|---|

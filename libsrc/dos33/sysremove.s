@@ -10,7 +10,6 @@
 ;
 
         .export         __sysremove
-        .import         __dos_type
 
         .include        "zeropage.inc"
         .include        "fm.inc"
@@ -21,13 +20,7 @@ __sysremove:
         sta     name
         stx     name+1
 
-        ; Under ProDOS the page 3 vectors aren't the File Manager
-        lda     __dos_type
-        beq     :+
-        lda     #LIBERR_NODOS   ; -> ENOSYS
-        rts
-
-:       jsr     fm_tempfcb
+        jsr     fm_tempfcb
         bcs     done
         jsr     fm_begin
         lda     name

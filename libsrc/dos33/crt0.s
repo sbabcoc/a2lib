@@ -3,14 +3,10 @@
 ;
 ; Startup code for cc65 (Apple2 version)
 ;
-; DOS 3.3 support for the cc65 apple2 target: modified copy of
-; libsrc/apple2/crt0.s from cc65. The only change: under DOS 3.3, the
-; 6502 RESET and IRQ vectors in Language Card RAM are patched *before*
-; the module constructors run, rather than after. Constructors then see
-; the vectors as the program will run with them, so irq.s's initirq can
-; replace the IRQ vector with its own entry point, and keep crt0's
-; irq_6502 as the handler to chain to, without crt0 overwriting it
-; afterward. This is part of the upstream proposal (DESIGN.md 6.1).
+; DOS 3.3 version of libsrc/apple2/crt0.s from cc65. The ProDOS paths
+; are removed. The 6502 RESET and IRQ vectors in Language Card RAM are
+; patched before the module constructors run, so irq.s's initirq can
+; replace the IRQ vector and chain to irq_6502.
 ;
 
         .export         done, return
@@ -30,9 +26,6 @@
 
         .segment        "STARTUP"
 
-        ; ProDOS TechRefMan, chapter 5.2.1:
-        ; "For maximum interrupt efficiency, a system program should not
-        ;  use more than the upper 3/4 of the stack."
         ldx     #$FF
         txs                     ; Init stack pointer
 
@@ -64,40 +57,13 @@ init:   ldx     #zpspace-1
         dex
         bpl     :-
 
-        ; Check for ProDOS.
-        lda     $BF00           ; MLI call entry point
-        sec
-        sbc     #$4C            ; Is MLI present? (JMP opcode)
-        pha                     ; Backup the result for later
-        bne     basic
-
-        ; Check the ProDOS system bit map.
-        lda     $BF6F           ; Protection for pages $B8 - $BF
-        cmp     #%00000001      ; Exactly system global page is protected
-        bne     basic
-
-        ; No BASIC.SYSTEM; so, quit to the ProDOS dispatcher instead.
-        lda     #<quit
-        ldx     #>quit
-        sta     done+1
-        stx     done+2
-
-        ; No BASIC.SYSTEM; so, use the addr of the ProDOS system global page.
-        lda     #<$BF00
-        ldx     #>$BF00
-        bne     :+              ; Branch always
-
-        ; Get the highest available mem addr from the BASIC interpreter.
-basic:  lda     HIMEM
+        ; Set up the C stack below BASIC's HIMEM.
+        lda     HIMEM
         ldx     HIMEM+1
-
-        ; Set up the C stack.
-:       sta     c_sp
+        sta     c_sp
         stx     c_sp+1
 
-        ; ProDOS TechRefMan, chapter 5.3.5:
-        ; "Your system program should place in the RESET vector the
-        ;  address of a routine that ... closes the files."
+        ; RESET exits the program, closing its files.
         ldx     #<_exit
         lda     #>_exit
         jsr     reset           ; Setup RESET vector
@@ -105,9 +71,6 @@ basic:  lda     HIMEM
         ; Switch in LC bank 2 for W/O.
         bit     $C081
         bit     $C081
-
-        pla                     ; If not running ProDOS, we need to patch 6502 vectors.
-        beq     :+
 
         lda     #<reset_6502
         ldx     #>reset_6502
@@ -120,7 +83,7 @@ basic:  lda     HIMEM
         stx     ROM_IRQ+1
 
         ; Back to ROM for reading, LC write-protected, as at entry
-:       bit     $C082
+        bit     $C082
 
         ; Call the module constructors.
         jsr     initlib
@@ -170,36 +133,20 @@ reset:  stx     SOFTEV
         sta     PWREDUP
 return: rts
 
-        ; Quit to the ProDOS dispatcher.
-quit:   jsr     $BF00           ; MLI call entry point
-        .byte   $65             ; Quit
-        .word   q_param
-
-reset_6502:                     ; Used with DOS3.3 programs
+reset_6502:
         bit     $C082           ; Switch in ROM
         jmp     (ROM_RST)       ; Jump to ROM's RESET vector
 
-irq_6502:                       ; Used with DOS3.3 programs
+irq_6502:
         bit     $C082           ; Switch in ROM
         jmp     (ROM_IRQ)       ; Jump to ROM's IRQ/BRK vector
-
-; ------------------------------------------------------------------------
-
-        .rodata
-
-        ; MLI parameter list for quit
-q_param:.byte   $04             ; param_count
-        .byte   $00             ; quit_type
-        .word   $0000           ; reserved
-        .byte   $00             ; reserved
-        .word   $0000           ; reserved
 
 ; ------------------------------------------------------------------------
 
         .data
 
         ; Final jump when we're done
-done:   jmp     DOSWARM         ; Potentially patched at runtime
+done:   jmp     DOSWARM         ; Patched by exec()
 
 ; ------------------------------------------------------------------------
 

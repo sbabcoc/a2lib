@@ -15,20 +15,14 @@
 ;
 
         .export         __syschdir
-        .import         __dos_type, initcwd
+        .import         initcwd
 
         .include        "fm.inc"
 
         .code
 
 __syschdir:
-        ; Under ProDOS the page 3 vectors aren't DOS 3.3's
-        ldy     __dos_type
-        beq     :+
-        lda     #LIBERR_NODOS   ; -> ENOSYS
-        rts
-
-:       jsr     fm_location     ; From AX
+        jsr     fm_location     ; From AX
         bcs     done            ; A = DOSERR_SYNTAX
 
         lda     fm_slot

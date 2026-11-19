@@ -17,8 +17,7 @@
 ** Under DOS 3.3, clock_gettime and time() return the software clock: the
 ** up-time until clock_settime sets it (for example, from IP65's SNTP
 ** client), then the time set plus the seconds counted since. It drifts
-** slow by the time spent computing, so resynchronize now and then; under
-** ProDOS, cc65's clock functions are unchanged.
+** slow by the time spent computing, so resynchronize now and then.
 **
 ** Copyright (c) 2026 Scott Babcock. zlib license; see LICENSE.
 */

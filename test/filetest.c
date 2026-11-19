@@ -31,7 +31,7 @@
 #define DOSERR_SYNTAX   0x0B
 #define LIBERR_EXISTS   0x10
 #define LIBERR_OPEN     0x11
-#define LIBERR_POSITION 0x14
+#define LIBERR_POSITION 0x13
 
 static unsigned char passed, total;         /* All groups */
 static unsigned char gpassed, gtotal;       /* Current group */

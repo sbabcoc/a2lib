@@ -25,6 +25,11 @@ Section 9 lists the sources.
   3. Display backends selected at link time: VideoTerm, 40-column
      scrollable window, and Soft-70
   4. A text reflow output filter
+- **DOS 3.3 only (decision, 10.22).** Programs linked with a2lib run
+  under DOS 3.3, not ProDOS: the modules carry no ProDOS paths and no
+  `__dos_type` checks, as a separate cc65 target would. Build with stock
+  `apple2.lib` for ProDOS. Raised by Colin Leroy-Mira's review on
+  cc65/cc65#3050: ProDOS code kept in DOS 3.3 modules is dead weight.
 - **Stock DOS 3.3 only.** Patched DOSes (Diversi-DOS, ProntoDOS, etc.)
   are not a core objective. The layer uses only the documented page-3
   vectors (`$3D6`/`$3DC` File Manager, `$3D9`/`$3E3` RWTS, `$3EA` hook
@@ -78,10 +83,10 @@ follows them, so the code stays as readable as they left it.
 - **Labels.** An anonymous label is only for a jump to the nearest one
   (`:+`, `:-`). A jump past another label (`:++`, `:--`), including the
   outer loop of a nested pair, gets a named label (`@row`, `@col`).
-- **Vendored modules** (`libsrc/dos33/VENDORED.md`) keep their stock code
-  untouched, so they stay easy to compare with cc65's; a2lib's additions
-  inside them follow these conventions, and `VENDORED.md` lists each
-  module's changes. The same goes for backend modules based on stock ones
+- **Vendored modules** (`libsrc/dos33/VENDORED.md`) keep the stock code
+  they still use untouched, so they stay easy to compare with cc65's;
+  their ProDOS paths are removed. a2lib's additions inside them follow
+  these conventions, and `VENDORED.md` lists each module's changes. The same goes for backend modules based on stock ones
   (`cgetc.s`, `rdkey.s`, `cout.s` and the like).
 - **Generated files** are changed through their source: `s70/font.s` comes
   from `tools/s70font.txt`.
@@ -1295,10 +1300,13 @@ DOS 3.3 lacks) still do.
 |---|---|---|---|
 | `$10` | File exists | `EEXIST` | `open` with `O_CREAT \| O_EXCL`, `rename` onto an existing name |
 | `$11` | File is open | `EINVAL` | `remove`, `rename` of an open file (5.5a) |
-| `$12` | Not running under DOS 3.3 | `ENOSYS` | `remove`, `rename`, `exec` under ProDOS |
-| `$13` | Not a DOS 3.3 disk | `ENODEV` | `opendir` of a disk without a DOS 3.3 VTOC (5.9) |
-| `$14` | Position out of range | `ESPIPE` | `lseek` past a B file's recorded length (5.7) |
-| `$15` | No recorded end of file | `EINVAL` | `O_APPEND` to a raw file (5.3) |
+| `$12` | Not a DOS 3.3 disk | `ENODEV` | `opendir` of a disk without a DOS 3.3 VTOC (5.9) |
+| `$13` | Position out of range | `ESPIPE` | `lseek` past a B file's recorded length (5.7) |
+| `$14` | No recorded end of file | `EINVAL` | `O_APPEND` to a raw file (5.3) |
+
+Until 10.22, `$12` was "Not running under DOS 3.3" (`ENOSYS`), for
+`remove`, `rename` and `exec` under ProDOS, and the codes after it were
+one higher.
 
 The numbers are in `fm.inc` (`DOSERR_*`, `LIBERR_*`). The messages use
 cc65's sentence case, as the CBM and Atari lists do.
@@ -1456,18 +1464,15 @@ program the same way it would after the user typed the command.
 Before the point of no return. Every failure returns -1 with `errno` set,
 as stock `exec()` does:
 
-1. **Under ProDOS:** `ENOSYS`, as `open.s` does (a2lib's file layer is
-   DOS 3.3 only). Keeping stock's ProDOS path would keep its loader
-   resident for nothing.
-2. **Name:** `fm_tempfcb`, `fm_begin`, `fm_name`. Paths work as in
+1. **Name:** `fm_tempfcb`, `fm_begin`, `fm_name`. Paths work as in
    `open` (5.5). Errors: NO BUFFERS AVAILABLE → `ENOMEM`, SYNTAX ERROR →
    `EINVAL`, and SYNTAX ERROR for a name with a comma, which DOS's command
    parser would end there (increment 14).
-3. **Exists, and its type:** OPEN without allocating (X ≠ 0, as
+2. **Exists, and its type:** OPEN without allocating (X ≠ 0, as
    `fm_isopen` does), take `FM_TYPE` and mask the lock bit (as `open.s`
    does), CLOSE, `fm_freefcb`. OPEN errors are mapped by `fm_maperr`
    (`ENOENT`, `EIO`, …).
-4. **Verb:**
+3. **Verb:**
 
    | FM type | Command | Notes |
    |---|---|---|
@@ -1477,19 +1482,19 @@ as stock `exec()` does:
 
    I files are rejected. Whether Integer BASIC is present can't be known
    until DOS tries, which would be after the hand-off.
-5. **Build the command** in the stub's buffer: `$84`, verb, space, the
+4. **Build the command** in the stub's buffer: `$84`, verb, space, the
    name from `fm_namebuf` with its `$A0` padding trimmed, then
    `,S<slot>,D<drive>`, then `$8D`. Slot and drive are written out
    explicitly, so DOS opens the file that was just checked. Worst case is
    43 bytes: `^D` + `BRUN` + space + 30 + `,S7,D2` + CR. (Until increment
    14, a `,V<n>` suffix could follow, making 48.)
-6. **Copy the stub** to page 3 (`target = DOSWARM - size`, with stock's
+5. **Copy the stub** to page 3 (`target = DOSWARM - size`, with stock's
    `.assert target >= $300`). a2lib uses nothing else in `$300`–`$3CF`
    (checked by grep).
 
 Point of no return. Same as stock from here:
 
-7. Reset SP to `$FF`. Store up to 127 bytes of `cmdline`, `'\0'`
+6. Reset SP to `$FF`. Store up to 127 bytes of `cmdline`, `'\0'`
    included, at `$0100`. Point `done+1` at `target`, then
    `jmp exit_with_params`. The destructors close every file
    (`closeallfiles`), restore the hooks and the IRQ vector, and `_exit`
@@ -1497,15 +1502,15 @@ Point of no return. Same as stock from here:
 
 The stub, entered from `done` with ROM banked in:
 
-8. `JSR $3EA`: reconnect DOS's intercepts (does nothing if already
-   connected). Then print a CR, *before* step 9, while DOS still sees a
+7. `JSR $3EA`: reconnect DOS's intercepts (does nothing if already
+   connected). Then print a CR, *before* step 8, while DOS still sees a
    running program. A program that has just read the keyboard leaves
    DOS's intercept in its input state (3). There a CR goes to state 0,
    unless BASIC is in immediate mode, in which case DOS collects it as a
    command line (*Beneath Apple DOS* ch. 8, `$9F2F`). So the CR has to
    come before the reset puts DOS in immediate mode. (Decided in
    implementation; the probes printed nothing before their command.)
-9. Set `CURLIN+1 = $FF` and `PROMPT = $DD` (`]`), and clear `ERRFLG`
+8. Set `CURLIN+1 = $FF` and `PROMPT = $DD` (`]`), and clear `ERRFLG`
    (`$D8`). This puts DOS's state back to how it is when a user types the
    command, undoing `read.s`'s `initprompt`. Every DOS error goes through
    one handler (`$A6D5`), which skips its message while ONERR is set and
@@ -1515,11 +1520,11 @@ The stub, entered from `done` with ROM banked in:
    prompt. Without it, the same failure adds `BREAK IN 32868` (`$8064`:
    `initprompt`'s `$80` in `CURLIN+1`), because Applesoft takes the error
    as its own program's.
-10. If `cmdline` isn't empty, copy the argument tail (below) from `$0100`
+9. If `cmdline` isn't empty, copy the argument tail (below) from `$0100`
     to `$200 + L`, where L is the command's length (patched in at step
     5).
-11. Print the command through `$FDED`. DOS runs it on its final CR.
-12. `JMP DOSWARM`, for a B program that ends with `RTS`: DOS's exit
+10. Print the command through `$FDED`. DOS runs it on its final CR.
+11. `JMP DOSWARM`, for a B program that ends with `RTS`: DOS's exit
     (`$9FB3`) restores the S it had on entry, which returns into this
     stub.
 
@@ -1585,7 +1590,7 @@ $200: $84 "BRUN NAME,S6,D1" $8D   $00 $B2 cmdline… $00
 #### Tests (`make emutest`)
 
 `exectest` first reads a line (the runner types it), so DOS is in its
-input state when the stub runs (step 8), and `read.s` is linked, as in
+input state when the stub runs (step 7), and `read.s` is linked, as in
 any program that reads. It writes a T file and `EXECA`, an Applesoft
 program (`10 PRINT "EXECA OK"`, tokenized), then checks the failures.
 Each must return -1 with this program still running: a missing file
@@ -1631,8 +1636,8 @@ Master), all passing:
 | Run | Shows |
 |---|---|
 | `bloadprobe` | A running program can send DOS commands through `$FDED` (BSAVE, then BLOAD, round trip); DOS stores `$84`, the command and `$8D` at `$200`; BLOAD leaves `$230`–`$2FF` unchanged, so the argument tail survives `BRUN`'s load (`$A38E` runs BLOAD) |
-| `errprobe` | The hand-off (`main` returns, the destructors run, `done` jumps to a page-3 stub) and step 9: with `ERRFLG` set beforehand, a failed `BRUN` prints FILE NOT FOUND, no Applesoft error, and BASIC answers at `]` |
-| `errproberaw` | The same without step 9: FILE NOT FOUND, then `BREAK IN 32868` |
+| `errprobe` | The hand-off (`main` returns, the destructors run, `done` jumps to a page-3 stub) and step 8: with `ERRFLG` set beforehand, a failed `BRUN` prints FILE NOT FOUND, no Applesoft error, and BASIC answers at `]` |
+| `errproberaw` | The same without step 8: FILE NOT FOUND, then `BREAK IN 32868` |
 
 The error probes link `read.s` on purpose (`keep_read` in `errprobe.c`):
 `initprompt` is a constructor in `read.s`, so a program that only prints
@@ -1659,9 +1664,8 @@ selected at link time like the other modules.
 
 ### 6.1 Design (increment 4)
 
-`libsrc/dos33/irq.s` replaces stock `irq.s`. Its ProDOS path is stock
-cc65's, unchanged, so a DOS 3.3 build run under ProDOS still allocates
-an interrupt through the MLI.
+`libsrc/dos33/irq.s` replaces stock `irq.s`. Until 10.22 it kept stock's
+ProDOS path, which allocates an interrupt through the MLI.
 
 **The banking problem.** Under DOS 3.3, `crt0` points the IRQ vector in
 Language Card RAM at `irq_6502`, which switches ROM in and jumps through
@@ -2634,6 +2638,28 @@ a 6502 simulator (py65) before the emulator, on 42 paths for `fm_name` and
 `fm_location`: every valid form, and malformed ones (slot 0 or 8, drive 3,
 `/6`, `/`, a missing name, a slash in a name, 31 characters, a name with a
 leading digit), each giving SYNTAX ERROR. All passed.
+
+### 10.22 DOS 3.3 only
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/crt0.s` | No ProDOS check or quit path: the C stack is below HIMEM, and the 6502 vectors are always patched |
+| `libsrc/dos33/irq.s` | No ProDOS interrupt allocation or its error message |
+| `libsrc/dos33/initcwd.s`, `gettime.s`, `settime.s` | DOS 3.3 code only |
+| `libsrc/dos33/mainargs.s` | argv[0] is always `""`, kept out of page 2; no ProDOS file name |
+| `libsrc/dos33/dir.s`, `exec.s`, `open.s`, `sysremove.s`, `sysrename.s`, `syschdir.s` | No `__dos_type` guard |
+| `libsrc/dos33/timer.s`, `libsrc/vt/vt.s`, `libsrc/s80/s80.s` | No `__dos_type` test before DOS's I/O hooks |
+| `libsrc/dos33/fm.inc`, `oserror.s`, `oserrlist.s`, `test/filetest.c` | `LIBERR_NODOS` removed; the codes after it renumbered (5.6) |
+| `libsrc/dos33/machine.inc` | `BASIC_BUF` unconditional (mainargs.s no longer defines it) |
+| `test/sim/shim.s` | Stand-ins for `__dos_type`, `callmli` and `_mktime_dt` removed |
+| `VENDORED.md`, `README.md`, `include/a2timer.h`, DESIGN 1, 5.6, 5.10, 6.1 | DOS 3.3 only |
+
+Raised by Colin Leroy-Mira's review on cc65/cc65#3050. The modules shrink
+by 461 bytes in all (od65 segment sizes, BSS excluded); a linked program
+by 50 to 85 bytes, `filetest` by 259, and `timertest` by 1254, because
+`gettime.s` no longer pulls in ProDOS's date conversion. `mli.o`, with
+`callmli` and `dosdetect.o`, is still linked through `mliparam`, which
+`rwcommon.s` and stock `read.s` share.
 
 ## 11. Sources
 

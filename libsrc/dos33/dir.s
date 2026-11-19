@@ -21,7 +21,6 @@
 
         .export         __dos33_opendir, __dos33_readdir
         .export         __dos33_closedir, __dos33_rewinddir
-        .import         __dos_type
         .import         _malloc, _free
 
         .macpack        longbranch
@@ -38,13 +37,7 @@ __dos33_opendir:
         sta     ptr1
         stx     ptr1+1
 
-        ; Under ProDOS the page 3 vectors aren't DOS 3.3's
-        lda     __dos_type
-        beq     :+
-        lda     #ENOSYS
-        jmp     nulldirect
-
-:       lda     ptr1
+        lda     ptr1
         ldx     ptr1+1
         jsr     fm_location
         bcc     dir_at

@@ -23,7 +23,7 @@
 
         .constructor    vtinit
         .destructor     vtdone
-        .import         __dos_type, uppercasemask
+        .import         uppercasemask
 
         .macpack        longbranch
 
@@ -53,8 +53,6 @@ vtinit:
         lda     CSWL+1
         cmp     #>VT_ID0
         beq     was80
-        lda     __dos_type      ; DOS 3.3 only
-        bne     :+
         lda     DOS_CSW+1
         cmp     #>VT_ID0
         bne     :+
@@ -95,8 +93,6 @@ was80:  lda     #$80
         ; into CSW and KSW and reinstalls its intercepts on the way out
         ; ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a
         ; routine stored in CSW directly (DESIGN.md 3.5).
-        lda     __dos_type
-        bne     direct
         lda     CSWL
         cmp     DOS_VINT
         bne     direct
@@ -141,8 +137,6 @@ vtdone:
         sta     CSWL
         lda     savecsw+1
         sta     CSWL+1
-        lda     __dos_type
-        bne     mode
         lda     DOS_CSW
         cmp     #<vt_write
         bne     mode

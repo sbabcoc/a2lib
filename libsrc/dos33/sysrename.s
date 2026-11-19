@@ -20,7 +20,6 @@
 ;
 
         .export         __sysrename
-        .import         __dos_type
         .import         popax
 
         .macpack        longbranch
@@ -37,13 +36,7 @@ __sysrename:
         sta     oldname
         stx     oldname+1
 
-        ; Under ProDOS the page 3 vectors aren't the File Manager
-        lda     __dos_type
-        beq     :+
-        lda     #LIBERR_NODOS   ; -> ENOSYS
-        rts
-
-:       jsr     fm_tempfcb
+        jsr     fm_tempfcb
         jcs     done
         jsr     fm_begin
 

@@ -33,7 +33,7 @@
         .export         _a2_millis, _a2_idle, _a2_timer_start, _a2_timer_stop
         .constructor    timerinit
         .destructor     timerdone
-        .import         __dos_type, popax
+        .import         popax
 
         .include        "zeropage.inc"
         .include        "apple2.inc"
@@ -71,8 +71,6 @@ timerinit:
         ; ch. 8, $9ED1 and $A851), which would drop a routine stored in KSW
         ; directly. DOS restores the registers before calling the true
         ; routine, so it still gets A and Y as RDKEY passes them.
-        lda     __dos_type
-        bne     direct
         lda     KSWL
         cmp     DOS_KINT
         bne     direct
@@ -111,8 +109,6 @@ timerdone:
 
         ; DOS's reconnect routine may have moved our hook into its saved
         ; true input hook; put that back too
-        lda     __dos_type
-        bne     :+
         lda     DOS_KSW
         cmp     #<keyin
         bne     :+

@@ -121,10 +121,9 @@ DOSERR_TOOLARGE = $0E           ; Program too large
 DOSERR_NOTDIRECT = $0F          ; Not direct command
 LIBERR_EXISTS   = $10           ; File exists (O_EXCL, rename)
 LIBERR_OPEN     = $11           ; File is open (remove, rename)
-LIBERR_NODOS    = $12           ; Not running under DOS 3.3
-LIBERR_NOTDOS   = $13           ; Not a DOS 3.3 disk (opendir)
-LIBERR_POSITION = $14           ; Position out of range (lseek)
-LIBERR_NOEND    = $15           ; File has no recorded end (O_APPEND)
+LIBERR_NOTDOS   = $12           ; Not a DOS 3.3 disk (opendir)
+LIBERR_POSITION = $13           ; Position out of range (lseek)
+LIBERR_NOEND    = $14           ; File has no recorded end (O_APPEND)
 
 ; File types, as OPEN takes and returns them and the catalog stores them:
 ; one coding (DESIGN.md 4.4), DOS 3.3's own, which C programs see too

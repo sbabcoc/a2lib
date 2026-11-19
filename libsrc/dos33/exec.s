@@ -12,8 +12,8 @@
 ; (after DOS's copy of the command at $200) as $00 $B2 cmdline $00, for
 ; a2lib's mainargs.s; an A file takes no cmdline (EINVAL).
 ;
-; Fails, returning -1 with errno set, before anything is shut down: ENOSYS
-; under ProDOS (a2lib's file layer is DOS 3.3 only), EINVAL for a bad path,
+; Fails, returning -1 with errno set, before anything is shut down: EINVAL
+; for a bad path,
 ; a name with a comma (which a DOS command can't carry) or an A file with
 ; a cmdline, ENOENT and the other OPEN errors, ENOEXEC
 ; for a file that isn't B or A, ENOMEM if the temporary control block
@@ -21,7 +21,6 @@
 ;
 
         .export         _exec
-        .import         __dos_type
         .import         popax, done, exit_with_params
 
         .include        "zeropage.inc"
@@ -43,14 +42,8 @@ _exec:
         sta     progname
         stx     progname+1
 
-        ; Under ProDOS the page 3 vectors aren't the File Manager
-        lda     __dos_type
-        beq     :+
-        lda     #LIBERR_NODOS   ; -> ENOSYS
-        jmp     ___mappederrno
-
         ; The file: name, existence and type, as sysremove.s does it
-:       jsr     fm_tempfcb
+        jsr     fm_tempfcb
         bcs     oserr
         jsr     fm_begin
         lda     progname

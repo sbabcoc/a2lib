@@ -41,7 +41,6 @@
 
         .constructor    s80init, 6      ; After vt.s's (7): needs vt_active
         .destructor     s80done
-        .import         __dos_type
 
         .include        "apple2.inc"
         .include        "s80.inc"
@@ -94,8 +93,6 @@ s80init:
         ; into CSW and KSW and reinstalls its intercepts on the way out
         ; ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a
         ; routine stored in CSW directly (DESIGN.md 3.5, 3.6).
-        lda     __dos_type
-        bne     direct
         lda     CSWL
         cmp     DOS_VINT
         bne     direct
@@ -160,8 +157,6 @@ s80done:
         sta     CSWL
         lda     savecsw+1
         sta     CSWL+1
-        lda     __dos_type
-        bne     :+
         lda     DOS_CSW
         cmp     #<s80_cout
         bne     :+
