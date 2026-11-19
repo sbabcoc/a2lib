@@ -41,11 +41,13 @@ AC="${AC:-ac}"
 OUT=build/emu
 DISK="$OUT/a2libtests.dsk"
 NET_DISK="$OUT/a2libnet.dsk"
-PROBE_DISK="$OUT/a2libprobes.dsk"
+PROBE_DISK="$OUT/a2libexec.dsk"
 
-# The exec() probes (DESIGN.md 5.10) have a disk of their own: with them on
-# the main disk, filetest ran out of space (12 sectors were left free).
-PROBES=" bloadprobe errprobe errproberaw "
+# The exec() probes and tests (DESIGN.md 5.10) have a disk of their own:
+# with the probes on the main disk, filetest ran out of space (12 sectors
+# were left free). argtest is on it too: the exec tests start it.
+PROBES=" bloadprobe errprobe errproberaw exectest exectestvt execatest "
+PROBE_EXTRA="argtest"
 is_probe() { [[ "$PROBES" == *" $1 "* ]]; }
 
 die() { echo "emutest: $*" >&2; exit 1; }
@@ -82,6 +84,9 @@ nettest|nettest|net|--expect|SERVER PORT|--type|@PORT@\r|PRESS A KEY|ALL [0-9]* 
 bloadprobe|bloadprobe|-||PASSED|ALL [0-9]* PASSED
 errprobe|errprobe|-|--expect|FILE NOT FOUND|--type|PRINT 6*7\r|42|FILE NOT FOUND && ^42 && ! IN [0-9]
 errproberaw|errproberaw|-|--expect|FILE NOT FOUND|--type|PRINT 6*7\r|42|.
+exectest|exectest|-|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|DIRECT|ALL [0-9]* PASSED && DIRECT OK$
+exectest-vt|exectestvt|vt|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|DIRECT|ALL [0-9]* PASSED && DIRECT OK$
+execatest|execatest|-|--expect|TYPE A WORD|--type|HELLO\r|EXECA OK|^EXECA OK && ! ERROR
 '
 
 # errproberaw is a diagnostic (DESIGN.md 5.10): it passes whenever BASIC
@@ -170,7 +175,7 @@ for prog in $(printf '%s\n' "$RUNS" | grep -v '^[^|]*|[^|]*|net|' | cut -d'|' -f
     if is_probe "$prog"; then probe_progs+=("$prog"); else main_progs+=("$prog"); fi
 done
 make_disk "$DISK" ${main_progs[@]+"${main_progs[@]}"}
-(( ${#probe_progs[@]} > 0 )) && make_disk "$PROBE_DISK" "${probe_progs[@]}"
+(( ${#probe_progs[@]} > 0 )) && make_disk "$PROBE_DISK" "${probe_progs[@]}" $PROBE_EXTRA
 printf '%s\n' "$RUNS" | grep -q '^[^|]*|[^|]*|net|' \
     && make_disk "$NET_DISK" $(printf '%s\n' "$RUNS" | grep '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u)
 

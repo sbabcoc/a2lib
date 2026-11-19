@@ -23,6 +23,13 @@ explaining the change:
   under ProDOS; a software clock is added for DOS 3.3.
 - `cout.s` (from `libsrc/apple2/cout.s`): `COUT` is a vector, so the
   reflow filter can be switched in; the stock routine is `a2_rawcout`.
+- `mainargs.s` (from `libsrc/apple2/mainargs.s`): under DOS 3.3, takes the
+  arguments `exec()` leaves after its command in page 2 (DESIGN.md 5.10);
+  otherwise unchanged.
+
+`exec.s` replaces `libsrc/apple2/exec.s` but isn't a copy of it: it keeps
+the stock module's structure (its command-line copy and shutdown) with a
+DOS 3.3 command in place of the ProDOS loader.
 
 Because these replace stock modules in `lib/apple2-dos33.lib`, compare
 them with cc65's versions after updating cc65.

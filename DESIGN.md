@@ -1349,7 +1349,13 @@ Point of no return. Same as stock from here:
 The stub, entered from `done` with ROM banked in:
 
 8. `JSR $3EA`: reconnect DOS's intercepts (does nothing if already
-   connected).
+   connected). Then print a CR, *before* step 9, while DOS still sees a
+   running program. A program that has just read the keyboard leaves
+   DOS's intercept in its input state (3). There a CR goes to state 0,
+   unless BASIC is in immediate mode, in which case DOS collects it as a
+   command line (*Beneath Apple DOS* ch. 8, `$9F2F`). So the CR has to
+   come before the reset puts DOS in immediate mode. (Decided in
+   implementation; the probes printed nothing before their command.)
 9. Set `CURLIN+1 = $FF` and `PROMPT = $DD` (`]`), and clear `ERRFLG`
    (`$D8`). This puts DOS's state back to how it is when a user types the
    command, undoing `read.s`'s `initprompt`. Every DOS error goes through
@@ -1363,14 +1369,13 @@ The stub, entered from `done` with ROM banked in:
 10. If `cmdline` isn't empty, copy the argument tail (below) from `$0100`
     to `$200 + L`, where L is the command's length (patched in at step
     5).
-11. Print the command through `$FDED`: CR first, then the buffer. DOS
-    runs it on the final CR.
+11. Print the command through `$FDED`. DOS runs it on its final CR.
 12. `JMP DOSWARM`, for a B program that ends with `RTS`: DOS's exit
     (`$9FB3`) restores the S it had on entry, which returns into this
     stub.
 
-Estimated size: about 45 bytes of code plus the 48-byte buffer, well
-within the 208 bytes of `$300`–`$3CF`.
+The stub is 120 bytes, at `$358`–`$3CF`: 70 bytes of code, a length
+byte, and 49 bytes for the command and its terminator.
 
 #### Passing `cmdline` (decision)
 
@@ -1423,27 +1428,50 @@ $200: $84 "BRUN NAME,S6,D1" $8D   $00 $B2 cmdline… $00
 | `libsrc/dos33/exec.s` | New: replaces stock `exec.o` in `apple2-dos33.lib` |
 | `libsrc/dos33/mainargs.s` | Modified copy: the argument marker; argv[0] not at `FNAM` under DOS 3.3 |
 | `libsrc/dos33/VENDORED.md` | Lists `mainargs.s` |
-| `test/exectest.c`, `test/argtest.c`, `test/EXECA` (A file) | Tests, below |
-| `test/emutest.sh` | Runs `exectest`, and `exectest-vt` with the VideoTerm |
+| `test/exectest.c`, `test/argtest.c` | Tests, below |
+| `Makefile` | Builds `exectest`, `exectestvt` (VideoTerm library), `execatest` (`-DEXECA`) and `argtest` |
+| `test/emutest.sh` | Runs `exectest`, `exectest-vt` and `execatest`, on the exec disk with the probes; `argtest` goes on that disk too |
 
 #### Tests (`make emutest`)
 
-`exectest` checks the failures first. Each must return -1 with this
-program still running: a missing file (`ENOENT`), a T file (`ENOEXEC`),
-a bad name (`EINVAL`), and an A file with a `cmdline` (`EINVAL`). Then it
-calls `exec("ARGTEST,D2", "ONE \"TWO 2\" THREE")`. The `,D2` and the
-`'2'`s put the `$B2` hazard in the test. `argtest` checks argc 4 and each
-argument, then checks the marker was cleared, and prints "ALL n PASSED".
+`exectest` first reads a line (the runner types it), so DOS is in its
+input state when the stub runs (step 8), and `read.s` is linked, as in
+any program that reads. It writes a T file and `EXECA`, an Applesoft
+program (`10 PRINT "EXECA OK"`, tokenized), then checks the failures.
+Each must return -1 with this program still running: a missing file
+(`ENOENT`), a T file (`ENOEXEC`), a bad name (`EINVAL`), and an A file
+with a `cmdline` (`EINVAL`). Then it execs `ARGTEST,D2` with
+`PRE=4/4 ONE "TWO 2" THREE ` followed by 100 X's: 126 characters, the
+most stock keeps, so the tail reaches `$295`. The `,D2` in the command
+puts the `$B2` hazard in the test. `argtest` checks argc 6, argv[0] `""`,
+`PRE=4/4` (exectest's own checks), each argument, and that the marker
+was cleared, and prints "ALL n PASSED".
 
-Further runs:
+| Run | Checks |
+|---|---|
+| `exectest` | The above; then the runner types `BRUN ARGTEST,D2`, and `argtest` must get no arguments (DIRECT OK): a typed line isn't taken for exec's |
+| `exectest-vt` | The same, built with the VideoTerm library and run with the card: the backend's destructor puts DOS's hooks back, and DOS sees the command |
+| `execatest` | `RUN` of `EXECA` (no cmdline): EXECA OK, no error |
 
-- `RUN` of `EXECA`, which prints a line the runner waits for.
-- The same exec with the VideoTerm: hooks restored, command seen.
-- After `argtest` exits, typing `BRUN ARGTEST,D2` again: argc must be 1.
-  This is the stale-marker check, and the line is the same length as
-  exec's command.
-- The long-argument case, which confirms the BLOAD result below through
-  `BRUN` itself.
+**Simulated before the first emulator run:** `exec.s` and `mainargs.s` were
+run in a 6502 simulator (py65), with stand-ins for the File Manager glue
+and a model of DOS's video intercept: the five failures before the
+hand-off; the command sent (`$8D`, `$84`, `BRUN ARGTEST,S6,D2`, `$8D`, all
+with the high bit set); the first CR while DOS still sees a running
+program, and the reset done before the command runs; the tail at
+`$200 + L`; `mainargs` taking all six arguments back, clearing the marker,
+and finding none on a second start; `RUN` with a volume (`,V254`) and no
+tail for an A file. All 20 checks pass. The simulation can't show what
+DOS and Applesoft really do; the emulator runs do.
+
+**Verified with `make emutest`** (ReplicApple2Plus 1.11.0's runner, DOS
+3.3 System Master): `exectest` and `exectest-vt` pass all 8 of argtest's
+checks and DIRECT OK; `execatest` shows EXECA OK; all 22 runs pass. With
+the VideoTerm, exectestvt's output goes to the card and argtest's to the
+40-column screen, so the backend's hooks were put back and DOS still saw
+the command. A typed command's CR isn't echoed before the program runs,
+so DIRECT OK follows `]BRUN ARGTEST,D2` on the same line; the pass
+condition matches it at the end of the line.
 
 #### Probes (verified before implementation)
 
@@ -2320,6 +2348,20 @@ System Master). The new checks were run first against the unchanged
 library and failed ("remove open file", and "remove after close", since
 the open file had been deleted); with the change, `filetest` passes all 68
 checks, and the other 14 runs still pass.
+
+### 10.14 Increment 11: exec()
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/exec.s` | New: `exec()` under DOS 3.3, BRUN or RUN through COUT (5.10) |
+| `libsrc/dos33/mainargs.s` | Modified copy: takes exec()'s arguments from page 2 |
+| `libsrc/dos33/VENDORED.md` | Lists `mainargs.s`; notes `exec.s` |
+| `test/exectest.c`, `test/argtest.c` | Three runs: `exectest`, `exectest-vt`, `execatest` |
+| `test/bloadprobe.c`, `test/errprobe.c`, `test/errstub.s` | The probes run before implementation (5.10) |
+| `test/emutest.sh` | The exec disk; pass conditions joined with ` && `, `!` to negate |
+
+Raised by polluks on cc65/cc65#3050. **Verified with `make emutest`:** all
+22 runs pass (5.10).
 
 ## 11. Sources
 
