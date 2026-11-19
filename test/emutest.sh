@@ -41,6 +41,12 @@ AC="${AC:-ac}"
 OUT=build/emu
 DISK="$OUT/a2libtests.dsk"
 NET_DISK="$OUT/a2libnet.dsk"
+PROBE_DISK="$OUT/a2libprobes.dsk"
+
+# The exec() probes (DESIGN.md 5.10) have a disk of their own: with them on
+# the main disk, filetest ran out of space (12 sectors were left free).
+PROBES=" bloadprobe errprobe errproberaw "
+is_probe() { [[ "$PROBES" == *" $1 "* ]]; }
 
 die() { echo "emutest: $*" >&2; exit 1; }
 upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }
@@ -50,7 +56,9 @@ command -v "$RUNNER" >/dev/null || die "runner not found: $RUNNER (set RUNNER)"
 command -v "$AC" >/dev/null || die "AppleCommander not found: $AC (set AC)"
 
 # The runs: name | program | card (vt for the VideoTerm, net for the
-# Uthernet II, or -) | script | --until text | text that marks a pass. The
+# Uthernet II, or -) | script | --until text | text that marks a pass: an
+# ERE, or several joined by " && ", where one starting with ! must not
+# match. The
 # script is --type/--expect/--wait steps after BRUN; @PORT@ in it is the
 # echo server's port. Programs that end with "PRESS A KEY" wait there; the
 # others end with their summary, and a failing one runs to the timeout.
@@ -71,7 +79,29 @@ cswtest-vt|cswtest|vt|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
 cswwtest|cswwtest|-|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
 cswstest|cswstest|-|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
 nettest|nettest|net|--expect|SERVER PORT|--type|@PORT@\r|PRESS A KEY|ALL [0-9]* PASSED
+bloadprobe|bloadprobe|-||PASSED|ALL [0-9]* PASSED
+errprobe|errprobe|-|--expect|FILE NOT FOUND|--type|PRINT 6*7\r|42|FILE NOT FOUND && ^42 && ! IN [0-9]
+errproberaw|errproberaw|-|--expect|FILE NOT FOUND|--type|PRINT 6*7\r|42|.
 '
+
+# errproberaw is a diagnostic (DESIGN.md 5.10): it passes whenever BASIC
+# answers after the error; its screen shows what the stub's reset prevents.
+
+# screen_passes CONDITIONS FILE: whether the screen meets the pass
+# conditions (above).
+screen_passes() {
+    local conds="$1" c
+    while [[ -n "$conds" ]]; do
+        c="${conds%% && *}"
+        if [[ "$c" == "$conds" ]]; then conds=; else conds="${conds#* && }"; fi
+        if [[ "$c" == '!'* ]]; then
+            grep -q -E -- "${c#!}" "$2" && return 1
+        else
+            grep -q -E -- "$c" "$2" || return 1
+        fi
+    done
+    return 0
+}
 
 # Answers one connection: reads a line to its CR, waits two seconds (the
 # delay nettest times), and sends the line back. Its port goes to the file
@@ -121,8 +151,9 @@ mkdir -p "$OUT"
 printf '[3]\ntype=uthernet2\n\n[6]\ntype=disk2\n' > "$OUT/net.ini"
 
 # The test disks: the programs the runs use, as DOS 3.3 binary files. The
-# network run's program has a disk of its own, since with it the programs
-# would overflow one 140K disk.
+# network run's program and the probes have disks of their own, since with
+# them the programs would overflow one 140K disk, or leave filetest too
+# little space for its files.
 make_disk() {
     local disk="$1" prog
     shift
@@ -134,7 +165,12 @@ make_disk() {
             || die "couldn't put $prog on $disk"
     done
 }
-make_disk "$DISK" $(printf '%s\n' "$RUNS" | grep -v '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u)
+main_progs=() probe_progs=()
+for prog in $(printf '%s\n' "$RUNS" | grep -v '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u); do
+    if is_probe "$prog"; then probe_progs+=("$prog"); else main_progs+=("$prog"); fi
+done
+make_disk "$DISK" ${main_progs[@]+"${main_progs[@]}"}
+(( ${#probe_progs[@]} > 0 )) && make_disk "$PROBE_DISK" "${probe_progs[@]}"
 printf '%s\n' "$RUNS" | grep -q '^[^|]*|[^|]*|net|' \
     && make_disk "$NET_DISK" $(printf '%s\n' "$RUNS" | grep '^[^|]*|[^|]*|net|' | cut -d'|' -f2 | sort -u)
 
@@ -158,6 +194,7 @@ while IFS= read -r line; do
     args=(--d1 "$MASTER" --d2 "$DISK" --type "BRUN $(upper "$prog"),D2\\r")
     [[ -n "${ROMS:-}" ]] && args=(--roms "$ROMS" "${args[@]}")
     [[ "$vt" == vt ]] && args+=(--videoterm)
+    is_probe "$prog" && args=("${args[@]/#$DISK/$PROBE_DISK}")
     timeout=300
     server=
     if [[ "$vt" == net ]]; then
@@ -188,7 +225,7 @@ while IFS= read -r line; do
     fi
     ran=$((ran + 1))
     summary="$(grep -E -m1 "ALL [0-9]+ PASSED|[0-9]+ OF [0-9]+ FAILED|^[0-9]+ FAILED" "$OUT/$name.txt" 2>/dev/null)"
-    if (( status == 0 )) && grep -q -E "$pass_re" "$OUT/$name.txt"; then
+    if (( status == 0 )) && screen_passes "$pass_re" "$OUT/$name.txt"; then
         printf 'PASS %-12s %s\n' "$name" "$summary"
     else
         case $status in

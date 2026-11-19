@@ -153,7 +153,8 @@ screenshots: test
 
 test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest \
       build/test/reflowtest build/test/reflowvt build/test/reflowwin \
-      build/test/s70test build/test/cswstest build/test/reflows70 $(NET_TEST)
+      build/test/s70test build/test/cswstest build/test/reflows70 $(NET_TEST) \
+      build/test/bloadprobe build/test/errprobe build/test/errproberaw
 
 build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -260,3 +261,18 @@ simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim $(SIM_DIR)
 
 clean:
 	rm -rf build lib
+
+# Probes for exec() under DOS 3.3 (DESIGN.md 5.10): DOS commands through
+# COUT and page 2 across BLOAD; a DOS error after the hand-off, with and
+# without the stub's reset
+build/test/bloadprobe: test/bloadprobe.c test/cswcout.s $(DOS33_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/bloadprobe.c test/cswcout.s $(DOS33_LIB)
+
+build/test/errprobe: test/errprobe.c test/errstub.s $(DOS33_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/errprobe.c test/errstub.s $(DOS33_LIB)
+
+build/test/errproberaw: test/errprobe.c test/errstub.s $(DOS33_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -DRAW -m $@.map -o $@ test/errprobe.c test/errstub.s $(DOS33_LIB)

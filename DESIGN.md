@@ -1265,6 +1265,211 @@ file's exact size and load address.
 
 ---
 
+### 5.10 exec
+
+**Problem:** stock `exec()` fails under DOS 3.3. Its first step,
+`mli_file_info_direct`, goes through `callmli`, which returns `$01` when
+`__dos_type == 0`, so `exec()` sets `ENOSYS` (verified, `exec.s`, `mli.s`).
+Raised by polluks on cc65/cc65#3050: "What about exec() via COUT ^D?"
+
+**Approach (decision):** keep stock `exec()`'s structure: validate, shut
+down the C library, then hand off to a stub in page 3. Replace the stub's
+ProDOS loader with a DOS 3.3 command sent through `COUT`. DOS runs the
+program the same way it would after the user typed the command.
+
+| Option | Pros | Cons |
+|---|---|---|
+| DOS command through `COUT` (`BRUN`/`RUN`) | DOS's own loader; `RUN` of A files comes free; small stub | Errors after the hand-off are DOS's, not `errno` |
+| Load the B file with the File Manager in the stub, `JMP` to it | Errors could be caught later | The stub needs FM buffers and the parameter list after `free`; larger than page 3 allows; duplicates `BLOAD` |
+
+#### How DOS takes the command (verified, *Beneath Apple DOS* ch. 8)
+
+- DOS's video intercept (`$9EBD`) runs a state machine. In state 0 (start
+  of line), a Ctrl-D (`$84`) switches to state 1. State 1 stores each
+  character at `$200` + index, the Ctrl-D included. On a carriage return
+  it runs the command parser (`$9FCD`).
+- A CR in state 2 (ignoring a non-command line) or state 3 (after input)
+  sets state 0, so **the stub prints a CR first** and gets to state 0
+  from wherever the program left off. a2lib never uses DOS's own WRITE
+  mode (state 4), because it calls the File Manager directly.
+- State 0 checks for Ctrl-D whether or not BASIC is running. `read.s`'s
+  `initprompt` only stops DOS from scanning *input* for commands, so it
+  doesn't get in the way.
+- `BRUN` (`$A38E`) does a `BLOAD`, reinstalls DOS's intercepts, and
+  jumps to the file's load address.
+- `$3EA` (`$A851`) reinstalls an intercept only if it isn't already in
+  place, so it's safe to call when DOS is already hooked in.
+- The display backends' destructors put back the hooks they found
+  (verified, `vt.s` `vtdone`, `s80.s` `s80done`). After `donelib`, CSW is
+  what it was when the program started.
+
+#### Sequence
+
+Before the point of no return. Every failure returns -1 with `errno` set,
+as stock `exec()` does:
+
+1. **Under ProDOS:** `ENOSYS`, as `open.s` does (a2lib's file layer is
+   DOS 3.3 only). Keeping stock's ProDOS path would keep its loader
+   resident for nothing.
+2. **Name:** `fm_tempfcb`, `fm_begin`, `fm_name`. Suffixes (`,S`, `,D`,
+   `,V`) work as in `open` (5.5), and explicit S and D stay sticky.
+   Errors: `$25` → `ENOMEM`, `$40` → `EINVAL`.
+3. **Exists, and its type:** OPEN without allocating (X ≠ 0, as
+   `fm_isopen` does), take `FM_TYPE` and mask the lock bit (as `open.s`
+   does), CLOSE, `fm_freefcb`. OPEN errors are mapped by `fm_maperr`
+   (`ENOENT`, `EIO`, …).
+4. **Verb:**
+
+   | FM type | Command | Notes |
+   |---|---|---|
+   | `$04` B | `BRUN` | The counterpart of stock's BIN path |
+   | `$02` A | `RUN` | A DOS 3.3 idiom; stock has no BASIC case. `cmdline` must be NULL or `""`, otherwise `EINVAL` (an Applesoft program can't receive it, and the guiding principle rules out dropping it silently) |
+   | others | — | `$4A` → `ENOEXEC`, the code stock `typerr` uses |
+
+   I files are rejected. Whether Integer BASIC is present can't be known
+   until DOS tries, which would be after the hand-off.
+5. **Build the command** in the stub's buffer: `$84`, verb, space, the
+   name from `fm_namebuf` with its `$A0` padding trimmed, then
+   `,S<slot>,D<drive>`, plus `,V<n>` if a volume was given, then `$8D`.
+   Slot and drive are written out explicitly, so DOS opens the file that
+   was just checked. Worst case is 48 bytes: `^D` + `BRUN` + space + 30 +
+   `,S7,D2,V254` + CR.
+6. **Copy the stub** to page 3 (`target = DOSWARM - size`, with stock's
+   `.assert target >= $300`). a2lib uses nothing else in `$300`–`$3CF`
+   (checked by grep).
+
+Point of no return. Same as stock from here:
+
+7. Reset SP to `$FF`. Store up to 127 bytes of `cmdline`, `'\0'`
+   included, at `$0100`. Point `done+1` at `target`, then
+   `jmp exit_with_params`. The destructors close every file
+   (`closeallfiles`), restore the hooks and the IRQ vector, and `_exit`
+   restores the zero page.
+
+The stub, entered from `done` with ROM banked in:
+
+8. `JSR $3EA`: reconnect DOS's intercepts (does nothing if already
+   connected).
+9. Set `CURLIN+1 = $FF` and `PROMPT = $DD` (`]`), and clear `ERRFLG`
+   (`$D8`). This puts DOS's state back to how it is when a user types the
+   command, undoing `read.s`'s `initprompt`. Every DOS error goes through
+   one handler (`$A6D5`), which skips its message while ONERR is set and
+   passes the error to Applesoft while a program seems to be running
+   (*Beneath Apple DOS* ch. 8). **(verified, probes below)** With the
+   reset, a failed `BRUN` prints FILE NOT FOUND and returns to the `]`
+   prompt. Without it, the same failure adds `BREAK IN 32868` (`$8064`:
+   `initprompt`'s `$80` in `CURLIN+1`), because Applesoft takes the error
+   as its own program's.
+10. If `cmdline` isn't empty, copy the argument tail (below) from `$0100`
+    to `$200 + L`, where L is the command's length (patched in at step
+    5).
+11. Print the command through `$FDED`: CR first, then the buffer. DOS
+    runs it on the final CR.
+12. `JMP DOSWARM`, for a B program that ends with `RTS`: DOS's exit
+    (`$9FB3`) restores the S it had on entry, which returns into this
+    stub.
+
+Estimated size: about 45 bytes of code plus the 48-byte buffer, well
+within the 208 bytes of `$300`–`$3CF`.
+
+#### Passing `cmdline` (decision)
+
+There's no DOS 3.3 convention. The command has to end at its CR (any
+text after the name is a DOS SYNTAX ERROR), so the arguments go in page
+2 *after* the command, where DOS's line collector doesn't write:
+
+```
+$200: $84 "BRUN NAME,S6,D1" $8D   $00 $B2 cmdline… $00
+      └── stored by DOS ───────┘   └── written by the stub ──┘
+```
+
+- `$B2` is the REM token that stock `mainargs.s` looks for (the
+  BASIC.SYSTEM convention, from polluks's original mainargs code).
+- The `$00` before it is the marker. Keyboard input is stored with the
+  high bit set, so a typed line never has `$00` after its CR.
+- **Programs linked with a2lib** get a modified `mainargs.s`. Under DOS
+  3.3, if `$200` is `$84` and the first `$8D` is followed by `$00 $B2`,
+  it parses the arguments after the `$B2`, then overwrites the `$00`.
+  That way, if the user later types a line of exactly the same length,
+  the old arguments aren't picked up again.
+- In that version, argv[0] points to an empty string in DATA, not to
+  `FNAM` (`$281`). Under DOS 3.3, stock makes argv[0] `""` by writing `$00`
+  to `$281`, *before* copying the arguments. That is deliberate and fits
+  stock's documented 127-character limit (`BUF_LEN`), so it isn't a cc65
+  bug. But a 48-byte command plus a 129-byte tail can reach `$2B1`, and
+  that write would corrupt exec()'s tail.
+- **Other programs** (stock `mainargs`, Applesoft) see no arguments.
+  Stock's scan for `$B2` stops at the `$00`. One exception: a high-bit
+  `'2'` in the command (`PROG2`, `,D2`) is also `$B2`. Stock then starts
+  parsing right after it, hits a high-bit character and stops, so it
+  still sees no arguments rather than garbage. That stays true because
+  every byte of the command has its high bit set.
+- argv[0] stays `""`, as under DOS 3.3 today. Setting it to the program's
+  name is possible later; the name is in the command.
+
+#### Limits (documented, not fixed)
+
+- After the hand-off, failure is DOS's: a message and the `]` prompt.
+  Step 3 rules out the expected causes (missing file, wrong type).
+- Stock `exec()` doesn't check whether a BIN's load range overlaps its
+  loader, so this doesn't either. A B file loaded into page 2 or 3 would
+  overwrite the stub.
+- `cmdline` is truncated at 126 characters, as in stock.
+
+#### Files
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/exec.s` | New: replaces stock `exec.o` in `apple2-dos33.lib` |
+| `libsrc/dos33/mainargs.s` | Modified copy: the argument marker; argv[0] not at `FNAM` under DOS 3.3 |
+| `libsrc/dos33/VENDORED.md` | Lists `mainargs.s` |
+| `test/exectest.c`, `test/argtest.c`, `test/EXECA` (A file) | Tests, below |
+| `test/emutest.sh` | Runs `exectest`, and `exectest-vt` with the VideoTerm |
+
+#### Tests (`make emutest`)
+
+`exectest` checks the failures first. Each must return -1 with this
+program still running: a missing file (`ENOENT`), a T file (`ENOEXEC`),
+a bad name (`EINVAL`), and an A file with a `cmdline` (`EINVAL`). Then it
+calls `exec("ARGTEST,D2", "ONE \"TWO 2\" THREE")`. The `,D2` and the
+`'2'`s put the `$B2` hazard in the test. `argtest` checks argc 4 and each
+argument, then checks the marker was cleared, and prints "ALL n PASSED".
+
+Further runs:
+
+- `RUN` of `EXECA`, which prints a line the runner waits for.
+- The same exec with the VideoTerm: hooks restored, command seen.
+- After `argtest` exits, typing `BRUN ARGTEST,D2` again: argc must be 1.
+  This is the stale-marker check, and the line is the same length as
+  exec's command.
+- The long-argument case, which confirms the BLOAD result below through
+  `BRUN` itself.
+
+#### Probes (verified before implementation)
+
+Run with `make emutest` (ReplicApple2Plus's runner, DOS 3.3 System
+Master), all passing:
+
+| Run | Shows |
+|---|---|
+| `bloadprobe` | A running program can send DOS commands through `$FDED` (BSAVE, then BLOAD, round trip); DOS stores `$84`, the command and `$8D` at `$200`; BLOAD leaves `$230`–`$2FF` unchanged, so the argument tail survives `BRUN`'s load (`$A38E` runs BLOAD) |
+| `errprobe` | The hand-off (`main` returns, the destructors run, `done` jumps to a page-3 stub) and step 9: with `ERRFLG` set beforehand, a failed `BRUN` prints FILE NOT FOUND, no Applesoft error, and BASIC answers at `]` |
+| `errproberaw` | The same without step 9: FILE NOT FOUND, then `BREAK IN 32868` |
+
+The error probes link `read.s` on purpose (`keep_read` in `errprobe.c`):
+`initprompt` is a constructor in `read.s`, so a program that only prints
+never sets `PROMPT` and `CURLIN+1`, and the first run of the probes, which
+didn't link it, couldn't tell the variants apart. `emutest.sh` pass
+conditions may now join several EREs with ` && `, with `!` for one that
+must not match. The probes have a disk of their own
+(`build/emu/a2libprobes.dsk`), as `nettest` does: on the main test disk
+they left `filetest` 12 free sectors, and it failed 14 of 68 checks
+(LSEEK on) for lack of space. Verified: all 19 runs pass (ReplicApple2Plus
+1.11.0's runner, including `nettest`).
+
+**Upstream:** in a `-t apple2dos33` target (proposal item 2), `exec.s`
+and the `mainargs.s` change go in with the target, not as a separate PR.
+
 ## 6. DOS 3.3 interrupts
 
 **(verified)** cc65's `initirq` simply asks the ProDOS MLI to allocate an
