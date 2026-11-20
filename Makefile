@@ -3,6 +3,7 @@
 #   make            build the libraries (below)
 #   make test       also build the test programs
 #   make simtest    build and run the sim65 tests (no Apple II needed)
+#   make linktest   check that functions with no DOS 3.3 version don't link
 #   make emutest    run the test programs on ReplicApple2Plus (below)
 #   make screenshots  the README's screenshot, from an emutest run
 #   make clean      remove build/ and lib/
@@ -44,6 +45,12 @@ DOS33_OBJ := $(patsubst libsrc/dos33/%.s,build/dos33/%.o,$(DOS33_SRC))
 DOS33_INC := $(wildcard libsrc/dos33/*.inc)
 DOS33_LIB := lib/apple2-dos33.lib
 
+# Link-time guards (DESIGN.md 4.2): each replaces the stock ProDOS module
+# of the same name, so a call to a function with no DOS 3.3 implementation
+# fails to link instead of failing at run time
+GUARD_SRC := $(wildcard libsrc/guard/*.s)
+GUARD_OBJ := $(patsubst libsrc/guard/%.s,build/guard/%.o,$(GUARD_SRC))
+
 VT_SRC := $(wildcard libsrc/vt/*.s)
 VT_OBJ := $(patsubst libsrc/vt/%.s,build/vt/%.o,$(VT_SRC))
 VT_INC := $(wildcard libsrc/vt/*.inc)
@@ -60,7 +67,7 @@ WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC)) \
 WIN_INC := $(wildcard libsrc/win/*.inc) $(S80_INC)
 VTWIN_LIB := lib/apple2-dos33-vtwin.lib
 
-.PHONY: emutest screenshots all test simtest clean
+.PHONY: emutest screenshots all test simtest linktest clean
 
 S70_SRC := $(wildcard libsrc/s70/*.s)
 S70_OBJ := $(patsubst libsrc/s70/%.s,build/s70/%.o,$(S70_SRC)) \
@@ -84,10 +91,14 @@ build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/dos33 -o $@ $<
 
-$(DOS33_LIB): $(DOS33_OBJ) $(STOCK_LIB)
+build/guard/%.o: libsrc/guard/%.s
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) -o $@ $<
+
+$(DOS33_LIB): $(DOS33_OBJ) $(GUARD_OBJ) $(STOCK_LIB)
 	@mkdir -p $(@D)
 	cp $(STOCK_LIB) $@
-	$(AR65) r $@ $(DOS33_OBJ)
+	$(AR65) r $@ $(DOS33_OBJ) $(GUARD_OBJ)
 
 # VideoTerm backend: apple2-dos33.lib with VideoTerm-aware conio modules
 build/vt/%.o: libsrc/vt/%.s $(VT_INC) libsrc/dos33/timer.inc
@@ -262,6 +273,11 @@ $(SIM_DIR)/s70sim: test/sim/s70sim.c test/sim/shim.s test/sim/winshim.s test/sim
 
 $(SIM_DIR)/reflowsim: test/sim/reflowsim.c test/sim/reflowshim.s $(SIM_REFLOW)
 	$(CL65) -t sim6502 -O -I include -o $@ $^
+
+# Link-time guards (DESIGN.md 4.2): a call to each guarded function must
+# fail to link, naming its guard symbol, while a control program links
+linktest: $(DOS33_LIB)
+	CL65=$(CL65) bash test/linktest.sh $(DOS33_LIB)
 
 simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim $(SIM_DIR)/s70sim
 	$(SIM65) $(SIM_DIR)/timersim

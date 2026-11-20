@@ -975,10 +975,23 @@ smallest change to cc65, but:
 - Every DOS 3.3 binary would carry translation tables for all 16 calls.
 
 **Adopted: replace the modules above `callmli`, keeping `mli.s` as the
-fallback.** Anything without a DOS 3.3 equivalent (`chdir` to
-directories, `mkdir`, `rmdir`, DIO block calls) keeps failing with
-`ENOSYS`, as it does today. Features are ported one by one instead of
-emulating an entire OS interface.
+fallback.** Features are ported one by one instead of emulating an
+entire OS interface.
+
+**Functions with no DOS 3.3 equivalent fail at link time (revised in
+10.26).** A failure that can be caught at link time isn't left to run
+time. Each stock module whose C functions still depend on ProDOS is
+replaced by a guard of the same name (`libsrc/guard`), which defines the
+function as an alias of an undefined symbol that names it:
+`dio_open_has_no_DOS_3_3_implementation`, for example. ld65 reports that
+symbol, and the guard's file and line, for a program that calls it.
+Programs that don't call one link no guard. Guarded: `getcurrentdevice`,
+`getdevicedir`, `getfirstdevice`, `getnextdevice`, the `dio_*` calls,
+`file_set_type`, `file_set_auxtype`, `statvfs`, `mkdir`, `rmdir` and
+`clock_getres`. `make linktest` checks every one of them.
+Deleting the stock modules instead wouldn't work: `cl65` appends cc65's
+own `apple2.lib`, which would supply them again (confirmed with a link
+map).
 
 | Replace | Keep |
 |---|---|
@@ -2731,6 +2744,30 @@ Raised by Colin Leroy-Mira's review on cc65/cc65#3050, whose example was
 (od65): `exec.o` by 29, `open.o` by 36. No behavior changes; `make
 emutest` covers every path touched (exectest's commands, filetest's
 OPEN, lseek, O_APPEND and stat groups).
+
+### 10.26 Link-time guards for functions with no DOS 3.3 version
+
+| File | Change |
+|---|---|
+| `libsrc/guard/*.s` | New: one guard per stock module (`curdevice`, `devicedir`, `getdevice`, `dioopen`, `dioclose`, `dioread`, `diowrite`, `diosectcount`, `diosectsize`, `file_set_info`, `statvfs`, `sysmkdir`, `sysrmdir`, `getres`), replacing it in `apple2-dos33.lib` (4.2) |
+| `Makefile` | Builds the guards into `apple2-dos33.lib` (and so into the backend libraries); `make linktest` |
+| `test/linktest.sh` | New: a program per guarded function must fail to link, naming its guard symbol; a control program using `fopen`, `remove`, `rename`, `chdir` and `clock_gettime` must link |
+| `DESIGN.md` | 4.2: link-time failure replaces run-time `ENOSYS` |
+
+Before this change, these functions failed at run time: `callmli` returns
+`$01` when `__dos_type` is 0 (mapped to `ENOSYS`), `getres` returns
+`ENOSYS`, and the device functions return `INVALID_DEVICE` (or, for
+`getdevicedir`, NULL). Two did worse:
+`dio_query_sectsize` returned ProDOS's 512, and `rmdir` deleted the file
+it named, because stock `sysrmdir.s` aliases `_sysremove`, which a2lib
+replaces with DOS 3.3's DELETE (confirmed with a link map: `rmdir` linked
+a2lib's `sysremove.o`).
+
+Verified: `make linktest` passes (16 guards, control links). Run against
+the previous library (the stock modules put back with `ar65 r`), all 16
+checks fail and the control links. `make test` builds every test program
+unchanged; `make simtest` passes. `clock_getres`'s guard goes when the
+software clock gets its own `clock_getres`.
 
 ## 11. Sources
 
