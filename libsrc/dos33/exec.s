@@ -49,16 +49,8 @@ _exec:
         ldx     progname+1
         jsr     fm_name
         bcs     free
-        lda     #$00
-        ldy     #FM_RECORD
-        sta     (ptr3),y
-        iny
-        sta     (ptr3),y
-        ldy     #FM_CALL
-        lda     #FMC_OPEN
-        sta     (ptr3),y
         ldx     #$01            ; Don't allocate
-        jsr     fm_call
+        jsr     fm_open
         bcs     fail
         ldy     #FM_TYPE
         lda     (ptr3),y
@@ -116,47 +108,35 @@ stub:   ldx     #size - 1
         ldx     #$00
         lda     #HI_CTRL_D
         jsr     put
-        ldy     #$00
         lda     type
         cmp     #FMT_BINARY
         bne     :+
-        lda     #'B'
-        jsr     putlo
-:       lda     verbrun,y
-        beq     :+
-        jsr     putlo
-        iny
-        bne     :-              ; Branch always
+        lda     #'B' | $80
+        jsr     put
+:       ldy     #run - strings
+        jsr     puts
 
         ; The name, without its padding
-:       ldy     #NAME_LEN
-:       dey
-        lda     fm_namebuf,y
-        cmp     #HI_SPACE
-        beq     :-
-        sty     tmp1            ; Index of the last character
         ldy     #$00
-:       lda     fm_namebuf,y    ; High bit already set
+@name:  lda     fm_namebuf,y    ; High bit already set
         jsr     put
-        iny
-        cpy     tmp1
-        bcc     :-
-        beq     :-
+        cmp     #HI_SPACE
+        beq     :+
+        stx     tmp1            ; Just past the last character so far
+:       iny
+        cpy     #NAME_LEN
+        bne     @name
+        ldx     tmp1
 
-        lda     #','
-        jsr     putlo
-        lda     #'S'
-        jsr     putlo
+        ; ",S<slot>,D<drive>" and CR
         lda     fm_slot
-        jsr     putdigit
-        lda     #','
-        jsr     putlo
-        lda     #'D'
-        jsr     putlo
+        ora     #'0'
+        sta     slotdigit
         lda     fm_drive
-        jsr     putdigit
-        lda     #HI_CR
-        jsr     put
+        ora     #'0'
+        sta     drivedigit
+        ldy     #suffix - strings
+        jsr     puts
         stx     len_t           ; DOS stores ^D through CR: the tail goes after
         lda     #$00
         sta     cmd_t,x
@@ -188,24 +168,32 @@ stub:   ldx     #size - 1
         stx     done+2
         jmp     exit_with_params
 
-; put: store A at cmd_t + X, X + 1. putlo: the same with the high bit set.
-; Preserve Y.
+; put: store A at cmd_t + X, X + 1. Preserves A and Y.
 
-putlo:  ora     #$80
 put:    sta     cmd_t,x
         inx
         rts
 
-; putdigit: put the decimal digit (0-9) in A. Preserves Y.
+; puts: put the string at strings + Y, up to its $00, with the high bit
+; set.
 
-putdigit:
-        ora     #'0' | $80
-        bne     put             ; Branch always
+puts:   lda     strings,y
+        beq     :+
+        ora     #$80
+        jsr     put
+        iny
+        bne     puts            ; Branch always
+:       rts
 
-        .rodata
+        .data
 
-verbrun:
-        .byte   "RUN ", $00     ; BRUN: 'B' put first
+strings:
+run:    .byte   "RUN ", $00     ; BRUN: 'B' put first
+suffix: .byte   ",S"
+slotdigit:
+        .byte   "0,D"
+drivedigit:
+        .byte   "0", $0D, $00
 
 ; ------------------------------------------------------------------------
 ; The stub. Runs at target, entered from done with ROM banked in: only

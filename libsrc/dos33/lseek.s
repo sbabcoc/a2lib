@@ -58,11 +58,7 @@ _lseek:
         jcs     einval
 
         ; Control block and parameter list
-        lda     fdtab + FD::BUFFER,y
-        sta     ptr4
-        lda     fdtab + FD::BUFFER+1,y
-        sta     ptr4+1
-        jsr     fm_begin
+        jsr     fm_fdbegin
 
         ; Base position for whence
         lda     #$00

@@ -182,7 +182,7 @@ FCB_TEXT        = $80           ; FCB::KIND value for T files
 ; ------------------------------------------------------------------------
 ; Shared routines (fm.s, fmname.s)
 
-        .global         fm_begin, fm_call, fm_simple, fm_maperr
+        .global         fm_fdfcb, fm_fdbegin, fm_begin, fm_call, fm_simple, fm_op, fm_open, fm_maperr
         .global         fm_position, fm_readbyte, fm_writebyte
         .global         fm_rangeio, fm_rio_addr, fm_rio_count
         .global         fm_incpos

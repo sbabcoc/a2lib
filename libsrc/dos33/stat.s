@@ -68,10 +68,7 @@ _stat:
         asl
         asl
         tay
-        lda     fdtab + FD::BUFFER,y
-        sta     ptr4
-        lda     fdtab + FD::BUFFER+1,y
-        sta     ptr4+1
+        jsr     fm_fdfcb
         lda     stbuf
         sta     ptr1
         lda     stbuf+1

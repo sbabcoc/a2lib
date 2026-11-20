@@ -24,11 +24,7 @@
 
 seekend:
         sty     sslot
-        lda     fdtab + FD::BUFFER,y
-        sta     ptr4
-        lda     fdtab + FD::BUFFER+1,y
-        sta     ptr4+1
-        jsr     fm_begin
+        jsr     fm_fdbegin
 
         ldy     #FCB::KIND
         lda     (ptr4),y

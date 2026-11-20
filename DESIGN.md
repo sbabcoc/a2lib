@@ -2717,6 +2717,21 @@ reflow tests); those that do, by 25. No test program links `mli.o` or
 `dosdetect.o` now. The `O_APPEND` tests (T and B files, filetest) cover
 the moved path.
 
+### 10.25 Size pass: the file layer, first round
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/exec.s` | The command is built from a template (`",S0,D0"` and CR, digits patched in) copied by the loop that copies the verb; the name is copied and trimmed in one pass |
+| `libsrc/dos33/fm.s` | `fm_open` (OPEN with variable-length records; A = type for a new file), `fm_op`; `fm_fdfcb` and `fm_fdbegin` load a slot's control block (and begin) |
+| `libsrc/dos33/open.s`, `fmbuf.s`, `sysrename.s`, `exec.s` | `fm_open` in place of four copies of the OPEN setup |
+| `libsrc/dos33/open.s`, `lseek.s`, `seekend.s`, `stat.s` | `fm_fdfcb`/`fm_fdbegin` in place of five copies of the load |
+
+Raised by Colin Leroy-Mira's review on cc65/cc65#3050, whose example was
+`exec.s`'s character-by-character suffix. The modules shrink by 91 bytes
+(od65): `exec.o` by 29, `open.o` by 36. No behavior changes; `make
+emutest` covers every path touched (exectest's commands, filetest's
+OPEN, lseek, O_APPEND and stat groups).
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

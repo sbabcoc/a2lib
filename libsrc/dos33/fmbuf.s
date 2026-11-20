@@ -84,16 +84,8 @@ fm_freefcb:
         rts
 
 fm_isopen:
-        lda     #$00
-        ldy     #FM_RECORD
-        sta     (ptr3),y
-        iny
-        sta     (ptr3),y
-        ldy     #FM_CALL
-        lda     #FMC_OPEN
-        sta     (ptr3),y
         ldx     #$01            ; Don't allocate
-        jsr     fm_call
+        jsr     fm_open
         bcc     :+
         jsr     fm_maperr
         sec

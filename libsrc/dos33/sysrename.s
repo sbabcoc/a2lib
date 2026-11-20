@@ -83,16 +83,8 @@ __sysrename:
         lda     #<newbuf
         ldx     #>newbuf
         jsr     setname
-        lda     #$00
-        ldy     #FM_RECORD
-        sta     (ptr3),y
-        iny
-        sta     (ptr3),y
-        ldy     #FM_CALL
-        lda     #FMC_OPEN
-        sta     (ptr3),y
-        ldx     #$01
-        jsr     fm_call
+        ldx     #$01            ; Don't allocate
+        jsr     fm_open
         bcs     :+
         lda     #FMC_CLOSE      ; It exists
         jsr     fm_simple

@@ -6,11 +6,26 @@
 ;
 
         .include        "zeropage.inc"
+        .include        "filedes.inc"
         .include        "fm.inc"
 
         .code
 
 ; ------------------------------------------------------------------------
+; fm_fdfcb: ptr4 = the control block of fdtab slot Y. Preserves X and Y;
+; returns Z set if the slot has none (the console).
+; fm_fdbegin: the same, then fm_begin (falls into it).
+
+fm_fdfcb:
+        lda     fdtab + FD::BUFFER,y
+        sta     ptr4
+        lda     fdtab + FD::BUFFER+1,y
+        sta     ptr4+1
+        rts
+
+fm_fdbegin:
+        jsr     fm_fdfcb        ; Falls into fm_begin
+
 ; fm_begin: locate the parameter list (ptr3) and point its buffer fields at
 ; the control block in ptr4: its work area, and the T/S list and data
 ; buffers below it. Must precede every series of File Manager calls,
@@ -40,12 +55,28 @@ fm_begin:
 ; ------------------------------------------------------------------------
 ; fm_simple: call type in A, no other parameters (CLOSE; or DELETE after
 ; fm_name has set the name fields).
+; fm_op: the same, with X as for fm_call.
 
 fm_simple:
-        ldy     #FM_CALL
-        sta     (ptr3),y
         ldx     #$01
+fm_op:  ldy     #FM_CALL
+        sta     (ptr3),y
         jmp     fm_call         ; fm_call is in another segment
+
+; ------------------------------------------------------------------------
+; fm_open: OPEN the file the name fields name (fm_name), with variable-
+; length records; A is the type for a new file. X as for fm_call.
+
+fm_open:
+        ldy     #FM_TYPE
+        sta     (ptr3),y
+        lda     #$00
+        ldy     #FM_RECORD
+        sta     (ptr3),y
+        iny
+        sta     (ptr3),y
+        lda     #FMC_OPEN
+        bne     fm_op           ; Branch always
 
 ; ------------------------------------------------------------------------
 ; fm_call: call the File Manager. X = 0 allocates the file on OPEN if it

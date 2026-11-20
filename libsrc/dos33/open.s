@@ -297,18 +297,8 @@ tfree:  pla
 ; fmopen: OPEN with the name fields set, variable-length records and
 ; "type" as the type for a new file. X as for fm_call.
 
-fmopen: lda     #$00
-        ldy     #FM_RECORD
-        sta     (ptr3),y
-        iny
-        sta     (ptr3),y
-        ldy     #FM_TYPE
-        lda     type
-        sta     (ptr3),y
-        ldy     #FM_CALL
-        lda     #FMC_OPEN
-        sta     (ptr3),y
-        jmp     fm_call
+fmopen: lda     type
+        jmp     fm_open
 
 ; rewind: POSITION to the start of the file.
 
@@ -382,11 +372,7 @@ text:   lda     #FCB_TEXT
 
 closedirect:
         sty     cslot
-        lda     fdtab + FD::BUFFER,y
-        sta     ptr4
-        lda     fdtab + FD::BUFFER+1,y
-        sta     ptr4+1
-        jsr     fm_begin
+        jsr     fm_fdbegin
         lda     #$00
         sta     cerr
 
@@ -431,11 +417,8 @@ cclose: lda     #FMC_CLOSE
 ; (the console has none).
 
 freebuffer:
-        lda     fdtab + FD::BUFFER+1,y
+        jsr     fm_fdfcb
         beq     :+
-        sta     ptr4+1
-        lda     fdtab + FD::BUFFER,y
-        sta     ptr4
         jmp     fm_freefcb
 :       rts
 
