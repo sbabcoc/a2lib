@@ -1013,9 +1013,24 @@ the same value, is gone.
   missing; X≠0 does not.
 - **Buffers are supplied by the caller on every call:** a 45-byte work
   area, a 256-byte track/sector list buffer, and a 256-byte data buffer,
-  557 bytes per open file. **Decision:** allocate them with the existing
-  `iobuf` mechanism (smaller than ProDOS's 1K). The layer does not use
-  DOS's MAXFILES buffer chain, so it isn't limited by MAXFILES.
+  557 bytes per open file. **Decision (10.23):** use DOS's own file
+  buffers (ch. 6, DOS BUFFERS), MAXFILES of them between HIMEM and DOS,
+  chained from `$9D00`. Each holds the three buffers, a 30-byte name field
+  and DOS's pointers; a buffer is in use while the name field's first byte
+  is nonzero, the convention DOS's commands follow (ch. 8, `$A764`,
+  `$A2FC`). `fmbuf.s` reserves a free one with `$FF` there and keeps the
+  library's per-file fields (11 bytes) in the rest of the name field, so
+  file I/O needs no `malloc` and no memory of its own. At most MAXFILES
+  files are open at once (3 by default; `MAXFILES` before the program
+  raises it, up to the 5 fdtab has room for); one more fails with NO
+  BUFFERS AVAILABLE (`ENOMEM`), as DOS itself does. `remove`, `rename` and
+  `exec` need a free buffer too, as DOS's DELETE and RENAME do. Buffers
+  are released on `close` and at exit, before `exec`'s command, which
+  needs one. A DOS `CLOSE` command printed by the program closes the
+  library's files too; programs shouldn't issue one with files open.
+  Until 10.23, each control block was `malloc`'d (568 bytes), which
+  pulled `malloc` and `free` (739 bytes) into every program that opened a
+  file.
 - A POSITION is required before the first READ or WRITE.
 - A range WRITE takes the byte count **minus one**.
 - RENAME takes the new name's address at bytes `02/03`.
@@ -1240,15 +1255,15 @@ so paths, first.
   existing new name fails with `EEXIST`**: `rename` first tries to OPEN
   the new name without allocating it.
 - Both need the File Manager's work area and buffers even without an
-  open file, so they allocate a temporary control block (557 bytes).
-  If that fails, they return DOS's NO BUFFERS AVAILABLE (`$0C`), which
-  maps to `ENOMEM` (5.6).
+  open file, so they reserve a DOS buffer for the call (4.4). If none is
+  free, they return DOS's NO BUFFERS AVAILABLE (`$0C`), which maps to
+  `ENOMEM` (5.6).
 - **An open file can't be deleted or renamed** (library code `$11`,
   `EINVAL`, 5.6), as ProDOS refuses too. DOS 3.3 itself doesn't check. Before DELETE or RENAME, both
-  OPEN the file in the temporary control block without allocating it,
+  OPEN the file in that buffer without allocating it,
   CLOSE it, and compare the work area's first T/S list (track, sector),
   slot and drive ("Beneath Apple DOS" ch. 6, work area offsets `$00`-`$01`,
-  `$26`, `$27`) with those of every open file (`fm_isopen`, `fmtemp.s`).
+  `$26`, `$27`) with those of every open file (`fm_isopen`, `fmbuf.s`).
   The first T/S list is unique on a disk, so a file is recognised under
   any name it's opened by. A file missing or locked fails as before. The
   check costs a catalog search, as DELETE and RENAME make anyway.
@@ -1281,7 +1296,7 @@ first version, which translated everything into ProDOS codes.
 | `$09` | DISK FULL | `ENOSPC` | File Manager |
 | `$0A` | FILE LOCKED | `EACCES` | File Manager |
 | `$0B` | SYNTAX ERROR | `EINVAL` | A bad name (`fmname.s`, `rename`) |
-| `$0C` | NO BUFFERS AVAILABLE | `ENOMEM` | No memory for a temporary control block |
+| `$0C` | NO BUFFERS AVAILABLE | `ENOMEM` | Every DOS buffer in use (`open`, `remove`, `rename`, `exec`; 4.4) |
 | `$0D` | FILE TYPE MISMATCH | `ENOEXEC` | `exec()` of a file that isn't B or A |
 | `$0E`, `$0F` | PROGRAM TOO LARGE, NOT DIRECT COMMAND | `ENOMEM`, `EINVAL` | (DOS commands; not produced) |
 
@@ -2660,6 +2675,25 @@ by 50 to 85 bytes, `filetest` by 259, and `timertest` by 1254, because
 `gettime.s` no longer pulls in ProDOS's date conversion. `mli.o`, with
 `callmli` and `dosdetect.o`, is still linked through `mliparam`, which
 `rwcommon.s` and stock `read.s` share.
+
+### 10.23 DOS's file buffers for control blocks
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/fmbuf.s` | Was `fmtemp.s`: `fm_getfcb` reserves a free DOS buffer (in place of `malloc`), `fm_freefcb` releases it |
+| `libsrc/dos33/fm.inc` | `FCB` is a DOS buffer, addressed at its work area, with the library's fields in the name field; `DOS_BUFS` |
+| `libsrc/dos33/fm.s` | `fm_begin` points the parameter list at the work area and the two pages below it |
+| `libsrc/dos33/open.s` | `open` reserves its control block with `fm_getfcb` (`ENOMEM`, `__oserror` `$0C` when none is free); `freebuffer` skips the console; `closeallfiles` releases the buffers |
+| `libsrc/dos33/exec.s`, `sysremove.s`, `sysrename.s` | `fm_getfcb` |
+| `test/filetest.c` | New group DOS BUFFERS (5 checks: all free at start; one used per open file; one more `open`, and `remove`, fail with `ENOMEM` when none is free; `close` frees them); MAX_SHOWN 6 |
+
+Raised by Colin Leroy-Mira's review on cc65/cc65#3050: `malloc` and
+`free` cost 739 bytes. `exectest` shrinks by 746 bytes; other programs
+that open files lose `malloc` unless they use it themselves (`opendir`
+does, as stock's does). `fm_getfcb` was run on sim65 against a built
+chain of three buffers, the second in use: it skips the used one, clears
+the 11 library bytes and nothing past them, fails with `$0C` when all are
+taken, and reuses a released buffer.
 
 ## 11. Sources
 

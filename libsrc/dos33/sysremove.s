@@ -20,7 +20,7 @@ __sysremove:
         sta     name
         stx     name+1
 
-        jsr     fm_tempfcb
+        jsr     fm_getfcb
         bcs     done
         jsr     fm_begin
         lda     name

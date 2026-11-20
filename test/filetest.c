@@ -20,15 +20,17 @@
 #include <dirent.h>             /* a2lib's DOS 3.3 dirent.h (-I include) */
 #include "dos33_filetype.h"     /* DOS33_T_* (-I include) */
 
-/* Failure lines shown: 24 rows less the BRUN line, the title, 12 groups,
+/* Failure lines shown: 24 rows less the BRUN line, the title, 13 groups,
 ** the overflow line, the summary and the prompt after exit. */
-#define MAX_SHOWN   7
+#define MAX_SHOWN   6
 #define MAX_GROUP   10          /* Most checks in one group */
+#define MAX_FDS     8           /* cc65's fdtab slots (filedes.inc) */
 
 /* __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, then
 ** the library's codes for conditions DOS 3.3 has no number for */
 #define DOSERR_NOTFOUND 0x06
 #define DOSERR_SYNTAX   0x0B
+#define DOSERR_NOBUFS   0x0C
 #define LIBERR_EXISTS   0x10
 #define LIBERR_OPEN     0x11
 #define LIBERR_POSITION 0x13
@@ -453,6 +455,68 @@ static void irq_tests (void)
     check ("ROM path registers", r & IRQ_REGS);
 }
 
+/* DOS's file buffers ("Beneath Apple DOS" ch. 6): the word at $9D00
+** points at the first one's name field, whose first byte is 0 while the
+** buffer is free; the word at +$24 points at the next one's, or is 0.
+** Returns how many there are (MAXFILES), and sets *used. */
+static unsigned char dos_buffers (unsigned char* used)
+{
+    const unsigned char* p = *(const unsigned char* const*) 0x9D00;
+    unsigned char n = 0;
+
+    *used = 0;
+    while (p != NULL) {
+        ++n;
+        if (*p != 0) {
+            ++*used;
+        }
+        p = *(const unsigned char* const*) (p + 0x24);
+    }
+    return n;
+}
+
+/* Open files use DOS's buffers: at most MAXFILES at once (DESIGN.md 4.4) */
+static void buffers (void)
+{
+    static char name[] = "T.BUF0";
+    int fd[MAX_FDS];
+    unsigned char n, m, used, i, ok;
+
+    n = dos_buffers (&used);
+    check ("DOS buffers free", n != 0 && used == 0);
+
+    /* No more than fdtab has room for: MAX_FDS less stdin, stdout, stderr */
+    m = n < MAX_FDS - 3 ? n : MAX_FDS - 3;
+    _filetype = DOS33_T_TXT;
+    ok = 1;
+    for (i = 0; i < m; ++i) {
+        name[5] = '1' + i;
+        fd[i] = open (name, O_WRONLY | O_CREAT | O_TRUNC);
+        ok &= fd[i] >= 0;
+    }
+    check ("open uses a buffer each", ok && dos_buffers (&used) == n
+                                      && used == m);
+    if (m == n) {
+        check ("open with none free", open ("T.BUFX", O_WRONLY | O_CREAT) == -1
+                                      && errno == ENOMEM
+                                      && _oserror == DOSERR_NOBUFS);
+        name[5] = '1';
+        check ("remove with none free", remove (name) == -1
+                                        && errno == ENOMEM);
+    }
+    for (i = 0; i < m; ++i) {
+        close (fd[i]);
+    }
+    check ("close frees them", dos_buffers (&used) == n && used == 0);
+    ok = 1;
+    for (i = 0; i < m; ++i) {
+        name[5] = '1' + i;
+        ok &= remove (name) == 0;
+    }
+    check ("remove", ok && open ("T.BUFX", O_RDONLY) == -1
+                        && errno == ENOENT);
+}
+
 /* stdio on top of the POSIX layer */
 static void stdio_layer (void)
 {
@@ -496,6 +560,7 @@ int main (void)
     stat_tests ();              group ("STAT");
     dir_tests ();               group ("DIRECTORY");
     irq_tests ();               group ("INTERRUPTS");
+    buffers ();                 group ("DOS BUFFERS");
     if (hidden) {
         printf ("  (%u MORE FAILURES)\n", hidden);
     }

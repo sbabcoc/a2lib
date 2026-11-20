@@ -16,8 +16,7 @@
 ; for a bad path,
 ; a name with a comma (which a DOS command can't carry) or an A file with
 ; a cmdline, ENOENT and the other OPEN errors, ENOEXEC
-; for a file that isn't B or A, ENOMEM if the temporary control block
-; can't be allocated. After the hand-off, failures are DOS's.
+; for a file that isn't B or A, ENOMEM if every DOS buffer is in use. After the hand-off, failures are DOS's.
 ;
 
         .export         _exec
@@ -43,7 +42,7 @@ _exec:
         stx     progname+1
 
         ; The file: name, existence and type, as sysremove.s does it
-        jsr     fm_tempfcb
+        jsr     fm_getfcb
         bcs     oserr
         jsr     fm_begin
         lda     progname

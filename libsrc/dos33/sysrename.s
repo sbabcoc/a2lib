@@ -36,7 +36,7 @@ __sysrename:
         sta     oldname
         stx     oldname+1
 
-        jsr     fm_tempfcb
+        jsr     fm_getfcb
         jcs     done
         jsr     fm_begin
 

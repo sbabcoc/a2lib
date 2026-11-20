@@ -138,6 +138,7 @@ can't:
 | New files | Type from `_filetype`, in DOS 3.3's own codes (`include/dos33_filetype.h`): `DOS33_T_TXT`, `DOS33_T_BIN` (the default), `DOS33_T_BAS`, `DOS33_T_INT`, `DOS33_T_S`, `DOS33_T_REL`. ProDOS's codes don't apply: `PRODOS_T_TXT` is DOS 3.3's B. |
 | T files | Stored as DOS 3.3 text (high bit set, CR line endings) and read back byte-for-byte as written. Bytes `$80`–`$FF` are rejected with `EINVAL`; use B files for 8-bit data. |
 | B files | The 4-byte address/length header is hidden. `_auxtype` sets the load address; the length is exact. Files still `BLOAD` and `BRUN`. |
+| Open files | Each open file uses one of DOS's file buffers, so at most MAXFILES are open at once (3 by default; run `MAXFILES 5` first for more). One more fails with `ENOMEM`. |
 | Seeking | As under ProDOS, except that T files can be positioned past their end, to reach records of random-access files. Positions are limited to 16 bits. |
 | Rename | The new path must be at the old one's slot and drive, and an existing new name fails with `EEXIST`, as under ProDOS. |
 | Directories | `opendir` takes a directory: `"/6/2"`, `"2"`, `"."` or `""`. `struct dirent` has the name, DOS 3.3 type, lock bit and size in blocks and sectors; it omits the byte size, dates and aux type, which the catalog doesn't record (use `stat`). |

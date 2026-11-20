@@ -1,12 +1,16 @@
 ;
 ; DOS 3.3 file I/O for the cc65 apple2 target
 ;
-; Temporary control block for File Manager calls made without an open
-; file (DELETE, RENAME): they need the work area and buffers as OPEN does.
+; Control blocks (FCB, fm.inc) are DOS's own file buffers ("Beneath Apple
+; DOS" ch. 6, DOS BUFFERS; DESIGN.md 4.4): MAXFILES of them, between
+; HIMEM and DOS, chained from DOS_BUFS. A buffer is in use while the first
+; byte of its name field is nonzero, as DOS's own commands mark it.
 ;
-; fm_tempfcb: allocate one into ptr4. Returns carry clear, or carry set
-;             with A = DOSERR_NOBUFS (DOS's NO BUFFERS AVAILABLE, ENOMEM).
-; fm_freefcb: free the one in ptr4. Preserves A.
+; fm_getfcb:  reserve a free one into ptr4, with the library's fields
+;             cleared. Returns carry clear, or carry set with A =
+;             DOSERR_NOBUFS (DOS's NO BUFFERS AVAILABLE, ENOMEM) if every
+;             buffer is in use.
+; fm_freefcb: release the one in ptr4. Preserves A.
 ; fm_isopen:  whether the file named in the parameter list (by fm_name) is
 ;             open, before DELETE and RENAME (DESIGN.md
 ;             5.5a). OPENs it in the control block in ptr4 without
@@ -17,8 +21,6 @@
 ;             Set up the parameter list again before the next call
 ;             (fm_begin, fm_name). Uses ptr2.
 ;
-
-        .import         _malloc, _free
 
         .include        "zeropage.inc"
         .include        "fm.inc"
@@ -31,27 +33,53 @@ WA_TSL          = $00           ; Track, sector of the first T/S list
 WA_SLOT         = $26           ; Slot * 16
 WA_DRIVE        = $27           ; Drive
 
+        .assert FCB::BUFS = FCB::INUSE + 30, error  ; The name field's length
+
         .code
 
-fm_tempfcb:
-        lda     #<.sizeof(FCB)
-        ldx     #>.sizeof(FCB)
-        jsr     _malloc
-        sta     ptr4
+fm_getfcb:
+        lda     DOS_BUFS
+        ldx     DOS_BUFS+1
+@buf:   sta     ptr4            ; A buffer's name field
         stx     ptr4+1
         ora     ptr4+1
-        beq     :+
+        beq     @none           ; End of the chain
+        ldy     #$00
+        lda     (ptr4),y
+        beq     @free
+        ldy     #FCB::NEXT - FCB::INUSE + 1
+        lda     (ptr4),y        ; The next one's
+        tax
+        dey
+        lda     (ptr4),y
+        jmp     @buf
+
+@free:  lda     #FCB_INUSE
+        sta     (ptr4),y
+        sec                     ; Address the work area
+        lda     ptr4
+        sbc     #FCB::INUSE
+        sta     ptr4
+        bcs     :+
+        dec     ptr4+1
+:       lda     #$00            ; Clear the library's fields
+        ldy     #FCB::ADDR + 1
+@clear: sta     (ptr4),y
+        dey
+        cpy     #FCB::INUSE
+        bne     @clear
         clc
         rts
-:       lda     #DOSERR_NOBUFS
+
+@none:  lda     #DOSERR_NOBUFS
         sec
         rts
 
 fm_freefcb:
         pha
-        lda     ptr4
-        ldx     ptr4+1
-        jsr     _free
+        lda     #$00
+        ldy     #FCB::INUSE
+        sta     (ptr4),y
         pla
         rts
 

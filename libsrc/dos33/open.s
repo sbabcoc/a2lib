@@ -11,14 +11,14 @@
 ;   REF_NUM  fdtab offset of the slot ORed with $40: nonzero and below $80,
 ;            so read.s/write.s/close.s treat it as a file, and rwcommon can
 ;            find the slot again from it
-;   BUFFER   the file's control block (FCB), from malloc()
+;   BUFFER   the file's control block (FCB): a DOS buffer (fmbuf.s); 0 for
+;            the console
 ;
 
         .export         _open, closedirect, freebuffer
         .export         __filetype, __auxtype, __datetime
         .destructor     closeallfiles, 5
 
-        .import         _malloc, _free
         .import         addysp, popax
 
         .macpack        longbranch
@@ -65,30 +65,18 @@ _open:
 
 found:  sty     slot
 
-        ; Allocate the control block
-        lda     #<.sizeof(FCB)
-        ldx     #>.sizeof(FCB)
-        jsr     _malloc
-        sta     ptr4
-        stx     ptr4+1
-        ora     ptr4+1
-        bne     :+
-        lda     #ENOMEM
-        jmp     ___directerrno
+        ; Reserve a control block
+        jsr     fm_getfcb
+        bcc     :+
+        jmp     ___mappederrno  ; A = DOSERR_NOBUFS -> ENOMEM
 
 :       ldy     slot
         lda     ptr4
         sta     fdtab + FD::BUFFER,y
         lda     ptr4+1
         sta     fdtab + FD::BUFFER+1,y
-
-        ; Clear the control block's own fields (everything before WORK)
         lda     #$00
         sta     created
-        ldy     #FCB::WORK - 1
-:       sta     (ptr4),y
-        dey
-        bpl     :-
 
         jsr     fm_begin
         jsr     setname
@@ -438,22 +426,29 @@ cclose: lda     #FMC_CLOSE
         cmp     #$01            ; C = error
         rts
 
-; freebuffer: free the control block of fdtab slot Y.
+; freebuffer: release the control block of fdtab slot Y, if it has one
+; (the console has none).
 
 freebuffer:
+        lda     fdtab + FD::BUFFER+1,y
+        beq     :+
+        sta     ptr4+1
         lda     fdtab + FD::BUFFER,y
-        ldx     fdtab + FD::BUFFER+1,y
-        jmp     _free
+        sta     ptr4
+        jmp     fm_freefcb
+:       rts
 
 ; closeallfiles: close all open files at exit, so that buffered sectors
-; and header lengths reach the disk.
+; and header lengths reach the disk, and release their DOS buffers.
 
 closeallfiles:
         ldy     #$00
 @slot:  lda     fdtab + FD::REF_NUM,y
         beq     @next
         bmi     @next           ; Device
-        jsr     closedirect     ; Preserves Y
+        jsr     closedirect     ; Sets cslot
+        jsr     freebuffer
+        ldy     cslot
 @next:  iny
         iny
         iny

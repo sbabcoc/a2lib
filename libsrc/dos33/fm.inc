@@ -19,6 +19,10 @@ FM_ENTRY        := $03D6        ; File Manager entry; X=0 allocates on OPEN
 DOS_DRIVE       := $AA68        ; 2 bytes
 DOS_SLOT        := $AA6A        ; 2 bytes
 
+; DOS's file buffers ("Beneath Apple DOS" ch. 6, DOS BUFFERS): MAXFILES of
+; them, chained from the first two bytes of 48K DOS
+DOS_BUFS        := $9D00        ; The first buffer's name field
+
 ; RWTS ("Beneath Apple DOS" ch. 6): JSR $3E3 returns DOS's IOB address in
 ; Y (lo), A (hi); JSR $3D9 calls RWTS with the IOB address in Y and A.
 
@@ -143,11 +147,16 @@ FMT_TYPE_MASK   = $7F           ; AND mask: the type without the lock bit
 NAME_LEN        = 30
 
 ; ------------------------------------------------------------------------
-; Per-file control block, allocated with malloc() by open() and kept in
-; fdtab[fd].BUFFER. The File Manager's three buffers live inside it, so
-; the layer doesn't use DOS's MAXFILES buffer chain (DESIGN.md 4.4).
+; Per-file control block: one of DOS's file buffers (fmbuf.s, DESIGN.md
+; 4.4), addressed at its File Manager work area and kept in
+; fdtab[fd].BUFFER. The 30-byte name field follows the work area: its first
+; byte is nonzero while the buffer is in use, and the library keeps its
+; own fields in the rest. The T/S list and data sector buffers are 256 and
+; 512 bytes below the work area.
 
 .struct FCB
+        WORK    .res 45         ; File Manager work area
+        INUSE   .byte           ; First byte of the name field: FCB_INUSE
         KIND    .byte           ; Bit 7 set: T file (text codec)
         HDRLEN  .byte           ; Hidden header length: 0, 2 (A/I) or 4 (B)
         LENOFS  .byte           ; Offset of the length word in the header
@@ -156,10 +165,14 @@ NAME_LEN        = 30
         POS     .word           ; Logical position (bytes after the header)
         TYPE    .byte           ; OPEN's type byte, including the lock bit
         ADDR    .word           ; B files: load address (from the header)
-        WORK    .res 45         ; File Manager work area
-        TSL     .res 256        ; File Manager T/S list buffer
-        DATA    .res 256        ; File Manager data sector buffer
+                .res 18         ; Rest of the name field
+        BUFS    .res 6          ; DOS's pointers to the three buffers
+        NEXT    .addr           ; Next buffer's name field; 0 after the last
 .endstruct
+
+FCB_TSL         = $100          ; T/S list buffer: work area - FCB_TSL
+FCB_DATA        = $200          ; Data sector buffer: work area - FCB_DATA
+FCB_INUSE       = $FF           ; Any nonzero value reserves the buffer
 
 FCBS_EOF        = $80           ; T file: end of data was read
 FCBS_DIRTY      = $40           ; Header file: length changed, rewrite on close
@@ -179,7 +192,7 @@ FCB_TEXT        = $80           ; FCB::KIND value for T files
         .global         rwts_read, rwts_maperr
         .global         rwts_slot, rwts_drive, rwts_volume
         .global         rwts_track, rwts_sector, rwts_buf
-        .global         fm_tempfcb, fm_freefcb, fm_isopen
+        .global         fm_getfcb, fm_freefcb, fm_isopen
 
 ; ------------------------------------------------------------------------
 ; Directories. DIRENT must match struct dirent in include/dirent.h.

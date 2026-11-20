@@ -12,8 +12,9 @@
 
 ; ------------------------------------------------------------------------
 ; fm_begin: locate the parameter list (ptr3) and point its buffer fields at
-; the control block in ptr4. Must precede every series of File Manager
-; calls, because DOS owns the parameter list between calls.
+; the control block in ptr4: its work area, and the T/S list and data
+; buffers below it. Must precede every series of File Manager calls,
+; because DOS owns the parameter list between calls.
 
 fm_begin:
         jsr     FM_LOCATE       ; Y = low, A = high
@@ -22,26 +23,19 @@ fm_begin:
 
         .assert FM_TSL = FM_WORK + 2, error
         .assert FM_DATA = FM_TSL + 2, error
-        ldx     #$00
+        .assert FCB_TSL = $100 && FCB_DATA = $200, error
+        ldx     ptr4+1
         ldy     #FM_WORK
-:       clc
-        lda     ptr4
-        adc     bufofs_lo,x
+:       lda     ptr4            ; Each buffer a page below the last
         sta     (ptr3),y
         iny
-        lda     ptr4+1
-        adc     bufofs_hi,x
+        txa
         sta     (ptr3),y
         iny
-        inx
-        cpx     #3
+        dex
+        cpy     #FM_DATA + 2
         bne     :-
         rts
-
-bufofs_lo:
-        .byte   <FCB::WORK, <FCB::TSL, <FCB::DATA
-bufofs_hi:
-        .byte   >FCB::WORK, >FCB::TSL, >FCB::DATA
 
 ; ------------------------------------------------------------------------
 ; fm_simple: call type in A, no other parameters (CLOSE; or DELETE after
