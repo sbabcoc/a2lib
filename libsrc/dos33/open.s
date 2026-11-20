@@ -20,6 +20,7 @@
         .destructor     closeallfiles, 5
 
         .import         addysp, popax
+        .forceimport    rwfile          ; Files opened here are read and written there
 
         .macpack        longbranch
 

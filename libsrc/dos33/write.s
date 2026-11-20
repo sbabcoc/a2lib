@@ -4,13 +4,14 @@
 ; int __fastcall__ write (int fd, const void* buf, unsigned count);
 ;
 ; DOS 3.3 file I/O for the cc65 apple2 target: modified copy of
-; libsrc/apple2/write.s from cc65. The only change is in the O_APPEND
-; path, which calls seekend instead of issuing ProDOS MLI calls; this is
-; the refactoring proposed upstream (DESIGN.md 4.2).
+; libsrc/apple2/write.s from cc65. The O_APPEND path, which issued ProDOS
+; MLI calls, is gone: rwfile.s moves to the end of the file (seekend.s).
+; The device path leaves its count in rw_count (rwcommon.s), not in
+; ProDOS's parameter block.
 ;
 
         .export         _write
-        .import         rwprolog, rwcommon, rwepilog, seekend
+        .import         rwprolog, rwcommon, rwepilog, rw_count
         .import         COUT
         .ifndef __APPLE2ENH__
         .import         uppercasemask
@@ -37,25 +38,16 @@ _write:
         txa                     ; Restore fd
         bmi     device
 
-        ; Check for append flag
-        lda     fdtab + FD::FLAGS,y
-        and     #O_APPEND
-        beq     write
-
-        ; Move to the end of the file
-        jsr     seekend         ; Preserves Y
-        bcs     oserr
-
         ; Do write
-write:  lda     fdtab + FD::REF_NUM,y
+        lda     fdtab + FD::REF_NUM,y
         ldy     #WRITE_CALL
         jmp     rwcommon
 
         ; Save count for epilog
 device: ldx     ptr2
         lda     ptr2+1
-        stx     mliparam + MLI::RW::TRANS_COUNT
-        sta     mliparam + MLI::RW::TRANS_COUNT+1
+        stx     rw_count
+        sta     rw_count+1
 
         ; Check for zero count
         ora     ptr2
@@ -99,7 +91,4 @@ einval: lda     #EINVAL
 
         ; Set __errno
 errno:  jmp     ___directerrno
-
-        ; Set ___oserror
-oserr:  jmp     ___mappederrno
 

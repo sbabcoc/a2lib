@@ -990,7 +990,9 @@ emulating an entire OS interface.
   `GET_EOF`/`SET_MARK` directly. Instead of maintaining a fork, propose
   an upstream patch that moves "seek to end" into a helper next to
   `rwcommon`. Then `write.s` no longer depends on the OS, and the DOS 3.3
-  build replaces only the helper.
+  build replaces only the helper. a2lib does this itself (10.24): its
+  file code, `rwfile.s`, moves to the end, and its `write.s` is stock's
+  without the `O_APPEND` path.
 
 ### 4.3 `struct dirent`
 
@@ -2685,7 +2687,7 @@ by 50 to 85 bytes, `filetest` by 259, and `timertest` by 1254, because
 | `libsrc/dos33/fm.s` | `fm_begin` points the parameter list at the work area and the two pages below it |
 | `libsrc/dos33/open.s` | `open` reserves its control block with `fm_getfcb` (`ENOMEM`, `__oserror` `$0C` when none is free); `freebuffer` skips the console; `closeallfiles` releases the buffers |
 | `libsrc/dos33/exec.s`, `sysremove.s`, `sysrename.s` | `fm_getfcb` |
-| `test/filetest.c` | New group DOS BUFFERS (5 checks: all free at start; one used per open file; one more `open`, and `remove`, fail with `ENOMEM` when none is free; `close` frees them); MAX_SHOWN 6 |
+| `test/filetest.c` | New group DOS BUFFERS (6 checks: all free at start; one used per open file; one more `open`, and `remove`, fail with `ENOMEM` when none is free; `close` frees them; the files are removed); MAX_SHOWN 6 |
 
 Raised by Colin Leroy-Mira's review on cc65/cc65#3050: `malloc` and
 `free` cost 739 bytes. `exectest` shrinks by 746 bytes; other programs
@@ -2694,6 +2696,26 @@ does, as stock's does). `fm_getfcb` was run on sim65 against a built
 chain of three buffers, the second in use: it skips the used one, clears
 the 11 library bytes and nothing past them, fails with `$0C` when all are
 taken, and reuses a released buffer.
+
+### 10.24 Console-only programs leave the file code out
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/rwcommon.s` | Now only `rwprolog`, `rwepilog`, the byte count `rw_count`, and `rwcommon`: a `JMP` that `rwfile.s`'s constructor points at the file code |
+| `libsrc/dos33/rwfile.s` | Was `rwcommon.s`'s file code; also moves to the end of an `O_APPEND` file before a write (`seekend`) |
+| `libsrc/dos33/write.s` | Stock's without the `O_APPEND` path; the device count goes to `rw_count` |
+| `libsrc/dos33/open.s` | `.forceimport rwfile` |
+| `libsrc/dos33/VENDORED.md` | `write.s`, `mli.inc` |
+
+Found while measuring 10.23: stock `write.s` reaches `rwcommon` and
+`seekend` directly, so every program that used `printf` linked the whole
+file layer (`rwcommon`, `seekend`, `fm.s`) and, through `mliparam`,
+ProDOS's `mli.o` and `dosdetect.o`. Only `open` creates file
+descriptors, so the file code is linked with it. Programs that don't
+open files shrink by 1075 bytes (argtest, timertest, the display and
+reflow tests); those that do, by 25. No test program links `mli.o` or
+`dosdetect.o` now. The `O_APPEND` tests (T and B files, filetest) cover
+the moved path.
 
 ## 11. Sources
 

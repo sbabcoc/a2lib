@@ -2,17 +2,18 @@
 
 `filedes.inc` and `mli.inc` are unmodified copies from cc65's
 `libsrc/apple2/` (commit `eebf54a`), distributed under the zlib license.
-The DOS 3.3 modules share the stock runtime's file descriptor table and
-MLI parameter block (`mliparam`, used by `rwepilog`), so their layouts
-must match the cc65 version the library is linked with. These layouts
-have not changed since 2005.
+The DOS 3.3 modules share the stock runtime's file descriptor table, so
+its layout must match the cc65 version the library is linked with; it
+has not changed since 2005. `mli.inc` supplies `READ_CALL` and
+`WRITE_CALL`, the operation codes stock `read.s` passes to `rwcommon`.
 
 Modified copies of cc65 modules, each with a note in its header
 explaining the change. a2lib runs under DOS 3.3 only, so their ProDOS
 paths are removed (DESIGN.md 10.22); the code DOS 3.3 shares is stock's:
 
-- `write.s` (from `libsrc/apple2/write.s`): the `O_APPEND` path calls
-  `seekend` instead of ProDOS MLI calls.
+- `write.s` (from `libsrc/apple2/write.s`): no `O_APPEND` path (`rwfile.s`
+  moves to the end of the file); the device path's count goes to
+  `rw_count`, not ProDOS's parameter block.
 - `crt0.s` (from `libsrc/apple2/crt0.s`): patches the 6502 vectors in
   Language Card RAM before the module constructors run, not after.
 - `cgetc.s`, `kbhit.s` (from `libsrc/apple2/`): the wait loop calls the
