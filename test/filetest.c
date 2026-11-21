@@ -562,6 +562,24 @@ static void buffers (void)
 }
 
 /* stdio on top of the POSIX layer */
+void cout_count_start (void);           /* coutcount.s */
+unsigned cout_count_stop (void);
+
+/* write() to the console sends exactly the count through COUT; stock
+** write.s's loop made it 256 more for a nonzero multiple of 256 */
+static unsigned console_write (unsigned count)
+{
+    static char text[512];
+    int n;
+    unsigned sent;
+
+    memset (text, 'X', count);
+    cout_count_start ();
+    n = write (STDOUT_FILENO, text, count);
+    sent = cout_count_stop ();
+    return n == (int) count ? sent : 0;
+}
+
 static void stdio_layer (void)
 {
     FILE* f;
@@ -582,6 +600,11 @@ static void stdio_layer (void)
     if (f) {
         fclose (f);
     }
+
+    check ("console write 255, 257", console_write (255) == 255
+                                     && console_write (257) == 257);
+    check ("console write 256, 512", console_write (256) == 256
+                                     && console_write (512) == 512);
 }
 
 int main (void)

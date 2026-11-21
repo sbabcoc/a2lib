@@ -7,7 +7,9 @@
 ; libsrc/apple2/write.s from cc65. The O_APPEND path, which issued ProDOS
 ; MLI calls, is gone: rwfile.s moves to the end of the file (seekend.s).
 ; The device path leaves its count in rw_count (rwcommon.s), not in
-; ProDOS's parameter block.
+; ProDOS's parameter block, and counts its passes through the low byte
+; first: stock's loop wrote 256 characters too many for a count that is a
+; nonzero multiple of 256 (DESIGN.md 10.28).
 ;
 
         .export         _write
@@ -53,6 +55,12 @@ device: ldx     ptr2
         ora     ptr2
         beq     done
 
+        ; Count passes through the low byte: one more if it's nonzero
+        cpx     #$01
+        lda     ptr2+1
+        adc     #$00
+        sta     ptr2+1
+
         ; Get char from buf
         ldy     #$00
 next:   lda     (ptr1),y
@@ -80,7 +88,7 @@ output: jsr     COUT            ; Preserves X and Y
 :       dex
         bne     next
         dec     ptr2+1
-        bpl     next
+        bne     next
 
         ; Return success
 done:   lda     #$00

@@ -2791,6 +2791,27 @@ before the fixes: `make emutest` (filetest) failed 2 of 92 checks,
 passed, so DOS's RENAME does refuse a locked file. `stat.o` grows by 29
 bytes, `sysrename.o` by 2.
 
+### 10.28 Console write of a multiple of 256
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/write.s` | The device loop adds one to the count's high byte when the low byte is nonzero, then counts down to 0 (`bne`, not `bpl`) |
+| `libsrc/dos33/VENDORED.md` | The fix, as a difference from stock |
+| `test/coutcount.s` | New: counts what console output sends through CSW, without showing it |
+| `test/filetest.c` | STDIO: `write` to stdout of 255 and 257 characters, and of 256 and 512, sends exactly that many through COUT |
+| `Makefile` | `filetest` links `test/coutcount.s` |
+
+The device loop (stock `libsrc/apple2/write.s`, still in cc65 at
+`eebf54a`; `libsrc/agat/write.s` has the same loop) counted down with
+`dex / bne / dec high / bpl`. With a low byte of 0, the first pass ran
+256 times and the next one ran again in full, so a count of 256 sent 512
+characters and 512 sent 768, the extra ones read from past the buffer.
+Found by the line-by-line review and shown in sim65 (the loop extracted
+unchanged) before the test existed. Shown on DOS 3.3 before the fix:
+`make emutest` (filetest) failed 1 of 94 checks, "CONSOLE WRITE 256,
+512". The fixed loop was checked in sim65 for every count from 0 to 2048
+and for 65535. `write.o` grows by 8 bytes.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

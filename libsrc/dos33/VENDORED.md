@@ -13,7 +13,10 @@ paths are removed (DESIGN.md 10.22); the code DOS 3.3 shares is stock's:
 
 - `write.s` (from `libsrc/apple2/write.s`): no `O_APPEND` path (`rwfile.s`
   moves to the end of the file); the device path's count goes to
-  `rw_count`, not ProDOS's parameter block.
+  `rw_count`, not ProDOS's parameter block. Its loop also has a fix stock
+  doesn't (yet): a count that is a nonzero multiple of 256 wrote 256
+  characters too many (DESIGN.md 10.28). Drop it once cc65's
+  `write.s` has the same fix.
 - `crt0.s` (from `libsrc/apple2/crt0.s`): patches the 6502 vectors in
   Language Card RAM before the module constructors run, not after.
 - `cgetc.s`, `kbhit.s` (from `libsrc/apple2/`): the wait loop calls the
