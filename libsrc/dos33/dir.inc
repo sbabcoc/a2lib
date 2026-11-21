@@ -8,6 +8,10 @@ VTOC_TRACK      = $11           ; VTOC: track 17, sector 0
 VTOC_CATTRACK   = $01           ; First catalog sector: track, sector
 VTOC_TSPAIRS    = $27           ; T/S pairs per T/S list sector (122)
 VTOC_SECTORS    = $35           ; Sectors per track (16)
+
+DOS_SECTORS     = 16            ; Sectors per track
+DOS_TSPAIRS     = 122           ; T/S pairs per T/S list sector
+DOS_TRACKS      = 35            ; Tracks on a disk
 CAT_NEXT        = $01           ; Catalog sector: next track, sector
 CAT_ENTRIES     = $0B           ; Catalog sector: first file entry
 CAT_ENTRYLEN    = 35            ; Bytes per file entry

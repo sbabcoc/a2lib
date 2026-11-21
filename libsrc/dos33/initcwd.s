@@ -12,6 +12,8 @@
 
         .include        "fm.inc"        ; DOS_SLOT, DOS_DRIVE
 
+        .code
+
 initcwd:
         lda     #'/'
         sta     __cwd

@@ -118,6 +118,7 @@ file:   lda     fdtab + FD::REF_NUM,x
         lda     #LIBERR_OPEN    ; -> EINVAL
         sec
         rts
+        .assert .sizeof(FD) = 4, error
 next:   inx
         inx
         inx

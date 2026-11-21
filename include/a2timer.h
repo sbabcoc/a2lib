@@ -44,8 +44,8 @@ void a2_idle (void);
 ** is nonzero, every ms milliseconds. Returns a handle, or A2_TIMER_NONE
 ** if all 4 slots are in use. A one-shot timer's slot is freed when it
 ** fires. */
-unsigned char a2_timer_start (unsigned ms, void (*fn) (void),
-                              unsigned char periodic);
+unsigned char __fastcall__ a2_timer_start (unsigned ms, void (*fn) (void),
+                                          unsigned char periodic);
 
 /* Stop a timer and free its slot. */
 void __fastcall__ a2_timer_stop (unsigned char handle);

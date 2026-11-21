@@ -77,15 +77,15 @@ done:   ldx     #>$0000
         rts
 
 vt:     lda     cursor          ; Cursor on? Show the card's
-        beq     :+
+        beq     vtwait
         lda     #R10_BLINK
         jsr     vt_r10
-:       inc     RNDL            ; Increment random counter low
+vtwait: inc     RNDL            ; Increment random counter low
         bne     :+
         inc     RNDH            ; Increment random counter high
         jsr     a2_tickhook     ; One tick (DESIGN.md 6.3)
 :       lda     KBD
-        bpl     :--             ; If < 128, no key pressed
+        bpl     vtwait          ; If < 128, no key pressed
         pha
         lda     #R10_HIDDEN
         jsr     vt_r10

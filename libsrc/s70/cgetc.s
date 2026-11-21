@@ -42,10 +42,10 @@ wait:   inc     RNDL            ; Increment random counter low
         bpl     :+
         lda     #R10_HIDDEN
         jsr     vt_r10
-        jmp     :++
+        jmp     hidden
 :       jsr     s70_curhide     ; If shown
 
-:       pla
+hidden: pla
         bit     KBDSTRB         ; Clear keyboard strobe
         and     #$7F            ; No Open-Apple on a II+
         ldx     #>$0000

@@ -5,10 +5,9 @@
 ; void __fastcall__ gotoy (unsigned char y);
 ;
 ;
-; VideoTerm backend (a2lib-vt.lib): modified copy of
-; libsrc/apple2/gotoy.s from cc65; if the card is in use, moves its cursor
-; with the firmware's GOTOXY instead.
-; (DESIGN.md 3.4).
+; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/gotoy.s
+; from cc65; if the card is in use, moves its cursor with the firmware's
+; GOTOXY instead (DESIGN.md 3.4).
 
         .export         _gotoy
         .import         VTABZ

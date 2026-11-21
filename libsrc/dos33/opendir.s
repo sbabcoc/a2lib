@@ -69,22 +69,22 @@ dir_at:
         ; pairs per list sector, and a first catalog sector on the disk
 :       ldy     #DIR::BUF + VTOC_SECTORS
         lda     (ptr1),y
-        cmp     #16
+        cmp     #DOS_SECTORS
         bne     notdos
         ldy     #DIR::BUF + VTOC_TSPAIRS
         lda     (ptr1),y
-        cmp     #122
+        cmp     #DOS_TSPAIRS
         bne     notdos
         ldy     #DIR::BUF + VTOC_CATTRACK
         lda     (ptr1),y
         beq     notdos
-        cmp     #35
+        cmp     #DOS_TRACKS
         bcs     notdos
         ldy     #DIR::FIRSTT
         sta     (ptr1),y
         ldy     #DIR::BUF + VTOC_CATTRACK + 1
         lda     (ptr1),y
-        cmp     #16
+        cmp     #DOS_SECTORS
         bcs     notdos
         ldy     #DIR::FIRSTS
         sta     (ptr1),y

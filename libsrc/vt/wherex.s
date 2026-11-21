@@ -5,10 +5,9 @@
 ; unsigned char wherex (void);
 ;
 ;
-; VideoTerm backend (a2lib-vt.lib): modified copy of
-; libsrc/apple2/wherex.s from cc65; if the card is in use, returns its cursor
-; column (79 while a wrap is pending at column 80).
-; (DESIGN.md 3.4).
+; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/wherex.s
+; from cc65; if the card is in use, returns its cursor column (79 while a
+; wrap is pending at column 80) (DESIGN.md 3.4).
 
         .ifndef __APPLE2ENH__
         .import         machinetype

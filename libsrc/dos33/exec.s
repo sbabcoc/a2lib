@@ -13,10 +13,10 @@
 ; a2lib's mainargs.s; an A file takes no cmdline (EINVAL).
 ;
 ; Fails, returning -1 with errno set, before anything is shut down: EINVAL
-; for a bad path,
-; a name with a comma (which a DOS command can't carry) or an A file with
-; a cmdline, ENOENT and the other OPEN errors, ENOEXEC
-; for a file that isn't B or A, ENOMEM if every DOS buffer is in use. After the hand-off, failures are DOS's.
+; for a bad path, a name with a comma (which a DOS command can't carry) or
+; an A file with a cmdline, ENOENT and the other OPEN errors, ENOEXEC for a
+; file that isn't B or A, ENOMEM if every DOS buffer is in use. After the
+; hand-off, failures are DOS's.
 ;
 
         .export         _exec

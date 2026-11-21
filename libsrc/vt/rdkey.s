@@ -5,10 +5,9 @@
 ; RDKEY routine
 ;
 ;
-; VideoTerm backend (a2lib-vt.lib): modified copy of
-; libsrc/apple2/rdkey.s from cc65; if the card is in use, shows its cursor
-; while waiting for the key.
-; (DESIGN.md 3.4).
+; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/rdkey.s
+; from cc65; if the card is in use, shows its cursor while waiting for the
+; key (DESIGN.md 3.4).
 
         .export         RDKEY
 

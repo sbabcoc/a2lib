@@ -55,8 +55,8 @@ vt:     ldy     VT_CHORZ
         tax
         bcs     :+
         lda     VT_WINDOW,x
-        bcc     :++             ; Branch always
+        bcc     got             ; Branch always
 :       lda     VT_WINDOW+$100,x
-:       and     #$7F
+got:    and     #$7F
         ldx     #>$0000
         rts

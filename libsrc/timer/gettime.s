@@ -54,7 +54,7 @@ _clock_gettime:
         ldx     #10
 mloop:  lsr     mul+1
         ror     mul
-        bcc     :++
+        bcc     noadd
         clc
         ldy     #$00
 :       lda     nsec,y
@@ -64,7 +64,7 @@ mloop:  lsr     mul+1
         tya
         eor     #4              ; Leaves C alone
         bne     :-
-:       asl     addend
+noadd:  asl     addend
         rol     addend+1
         rol     addend+2
         rol     addend+3

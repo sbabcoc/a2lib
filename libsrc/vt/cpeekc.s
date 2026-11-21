@@ -5,10 +5,9 @@
 ; char cpeekc (void);
 ;
 ;
-; VideoTerm backend (a2lib-vt.lib): modified copy of
-; libsrc/apple2/cpeekc.s from cc65; if the card is in use, reads the character
-; at its cursor from VRAM, locating it as the firmware's $CA59 does.
-; (DESIGN.md 3.4).
+; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/cpeekc.s
+; from cc65; if the card is in use, reads the character at its cursor from
+; VRAM, locating it as the firmware's $CA59 does (DESIGN.md 3.4).
 
         .ifndef __APPLE2ENH__
         .import         machinetype
@@ -77,8 +76,8 @@ vt:     ldy     VT_CHORZ
         tax
         bcs     :+
         lda     VT_WINDOW,x
-        bcc     :++             ; Branch always
+        bcc     got             ; Branch always
 :       lda     VT_WINDOW+$100,x
-:       and     #$7F            ; Bit 7 is the character set
+got:    and     #$7F            ; Bit 7 is the character set
         ldx     #>$0000
         rts

@@ -16,13 +16,13 @@
 
 _gotoy:
         bit     vt_active
-        bpl     :++
+        bpl     model
         ldx     VT_CHORZ
         cpx     #VT_COLS
         bcc     :+
         ldx     #VT_COLS-1
 :       jmp     vt_goto
-:       ldx     s80_x
+model:  ldx     s80_x
         cpx     #S80_COLS
         bcc     :+
         ldx     #S80_COLS-1

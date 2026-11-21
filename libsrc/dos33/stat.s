@@ -31,7 +31,6 @@
         .include        "zeropage.inc"
         .include        "errno.inc"
         .include        "fcntl.inc"
-        .include        "filedes.inc"
         .include        "stat.inc"
         .include        "fm.inc"
         .include        "dir.inc"
@@ -232,8 +231,6 @@ fail:   lda     ___errno
         lda     #$FF
         tax
         rts
-
-        .rodata
 
         .bss
 

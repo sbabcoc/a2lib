@@ -3239,7 +3239,31 @@ Verified: `tools/samebytes.sh` against 10.35 differs, beyond the removed
 files, only in the test programs whose sources changed (`vttest`,
 `s70test`, `reflowtest`, `reflowvt`, `s70sim`); no library module.
 `make simtest` passes, with the seven gauge checks; `make linktest`, 73
-checks (the window's 14 removed).
+checks (the window's 14 removed); `make emutest`, all 19 runs (`nettest`
+included).
+
+### 10.37 Convention items N1-N5, N7, N8 and N10 of the review
+
+| File | Change |
+|---|---|
+| `libsrc/timer/gettime.s`, `libsrc/s70/cgetc.s`, `libsrc/s80/gotoy.s`, `libsrc/s80/cpeekc.s`, `libsrc/vt/cpeekc.s`, `libsrc/vt/cgetc.s` | N1: named labels for jumps past another label (`:++`, `:--`), as the conventions ask (10.20); the stock wait loops of `vt/cgetc.s` and `timer/cgetc.s` keep theirs |
+| `libsrc/dos33/fmbuf.s` | N2: `.assert .sizeof(FD) = 4` over the four `inx` stepping through `fdtab`, as `open.s` has |
+| `libsrc/dos33/dir.inc`, `opendir.s` | N3: `DOS_SECTORS`, `DOS_TSPAIRS`, `DOS_TRACKS` in place of 16, 122 and 35 in the VTOC checks |
+| `libsrc/dos33/stat.s` | N4: no `filedes.inc`, which it didn't use, and no empty RODATA |
+| `libsrc/dos33/exec.s` | N5: the header's failure paragraph rewrapped (it broke mid-sentence and ran to 109 columns) |
+| `include/a2timer.h`, `libsrc/timer/timer.s` | N7: `a2_timer_start` marked `__fastcall__`, which takes its last argument in A; cc65's default already, so for consistency with the other prototypes |
+| `libsrc/vt/*.s` (8 modules) | N8: "(DESIGN.md 3.4)." joined to the sentence it ends, left alone on a line by an earlier reflow |
+| `libsrc/dos33/initcwd.s` | N10: `.code`, as every other module names its segment |
+
+N6 (an equate alone in the window's ONCE) left with the window (10.36).
+N9: 10.20 says `machine.inc` defines `BASIC_BUF` "only if not already",
+as stock `mainargs.s` defined it too. 10.22 dropped the condition with
+the ProDOS paths (a2lib's `mainargs.s` takes it from `machine.inc`), so
+since then it's defined unconditionally; 10.20 stays as written.
+
+Verified: `tools/samebytes.sh` reports the tree IDENTICAL to 10.36, every
+module and program, the C tests compiled with the changed `a2timer.h`
+included.
 
 ## 11. Sources
 

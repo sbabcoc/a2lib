@@ -5,8 +5,8 @@
 ;
 ; unsigned long a2_millis (void);
 ; void a2_idle (void);
-; unsigned char a2_timer_start (unsigned ms, void (*fn) (void),
-;                               unsigned char periodic);
+; unsigned char __fastcall__ a2_timer_start (unsigned ms, void (*fn) (void),
+;                                           unsigned char periodic);
 ; void __fastcall__ a2_timer_stop (unsigned char handle);
 ;
 ; Time advances only while the program waits in the library: the 15-cycle
