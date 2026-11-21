@@ -1,18 +1,19 @@
 /*
 ** soft70.h: the Soft-70 display (a2lib)
 **
-** With lib/apple2-dos33-vts70.lib, a program sees an 80 x 24 screen. On a
-** VideoTerm it is shown whole; without one, Soft-70 shows 70 of its 80
-** columns as text drawn on hi-res page 1, with upper and lowercase. By
-** default the view follows the cursor, panning between columns 0-69 and
-** 10-79, when a character is written or the cursor is about to be shown.
+** With lib/a2lib-soft70.o and lib/a2lib-soft70.lib, a program sees an
+** 80 x 24 screen. On a VideoTerm it is shown whole; without one, Soft-70
+** shows 70 of its 80 columns as text drawn on hi-res page 1, with upper
+** and lowercase. By default the view follows the cursor, panning between
+** columns 0-69 and 10-79, when a character is written or the cursor is
+** about to be shown.
 ** On the VideoTerm these functions do nothing (s70_left and s70_active
 ** return 0), so programs need no conditionals.
 **
 ** Link with --start-addr 0x4000, so that the program sits above the
 ** hi-res page:
 **   cl65 -t apple2 --start-addr 0x4000 -I include -o prog prog.c \
-**        lib/apple2-dos33-vts70.lib
+**        lib/a2lib-soft70.o lib/a2lib-soft70.lib lib/a2lib-dos33.lib
 **
 ** Soft-70 is drawn for monochrome monitors; on a colour monitor its text
 ** shows colour fringes, as hi-res text did on a real II+. While it runs, a

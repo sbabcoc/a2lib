@@ -7,7 +7,7 @@
 ; Important note: The implementation of cputs() relies on the cputc() function
 ; not clobbering ptr1. Beware when rewriting or changing this function!
 ;
-; VideoTerm backend (apple2-dos33-vt.lib): modified copy of
+; VideoTerm backend (a2lib-vt.lib): modified copy of
 ; libsrc/apple2/cputc.s from cc65. Each exported entry point first tests
 ; vt_active; if the card is in use, it writes through the firmware instead
 ; of the 40-column screen (DESIGN.md 3.4):

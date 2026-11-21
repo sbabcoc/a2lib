@@ -1,7 +1,7 @@
 ;
 ; RDKEY routine
 ;
-; Soft-70 backend (apple2-dos33-vts70.lib), based on cc65's
+; Soft-70 backend (a2lib-soft70.lib), based on cc65's
 ; libsrc/apple2/rdkey.s (Oliver Schmidt). On the VideoTerm, shows its
 ; cursor while waiting. With Soft-70, shows the blinking cursor at the
 ; model's cursor (panning to it if following) while the monitor's RDKEY

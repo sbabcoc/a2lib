@@ -4,7 +4,7 @@
 ; char cpeekc (void);
 ;
 ;
-; VideoTerm backend (apple2-dos33-vt.lib): modified copy of
+; VideoTerm backend (a2lib-vt.lib): modified copy of
 ; libsrc/apple2/cpeekc.s from cc65; if the card is in use, reads the character
 ; at its cursor from VRAM, locating it as the firmware's $CA59 does.
 ; (DESIGN.md 3.4).

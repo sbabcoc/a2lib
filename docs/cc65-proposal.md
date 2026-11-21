@@ -26,7 +26,7 @@ pull requests.
 
 ## What it does
 
-a2lib's `apple2-dos33.lib` is cc65's `apple2.lib` with replacement
+a2lib's `a2lib-dos33.lib` is cc65's `apple2.lib` with replacement
 modules (`open.s`, `rwcommon.s`, `lseek.s`, `stat.s`, `sysremove.s`,
 `sysrename.s`, the `dirent` functions), plus small helpers for the File
 Manager and RWTS. The stock `filedes.s`, `close.s`, `read.s` and console

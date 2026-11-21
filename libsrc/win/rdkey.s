@@ -1,7 +1,7 @@
 ;
 ; RDKEY routine
 ;
-; 40-column window backend (apple2-dos33-vtwin.lib), based on cc65's
+; 40-column window backend (a2lib-c40win.lib), based on cc65's
 ; libsrc/apple2/rdkey.s (Oliver Schmidt). On the VideoTerm, shows its
 ; cursor while waiting. In the window, pans to the cursor (if following)
 ; and points the monitor's cursor (CH, CV, BASL) at it, so RDKEY's own

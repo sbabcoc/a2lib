@@ -45,10 +45,10 @@ for the Uthernet II.
   interruptors, as used by the mouse and serial drivers), and also passes
   all its tests under DOS 3.3. The interrupt paths are tested with
   simulated interrupts until ReplicApple2Plus has a card that raises IRQ.
-- **Increment 5** adds the VideoTerm backend (`lib/apple2-dos33-vt.lib`),
+- **Increment 5** adds the VideoTerm backend (`lib/a2lib-vt.lib`),
   and passes all its tests both with the card and on the 40-column
   fallback.
-- **Increment 6** adds the 40-column window (`lib/apple2-dos33-vtwin.lib`),
+- **Increment 6** adds the 40-column window (`lib/a2lib-c40win.lib`),
   and passes all its tests, with and without the card.
 - **Increment 7** adds the cooperative timer, the software clock, the
   40-column window's position gauge, and an IP65 timer driver. It passes
@@ -56,7 +56,7 @@ for the Uthernet II.
   (`make simtest`).
 - **Increment 8** adds the reflow filter, and passes all its tests on the
   stock screen, the VideoTerm and the 40-column window.
-- **Increment 9** adds Soft-70 (`lib/apple2-dos33-vts70.lib`), on an
+- **Increment 9** adds Soft-70 (`lib/a2lib-soft70.lib`), on an
   80 × 24 screen model now shared with the 40-column window. It passes
   all its tests on the emulator, with and without the card, and the sim65
   regression tests.
@@ -72,35 +72,67 @@ git clone https://github.com/cc65/cc65
 make -C cc65 -j"$(nproc)"
 export PATH="$PWD/cc65/bin:$PATH"
 
-make          # lib/apple2-dos33.lib
-make test     # also build/test/filetest
+make          # lib/a2lib-dos33.lib and the add-on libraries
+make test     # also the test programs, in build/test
 ```
 
 ## Using the DOS 3.3 file layer
 
-`lib/apple2-dos33.lib` is a complete replacement for cc65's `apple2.lib`,
+`lib/a2lib-dos33.lib` is a complete replacement for cc65's `apple2.lib`,
 built from the installed cc65's library with the DOS 3.3 modules swapped
 in. Build with:
 
 ```sh
-cl65 -t apple2 -I include -o prog prog.c lib/apple2-dos33.lib
+cl65 -t apple2 -I include -o prog prog.c lib/a2lib-dos33.lib
 ```
 
 `-I include` selects a2lib's DOS 3.3 `dirent.h`, which programs that use
-the directory functions need. To use a Videx VideoTerm in slot 3 when one
-is present, link one of these instead:
+the directory functions need.
 
-| Library | Without a VideoTerm |
+## Add-on libraries
+
+What stock cc65 doesn't have is in add-on libraries, each with a
+*selector*, an object file to link ahead of it:
+
+| Selector and library | Adds |
 |---|---|
-| `lib/apple2-dos33-vt.lib` | The stock 40-column screen |
-| `lib/apple2-dos33-vtwin.lib` | A 40-column window onto an 80 × 24 screen; see `include/c40win.h` |
-| `lib/apple2-dos33-vts70.lib` | Soft-70: 70 columns of an 80 × 24 screen on hi-res page 1; see `include/soft70.h` |
+| `lib/a2lib-timer.o` `lib/a2lib-timer.lib` | The cooperative timer (`include/a2timer.h`) and the software clock (`time`, `clock_gettime`, `clock_settime`) |
+| `lib/a2lib-reflow.o` `lib/a2lib-reflow.lib` | Word-wrapped stdio console output (`include/a2reflow.h`) |
+| `lib/a2lib-vt.o` `lib/a2lib-vt.lib` | A Videx VideoTerm in slot 3 when present; the stock 40-column screen otherwise |
+| `lib/a2lib-c40win.o` `lib/a2lib-c40win.lib` | The VideoTerm when present; otherwise a 40-column window onto an 80 × 24 screen (`include/c40win.h`) |
+| `lib/a2lib-soft70.o` `lib/a2lib-soft70.lib` | The VideoTerm when present; otherwise Soft-70, 70 columns of an 80 × 24 screen on hi-res page 1 (`include/soft70.h`) |
+
+Use at most one of the last three. List the selectors first, then the
+libraries in the table's order reversed (display, reflow, timer), then
+`lib/a2lib-dos33.lib`:
+
+```sh
+cl65 -t apple2 -I include -o prog prog.c \
+    lib/a2lib-vt.o lib/a2lib-reflow.o lib/a2lib-timer.o \
+    lib/a2lib-vt.lib lib/a2lib-reflow.lib lib/a2lib-timer.lib lib/a2lib-dos33.lib
+```
+
+ld65 takes from each library only the modules that resolve references
+open when it reaches it. The selector makes sure the add-on's versions of
+stock functions are taken even when only another stock function calls
+them: without `lib/a2lib-vt.o`, a program calling `cputs` but not `cputc`
+would get stock `cputc`, and `printf` would write to the 40-column screen.
+The selector pulls in only those functions, a few hundred bytes at most
+(`make linktest` checks each list). The display libraries include what
+they use of the timer, so they need the timer library only for the clock.
+
+Without the timer library, `time`, `clock_gettime` and `clock_settime`
+fail to link, naming `clock_gettime_needs_a2lib_timer` or
+`clock_settime_needs_a2lib_timer`, as functions with no DOS 3.3 version
+(`dio_open`, `mkdir` and the like) fail naming
+`..._has_no_DOS_3_3_implementation`.
 
 Soft-70 programs must be linked with `--start-addr 0x4000`, above the
 hi-res page; linking without it fails with a message saying so:
 
 ```sh
-cl65 -t apple2 --start-addr 0x4000 -I include -o prog prog.c lib/apple2-dos33-vts70.lib
+cl65 -t apple2 --start-addr 0x4000 -I include -o prog prog.c \
+    lib/a2lib-soft70.o lib/a2lib-soft70.lib lib/a2lib-dos33.lib
 ```
 
 Soft-70 is drawn for monochrome monitors, as period hi-res text was.
@@ -142,18 +174,20 @@ can't:
 | Seeking | As under ProDOS, except that T files can be positioned past their end, to reach records of random-access files. Positions are limited to 16 bits. |
 | Rename | The new path must be at the old one's slot and drive, and an existing new name fails with `EEXIST`, as under ProDOS. |
 | Directories | `opendir` takes a directory: `"/6/2"`, `"2"`, `"."` or `""`. `struct dirent` has the name, DOS 3.3 type, lock bit and size in blocks and sectors; it omits the byte size, dates and aux type, which the catalog doesn't record (use `stat`). |
-| Clock | `time()` and `clock_gettime` count the up-time until `clock_settime` sets the clock; `a2_clock_age` tells whether, and how long ago, it was set. |
+| Clock | DOS 3.3 has none: with `lib/a2lib-timer.lib`, `time()` and `clock_gettime` count the up-time until `clock_settime` sets the clock, and `a2_clock_age` tells whether, and how long ago, it was set. Without it they fail to link. |
 | Errors | The same `errno` values as under ProDOS; `_oserror` holds DOS 3.3's own error numbers (the ones `ONERR` reports), and `_stroserror` gives DOS's messages. |
 
 ## Using the timer with IP65
 
-Link `lib/a2lib-ip65.o` before IP65's libraries. It replaces IP65's
+Link `lib/a2lib-ip65.o` before IP65's libraries, and the timer library
+after them. It replaces IP65's
 Apple II timer driver, which busy-waits about 33 ms on every
 `timer_read`, with one that waits a single tick (about 3.9 ms) and
 reports counted milliseconds:
 
 ```sh
-cl65 -t apple2 -I include -o prog prog.c lib/a2lib-ip65.o ip65.lib a2uther2.lib lib/apple2-dos33.lib
+cl65 -t apple2 -I include -o prog prog.c lib/a2lib-ip65.o ip65.lib a2uther2.lib \
+    lib/a2lib-timer.o lib/a2lib-timer.lib lib/a2lib-dos33.lib
 ```
 
 ## Testing

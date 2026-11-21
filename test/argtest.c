@@ -8,7 +8,7 @@
 ** arguments, and prints DIRECT OK, then ARGTEST DONE: the runner waits
 ** for that last line, so the screen it saves has the result whole.
 **
-** Built with apple2-dos33.lib. Run under DOS 3.3 with the test disk in
+** Built with a2lib-dos33.lib. Run under DOS 3.3 with the test disk in
 ** drive 2, by exectest.
 */
 

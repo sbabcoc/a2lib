@@ -4,7 +4,7 @@
 ; COUT routine
 ;
 ;
-; VideoTerm backend (apple2-dos33-vt.lib): modified copy of
+; VideoTerm backend (a2lib-vt.lib): modified copy of
 ; libsrc/apple2/cout.s from cc65; if the card is in use, writes through the
 ; firmware directly. Linking this module (all console output does) also
 ; links vt.s, whose constructor detects the card.

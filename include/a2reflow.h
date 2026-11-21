@@ -7,6 +7,9 @@
 ** menus, and is linked only into programs that use it. See DESIGN.md
 ** sections 3.2 and 3.7.
 **
+** Link lib/a2lib-reflow.o and lib/a2lib-reflow.lib ahead of
+** lib/a2lib-dos33.lib, after a display library if there is one.
+**
 ** Copyright (c) 2026 Scott Babcock. zlib license; see LICENSE.
 */
 

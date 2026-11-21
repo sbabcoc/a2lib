@@ -5,7 +5,7 @@
 ; void __fastcall__ gotox (unsigned char x);
 ;
 ;
-; VideoTerm backend (apple2-dos33-vt.lib): modified copy of
+; VideoTerm backend (a2lib-vt.lib): modified copy of
 ; libsrc/apple2/gotoxy.s from cc65; if the card is in use, moves its cursor
 ; with the firmware's GOTOXY instead.
 ; (DESIGN.md 3.4).

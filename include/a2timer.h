@@ -7,6 +7,11 @@
 ** without calling these, the count stands still. One tick is about
 ** 3.86 ms (NTSC Apple II+). See DESIGN.md section 6.3.
 **
+** Link lib/a2lib-timer.o and lib/a2lib-timer.lib ahead of
+** lib/a2lib-dos33.lib. The display libraries (a2lib-vt, a2lib-c40win,
+** a2lib-soft70) include the timer, so with one of them only the clock
+** (time, clock_gettime, clock_settime) needs the timer library.
+**
 ** Timer callbacks run inside those waits. They must be short, may use
 ** conio and stdio output, and must not wait for keys (cgetc, stdio input),
 ** call a2_idle, or call IP65. The C runtime's zero page and the monitor's

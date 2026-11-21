@@ -2,12 +2,12 @@
 ** dirent.h for DOS 3.3 (a2lib)
 **
 ** Shadows cc65's <dirent.h> when a2lib's include directory is passed with
-** -I. Use it together with lib/apple2-dos33.lib:
+** -I. Use it together with lib/a2lib-dos33.lib:
 **
-**   cl65 -t apple2 -I a2lib/include -o prog prog.c a2lib/lib/apple2-dos33.lib
+**   cl65 -t apple2 -I a2lib/include -o prog prog.c a2lib/lib/a2lib-dos33.lib
 **
 ** The directory functions keep their names in C, but map to DOS 3.3
-** symbols that exist only in apple2-dos33.lib. Compiling with this header
+** symbols that exist only in a2lib-dos33.lib. Compiling with this header
 ** and linking without the library fails to link, rather than mixing this
 ** struct dirent with cc65's ProDOS implementation (DESIGN.md section 2).
 **

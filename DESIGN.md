@@ -132,7 +132,7 @@ sync with it. The header is needed only by programs that use the
 directory functions.
 
 **Link guard:** the header maps `opendir`, `readdir`, `closedir` and
-`rewinddir` to `_dos33_*` symbols that exist only in `apple2-dos33.lib`.
+`rewinddir` to `_dos33_*` symbols that exist only in `a2lib-dos33.lib`.
 
 - Header without the library: the link fails (verified: ld65 reports
   `__dos33_opendir` as unresolved).
@@ -145,7 +145,7 @@ Either way, the DOS 3.3 `struct dirent` is never mixed with the ProDOS
 implementation.
 
 **The add-on library is a complete library (decision, from the first run
-of increment 2):** `lib/apple2-dos33.lib` is a copy of the installed
+of increment 2):** `lib/a2lib-dos33.lib` is a copy of the installed
 cc65's `apple2.lib` with the DOS 3.3 modules replacing the stock modules
 of the same name (`ar65 r`) and the new modules added. A library holding
 only the replacement modules is not enough, because ld65 scans each
@@ -166,6 +166,61 @@ nothing. The link command is unchanged. Because the library embeds the
 stock modules of the cc65 it was built with, **it must be rebuilt after
 updating cc65**; the Makefile locates the installed `apple2.lib` through
 `cl65 --print-target-path`.
+
+**What stock cc65 doesn't have is in add-on libraries (decision, 10.31).**
+The core, `a2lib-dos33.lib`, is stock `apple2.lib` with only the DOS 3.3
+file layer, its interrupt support and exec, and the link-time guards
+(4.2). New functionality is in libraries of its own:
+
+| Library | Contents |
+|---|---|
+| `a2lib-timer.lib` | The cooperative timer and software clock (6.3): `timer.s`, `tick.s`, `gettime.s`, `settime.s`, and the ticking `cgetc.s` and `kbhit.s` (`libsrc/timer`) |
+| `a2lib-reflow.lib` | The reflow filter (3.7): `reflow.s`, the vectored `cout.s`, `viewport.s` (`libsrc/reflow`) |
+| `a2lib-vt.lib` | The VideoTerm backend (3.5), with `tick.s` and `kbhit.s` |
+| `a2lib-c40win.lib` | The VideoTerm with the 40-column window (3.6), with `tick.s`, `kbhit.s` and `timer.s` |
+| `a2lib-soft70.lib` | The VideoTerm with Soft-70 (3.8), the same |
+
+A link line lists the add-ons' selectors (below), then the add-ons in
+the order display, reflow, timer, then the core. Each module of an
+add-on replaces the core's module of the same name, or extends a library
+listed before it: a display library's `cout.s` and `viewport.s` take the
+place of `a2lib-reflow.lib`'s. The display libraries carry the timer
+modules they use, identical to `a2lib-timer.lib`'s, so a program using
+one needs the timer library only for the clock; without it,
+`clock_gettime` and `clock_settime` reach the core's guards and fail to
+link. A program using none of them links the core alone and gets stock
+cc65's conio, `cgetc`, `kbhit` and `COUT`.
+
+**Selectors.** ld65's single scan, which made the core a complete
+library, applies to the add-ons too: listed ahead of the core, an add-on
+supplies only what is open when ld65 reaches it, the program's own
+calls. A program calling `cputs` but not `cputc`, linked with
+`a2lib-vt.lib`, would get stock `cputs` and then stock `cputc` from the
+core. Copying the core into each add-on, as the core copies
+`apple2.lib`, would remove the problem but make the add-ons
+alternatives, not additions. Instead, each add-on has a selector,
+`lib/a2lib-<name>.o` (`libsrc/select`), an object of `.forceimport`s for
+the add-on's modules that a module listed after it may import: the
+core's (stock `cputs` imports `_cputc`; a2lib's `write` imports `COUT`)
+or another add-on's (`reflow.s` imports `a2_viewport`). Objects are
+linked whole, so those names are open before ld65 reads the first
+library. A module no later module imports, such as `cpeekc.s`, isn't
+forced; only the program can call it, and gets the add-on's.
+
+`test/selcheck.py`, run by `make linktest`, computes that set from the
+built libraries with `od65` and checks each selector against it, at the
+level of modules: one missing would be a silent fallback to stock, one
+more would cost every program its size. It also checks parity: a
+replacing module defines every symbol of the module it replaces that
+any module imports, so the replaced one can't be linked beside it. A
+module identical to the later library's copy (the bundled timer
+modules) isn't a replacement. `make linktest` also links programs that
+reach each add-on only through stock modules and checks their maps.
+
+The cost is what the selector forces in for programs that don't use it.
+A stdio-only program on the VideoTerm library links its `cputc`, `cgetc`
+and `gotoxy` though it calls none of them: `exectestvt` is 556 bytes
+larger than with the combined libraries this replaces (10.31).
 
 ---
 
@@ -360,10 +415,11 @@ modes; the ROM is authoritative.
 
 ### 3.5 VideoTerm implementation (increment 5)
 
-**Packaging.** `lib/apple2-dos33-vt.lib` is `apple2-dos33.lib` with
-VideoTerm-aware versions of the stock conio modules (`libsrc/vt/`). It is
-the link-time choice of section 3.1: programs that don't want the backend
-link `apple2-dos33.lib` and pay nothing. Each replaced module is a
+**Packaging.** `lib/a2lib-vt.lib` holds VideoTerm-aware versions of the
+stock conio modules (`libsrc/vt/`), linked with its selector ahead of
+`a2lib-dos33.lib` (section 2). It is the link-time choice of section 3.1:
+programs that don't want the backend link `a2lib-dos33.lib` alone and
+pay nothing. Each replaced module is a
 modified copy of stock cc65's that first tests `vt_active` (set at
 startup when the card is found) and either drives the card or runs the
 stock 40-column code. The stock `chline`, `cvline`, `cclear` and `cputs`
@@ -467,11 +523,12 @@ they use.
 
 ### 3.6 40-column window implementation (increment 6)
 
-**Packaging.** `lib/apple2-dos33-vtwin.lib` holds the VideoTerm backend
+**Packaging.** `lib/a2lib-c40win.lib` holds the VideoTerm backend
 with the 40-column window (`c40win`) as its fallback, in place of the
 stock 40-column screen (section 3.1: a binary contains the VideoTerm
-backend plus one fallback). It is `apple2-dos33.lib` plus `vt.s`, shared
-unchanged with `apple2-dos33-vt.lib`, plus the window's conio modules
+backend plus one fallback). It holds `vt.s`, shared unchanged with
+`a2lib-vt.lib`, the timer modules the gauge uses, and the window's conio
+modules
 (`libsrc/win/`), each with the same VideoTerm branch as in the VideoTerm
 library and window code in place of the stock 40-column code.
 
@@ -989,6 +1046,10 @@ Programs that don't call one link no guard. Guarded: `getcurrentdevice`,
 `getdevicedir`, `getfirstdevice`, `getnextdevice`, the `dio_*` calls,
 `file_set_type`, `file_set_auxtype`, `statvfs`, `mkdir`, `rmdir` and
 `clock_getres`. `make linktest` checks every one of them.
+`clock_gettime` and `clock_settime` have a DOS 3.3 version, the software
+clock, but in `a2lib-timer.lib` (section 2): their guards' symbols say
+so, `clock_gettime_needs_a2lib_timer`, and the timer library, linked
+ahead of the core, supplies the functions instead.
 Deleting the stock modules instead wouldn't work: `cl65` appends cc65's
 own `apple2.lib`, which would supply them again (confirmed with a link
 map).
@@ -1621,7 +1682,7 @@ $200: $84 "BRUN NAME,S6,D1" $8D   $00 $B2 cmdline… $00
 
 | File | Change |
 |---|---|
-| `libsrc/dos33/exec.s` | New: replaces stock `exec.o` in `apple2-dos33.lib` |
+| `libsrc/dos33/exec.s` | New: replaces stock `exec.o` in `a2lib-dos33.lib` |
 | `libsrc/dos33/mainargs.s` | Modified copy: the argument marker; argv[0] not at `FNAM` under DOS 3.3 |
 | `libsrc/dos33/VENDORED.md` | Lists `mainargs.s` |
 | `test/exectest.c`, `test/argtest.c` | Tests, below |
@@ -2062,7 +2123,7 @@ Most of `timer.s` is the dispatcher's save and restore, `a2_timer_start`'s
 24-bit ms-to-tick arithmetic, and the slot tables. Programs that use none
 of these pay only the hook: `filetest` is unchanged, `vttest` grew by 11
 bytes. The window's gauge adds about 150 bytes to `win.s`, and because
-the gauge uses the timer, programs linked with `apple2-dos33-vtwin.lib`
+the gauge uses the timer, programs linked with `a2lib-c40win.lib`
 include `timer.s` (`wintest` grew by 1,374 bytes, gauge checks included).
 
 **Testing in sim65 (`make simtest`).** cc65's 6502 simulator runs the
@@ -2227,10 +2288,10 @@ Files (repository root):
 | `libsrc/dos33/seekend.s` | Seek to end for `O_APPEND` |
 | `libsrc/dos33/filedes.inc`, `mli.inc` | Unmodified copies from cc65 (see `VENDORED.md`) |
 | `test/filetest.c` | Tests for every decision in section 5 |
-| `Makefile` | Builds `lib/apple2-dos33.lib` and the tests |
+| `Makefile` | Builds `lib/a2lib-dos33.lib` and the tests |
 
 Programs link with
-`cl65 -t apple2 -o prog prog.c lib/apple2-dos33.lib`; the library is a
+`cl65 -t apple2 -o prog prog.c lib/a2lib-dos33.lib`; the library is a
 complete replacement for cc65's `apple2.lib` (section 2).
 
 **Verified by building:** all modules assemble, and the test program
@@ -2377,8 +2438,8 @@ ReplicApple2Plus (6.2).
 | `libsrc/vt/` conio modules | Modified copies of stock `cputc.s`, `gotoxy.s`, `gotoy.s`, `clrscr.s`, `wherex.s`, `wherey.s`, `cgetc.s`, `_scrsize.s`, `cpeekc.s`, `cout.s`, `rdkey.s` |
 | `test/vttest.c` | Display tests, run with and without the card |
 
-The Makefile builds `lib/apple2-dos33-vt.lib` alongside
-`apple2-dos33.lib`. **Verified by building:** the VideoTerm modules
+The Makefile builds `lib/a2lib-vt.lib` alongside
+`a2lib-dos33.lib`. **Verified by building:** the VideoTerm modules
 replace the stock ones in the new library (larger segment sizes), the
 test links them, and a stdio-only program links `vt.s` through `cout.s`.
 
@@ -2397,7 +2458,7 @@ with a working BASIC prompt.
 | `include/c40win.h` | `c40_pan`, `c40_follow`, `c40_left`, `c40_active` |
 | `test/vttest.c` | Also built as `wintest` (with `C40WIN`), adding scrolling and panning checks |
 
-The Makefile builds `lib/apple2-dos33-vtwin.lib`.
+The Makefile builds `lib/a2lib-c40win.lib`.
 
 **First run, in ReplicApple2Plus:** all four combinations passed:
 `wintest` without the card (40-column window, 20 checks) and with it
@@ -2494,7 +2555,7 @@ on the VideoTerm (`W=80`, 6), and `reflowwin` in the 40-column window
 | `libsrc/s70/font.s` | Default font, generated |
 | `tools/s70font.txt`, `s70font.py` | Font source and tool |
 | `include/soft70.h` | Public API |
-| `lib/apple2-dos33-vts70.lib` | VideoTerm, or Soft-70 without one |
+| `lib/a2lib-soft70.lib` | VideoTerm, or Soft-70 without one |
 | `test/vttest.c`, `reflowtest.c`, `cswtest.c` | Emulator tests, also built as `s70test`, `reflows70`, `cswstest` |
 | `test/sim/s70sim.c`, `s70shim.s`, `sim4000.cfg` | sim65 regression test |
 | `test/sim/bssfill.s`, `gaugesim.c` | Check that startup leaves a BSS buffer to `crt0` |
@@ -2782,8 +2843,8 @@ OPEN, lseek, O_APPEND and stat groups).
 
 | File | Change |
 |---|---|
-| `libsrc/guard/*.s` | New: one guard per stock module (`curdevice`, `devicedir`, `getdevice`, `dioopen`, `dioclose`, `dioread`, `diowrite`, `diosectcount`, `diosectsize`, `file_set_info`, `statvfs`, `sysmkdir`, `sysrmdir`, `getres`), replacing it in `apple2-dos33.lib` (4.2) |
-| `Makefile` | Builds the guards into `apple2-dos33.lib` (and so into the backend libraries); `make linktest` |
+| `libsrc/guard/*.s` | New: one guard per stock module (`curdevice`, `devicedir`, `getdevice`, `dioopen`, `dioclose`, `dioread`, `diowrite`, `diosectcount`, `diosectsize`, `file_set_info`, `statvfs`, `sysmkdir`, `sysrmdir`, `getres`), replacing it in `a2lib-dos33.lib` (4.2) |
+| `Makefile` | Builds the guards into `a2lib-dos33.lib` (and so into the backend libraries); `make linktest` |
 | `test/linktest.sh` | New: a program per guarded function must fail to link, naming its guard symbol; a control program using `fopen`, `remove`, `rename`, `chdir` and `clock_gettime` must link |
 | `DESIGN.md` | 4.2: link-time failure replaces run-time `ENOSYS` |
 
@@ -2867,6 +2928,48 @@ raised can't be produced this way (5.11).
 Found by the line-by-line review. Shown before the fixes: `make emutest`
 (filetest) failed 2 of 96 checks, "O_CREAT EXISTING, ANY TYPE" and
 "RENAME TO OWN NAME". `open.o` grows by 11 bytes, `sysrename.o` by 17.
+
+### 10.31 Add-on libraries and selectors
+
+| File | Change |
+|---|---|
+| `libsrc/timer/` | Moved from `libsrc/dos33/`: `timer.s`, `timer.inc`, `tick.s`, `gettime.s`, `settime.s`, `cgetc.s`, `kbhit.s`; `VENDORED.md` for `cgetc.s` and `kbhit.s` |
+| `libsrc/reflow/` | Moved from `libsrc/dos33/`: `reflow.s`, `cout.s`, `viewport.s`; `VENDORED.md` for `cout.s` |
+| `libsrc/select/*.s` | New: a selector for each add-on (2) |
+| `libsrc/guard/gettime.s`, `settime.s` | New: guards for the clock in the core (4.2) |
+| `libsrc/dos33/VENDORED.md` | The moved modules' notes go with them |
+| `Makefile` | Builds `a2lib-timer.lib`, `a2lib-reflow.lib`, the display libraries without a copy of the core, and the selectors; each test links its add-ons; `make linktest` builds everything first |
+| `test/linktest.sh` | Takes the library folder. Guards: `clock_gettime`, `clock_settime`, `time`. Controls: the file functions alone, and the clock with the timer. Programs reaching each add-on only through stock modules get its modules (link maps) |
+| `test/selcheck.py` | New: each selector pulls in exactly what modules listed after it may import; parity of replacing modules (2) |
+| `README.md`, `include/*.h`, `libsrc/ip65/a2timer.s`, test headers | The libraries' new names and link lines |
+| `DESIGN.md` | 2, 3.5, 3.6, 4.2 |
+
+The library files are renamed: `apple2-dos33.lib` is now
+`a2lib-dos33.lib`, and `apple2-dos33-vt.lib`, `-vtwin.lib` and
+`-vts70.lib` are `a2lib-vt.lib`, `a2lib-c40win.lib` and
+`a2lib-soft70.lib`. Earlier records use the new names too, so they can be
+followed in the current tree.
+
+The display libraries now include `kbhit.s` from the timer. The combined
+libraries had it, through their copy of the core, and without it a
+program polling `kbhit` in the 40-column window or on Soft-70 would stop
+running the timers their gauge and cursor use.
+
+Verified: `make linktest` passes, 53 checks. `test/selcheck.py` was shown
+to fail for a selector missing `RDKEY`, for one with `_cpeekc` added,
+and for a VideoTerm `cputc.s` that didn't export `cputdirect`. `make
+simtest` passes. Every test program links the same modules as before,
+with these differences (sizes against the previous build):
+
+| Programs | Bytes | Why |
+|---|---|---|
+| Core only (`filetest`, `exectest`, `wptest` and the probes) | -3 to -11 | Stock `cout.s` in place of the vector; no `tick.s` with stock `cgetc` |
+| `reflowtest` | -8 | No `tick.s` |
+| `vttest`, `wintest`, `s70test` | +78 to +108 | `kbhit.s`, `rdkey.s`, `viewport.s` forced |
+| `reflowvt`, `reflowwin`, `reflows70` | +87 to +227 | The same, and `cputc.s` and `wherey.s` |
+| `cswtest`, `cswwtest`, `cswstest` | +119 to +200 | The same, and `_scrsize.s`, `wherex.s` |
+| `timertest` | +266 | The timer's `cgetc.s`, with the stock `cputc.s` and `gotoxy.s` it calls for the cursor |
+| `exectestvt` | +556 | The VideoTerm's conio modules, none of which it calls |
 
 ## 11. Sources
 

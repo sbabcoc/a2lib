@@ -1,7 +1,7 @@
 ;
 ; char cgetc (void);
 ;
-; 40-column window backend (apple2-dos33-vtwin.lib), based on cc65's
+; 40-column window backend (a2lib-c40win.lib), based on cc65's
 ; libsrc/apple2/cgetc.s (Kevin Ruland). With the cursor on, shows the
 ; VideoTerm's cursor, or a flashing caret at the cursor of the 80 x 24
 ; model (s80.s; panning to it if following), while waiting.

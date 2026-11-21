@@ -1,7 +1,7 @@
 ;
 ; COUT routine
 ;
-; 80 x 24 backends (apple2-dos33-vtwin.lib, apple2-dos33-vts70.lib), based
+; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
 ; on cc65's libsrc/apple2/cout.s (Oliver Schmidt). Console output goes to
 ; the VideoTerm or into the model (s80.s). Linking this module (all console
 ; output does) also links vt.s and s80.s, whose constructors set up the

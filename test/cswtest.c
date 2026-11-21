@@ -2,9 +2,9 @@
 ** Does output through the monitor's COUT still reach the display backend
 ** after stdio input under DOS 3.3? (DESIGN.md section 9, open item.)
 **
-** Built three times: cswtest with apple2-dos33-vt.lib (run with the
-** VideoTerm in slot 3), cswwtest with apple2-dos33-vtwin.lib (run without
-** it, for the 40-column window), and cswstest with apple2-dos33-vts70.lib
+** Built three times: cswtest with a2lib-vt.lib (run with the
+** VideoTerm in slot 3), cswwtest with a2lib-c40win.lib (run without
+** it, for the 40-column window), and cswstest with a2lib-soft70.lib
 ** (run without it, for Soft-70). Run under DOS 3.3. Writes a character through
 ** COUT ($FDED, through CSW) before and after stdio input, reads it back
 ** from the backend with cpeekc, and shows where CSW and DOS's saved CSW

@@ -2,11 +2,11 @@
 ** Display backend tests (DESIGN.md 3.4-3.6).
 **
 ** Built twice:
-**   vttest   linked with apple2-dos33-vt.lib: the VideoTerm, or the stock
+**   vttest   linked with a2lib-vt.lib: the VideoTerm, or the stock
 **            40-column screen without one
-**   wintest  (C40WIN defined) linked with apple2-dos33-vtwin.lib: the
+**   wintest  (C40WIN defined) linked with a2lib-c40win.lib: the
 **            VideoTerm, or the 40-column window onto 80 x 24 without one
-**   s70test  (S70 defined) linked with apple2-dos33-vts70.lib at $4000:
+**   s70test  (S70 defined) linked with a2lib-soft70.lib at $4000:
 **            the VideoTerm, or Soft-70 without one
 **
 ** The same checks run in every case, adjusted for the width and for

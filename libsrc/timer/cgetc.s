@@ -6,8 +6,9 @@
 ; If open_apple key is pressed then the high-bit of the key is set.
 ;
 ; Cooperative timer (DESIGN.md 6.3): modified copy of libsrc/apple2/cgetc.s
-; from cc65. The wait loop calls a2_tickhook each time it increments RNDH;
-; that does nothing unless the program uses the timer.
+; from cc65. The wait loop calls a2_tickhook each time it increments RNDH.
+; In a2lib-timer.lib; a2lib-timer.o pulls it in, so that cgets and cscanf,
+; stock modules that call cgetc, get it too.
 ;
 
         .export         _cgetc

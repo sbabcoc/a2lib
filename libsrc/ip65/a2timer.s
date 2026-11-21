@@ -12,8 +12,10 @@
 ;                   time-of-day drivers return
 ;
 ; ld65 scans each library once, so this ships as an object file
-; (lib/a2lib-ip65.o) to list on the link line, before IP65's library:
-;   cl65 -t apple2 ... lib/a2lib-ip65.o ip65.lib ... lib/apple2-dos33.lib
+; (lib/a2lib-ip65.o) to list on the link line, before IP65's library, and
+; the timer library after it:
+;   cl65 -t apple2 ... lib/a2lib-ip65.o ip65.lib ... \
+;       lib/a2lib-timer.o lib/a2lib-timer.lib lib/a2lib-dos33.lib
 ;
 ; Callbacks run inside timer_read, so they must not call IP65.
 ;

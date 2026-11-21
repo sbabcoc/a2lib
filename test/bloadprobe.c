@@ -13,7 +13,7 @@
 **   - DOS stored the BLOAD command at $200: $84, the command, $8D
 **   - $230-$2FF, where exec()'s argument tail goes, is unchanged
 **
-** Built with apple2-dos33.lib. Run under DOS 3.3 with a writable disk in
+** Built with a2lib-dos33.lib. Run under DOS 3.3 with a writable disk in
 ** drive 2 (make emutest's test disk). Ends with its summary.
 */
 

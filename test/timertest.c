@@ -1,6 +1,6 @@
 /*
 ** Cooperative timer and software clock tests (DESIGN.md 6.3), linked with
-** apple2-dos33.lib. Run under DOS 3.3 without touching the keyboard until
+** a2lib-timer.o, a2lib-timer.lib and a2lib-dos33.lib. Run under DOS 3.3 without touching the keyboard until
 ** the INPUT group asks for a line. Output fits a 40x24 screen.
 */
 

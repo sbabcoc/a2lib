@@ -6,8 +6,9 @@
 ; Reflow support (DESIGN.md 3.7): modified copy of libsrc/apple2/cout.s
 ; from cc65. COUT, through which all stdio console output passes (write.s,
 ; and read.s for its echo), is a JMP in DATA that reflow.s's reflow_on
-; points at its filter; a2_rawcout is the stock routine. Programs that
-; never call reflow_on pay 3 bytes and 3 cycles per character.
+; points at its filter; a2_rawcout is the stock routine. In
+; a2lib-reflow.lib; a2lib-reflow.o pulls it in, in place of stock cout.s.
+; The display libraries have their own.
 ;
 
         .export         COUT, a2_rawcout, a2_coutvec

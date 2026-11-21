@@ -19,7 +19,7 @@
 **
 ** Links read.s on purpose (keep_read, below).
 **
-** Built with apple2-dos33.lib. Run under DOS 3.3 with the test disk in
+** Built with a2lib-dos33.lib. Run under DOS 3.3 with the test disk in
 ** drive 2. emutest then types PRINT 6*7 at the prompt.
 */
 

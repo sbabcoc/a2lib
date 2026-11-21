@@ -1,6 +1,6 @@
 /*
 ** IP65 timer driver tests (DESIGN.md 6.3), linked with lib/a2lib-ip65.o
-** ahead of IP65's libraries, then apple2-dos33.lib. Needs an Uthernet II
+** ahead of IP65's libraries, then the timer and a2lib-dos33.lib. Needs an Uthernet II
 ** in slot 3 and, at 10.0.2.2 (the emulated card's gateway to the host), a
 ** TCP server that echoes a line two seconds after reading it; it asks for
 ** the server's port. test/emutest.sh starts the server and runs this in

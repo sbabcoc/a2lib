@@ -1,7 +1,7 @@
 ;
 ; unsigned char wherey (void);
 ;
-; 80 x 24 backends (apple2-dos33-vtwin.lib, apple2-dos33-vts70.lib), based
+; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
 ; on cc65's libsrc/apple2/wherey.s. The cursor's row.
 ;
 

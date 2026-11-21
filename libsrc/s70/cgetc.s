@@ -1,7 +1,7 @@
 ;
 ; char cgetc (void);
 ;
-; Soft-70 backend (apple2-dos33-vts70.lib), based on cc65's
+; Soft-70 backend (a2lib-soft70.lib), based on cc65's
 ; libsrc/apple2/cgetc.s (Kevin Ruland). With the cursor on, shows the
 ; VideoTerm's cursor, or Soft-70's blinking inverse cell at the cursor of
 ; the 80 x 24 model (s80.s; panning to it if following), while waiting.

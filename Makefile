@@ -3,37 +3,45 @@
 #   make            build the libraries (below)
 #   make test       also build the test programs
 #   make simtest    build and run the sim65 tests (no Apple II needed)
-#   make linktest   check that functions with no DOS 3.3 version don't link
+#   make linktest   check the link-time guards and the add-ons' selectors
 #   make emutest    run the test programs on ReplicApple2Plus (below)
 #   make screenshots  the README's screenshot, from an emutest run
 #   make clean      remove build/ and lib/
 #
-# lib/apple2-dos33.lib is a complete replacement for cc65's apple2.lib:
-# a copy of the installed one with the DOS 3.3 modules in place of the
-# stock modules of the same name. Build a program for DOS 3.3 with:
-#   cl65 -t apple2 -I include -o prog prog.c lib/apple2-dos33.lib
+# lib/a2lib-dos33.lib, the core, is a complete replacement for cc65's
+# apple2.lib: a copy of the installed one with the DOS 3.3 modules in
+# place of the stock modules of the same name, and link-time guards for
+# functions with no DOS 3.3 version. Build a program for DOS 3.3 with:
+#   cl65 -t apple2 -I include -o prog prog.c lib/a2lib-dos33.lib
 # (-I include selects the DOS 3.3 dirent.h; it's needed only for
 # directory functions.)
 #
-# lib/apple2-dos33-vt.lib adds the Videx VideoTerm backend: conio and
-# console output use the card in slot 3 when present, and the stock
-# 40-column screen otherwise. Link with it instead of apple2-dos33.lib.
+# What stock cc65 doesn't have comes in add-on libraries (DESIGN.md 2),
+# each with a selector object that pulls in its replacements of stock
+# modules. List the selectors first, then the add-ons, then the core:
+#   a2lib-timer     cooperative timer and software clock (a2timer.h, time.h)
+#   a2lib-reflow    word-wrapping stdio console output (a2reflow.h)
+#   a2lib-vt        the Videx VideoTerm, or the stock 40-column screen
+#   a2lib-c40win    the VideoTerm, or a 40-column window onto 80 x 24
+#                   (c40win.h)
+#   a2lib-soft70    the VideoTerm, or Soft-70: 70 of 80 columns in hi-res
+#                   (soft70.h); link with --start-addr 0x4000
+# For example:
+#   cl65 -t apple2 -I include -o prog prog.c lib/a2lib-vt.o lib/a2lib-timer.o \
+#       lib/a2lib-vt.lib lib/a2lib-timer.lib lib/a2lib-dos33.lib
+# The display libraries carry what they need of the timer, and its kbhit.
 #
-# lib/apple2-dos33-vtwin.lib uses the VideoTerm when present and, without
-# it, a 40-column window onto an 80 x 24 screen (include/c40win.h).
-#
-# lib/apple2-dos33-vts70.lib uses the VideoTerm when present and, without
-# it, Soft-70: 70 columns of the 80 x 24 screen in hi-res (include/soft70.h).
-# Programs that use it are linked with --start-addr 0x4000.
-#
-# A library of only the replacement modules isn't enough: ld65 scans each
-# library once, so a stock module reached through another stock module
-# (fopen -> open, remove -> _sysremove) would be resolved from apple2.lib.
-# Rebuild after updating cc65, so the stock modules match the toolchain.
+# ld65 scans each library once, in order, and takes only modules that
+# resolve references open at that point. Hence a complete core (a stock
+# module reached through another, fopen -> open, would otherwise come from
+# apple2.lib), and the selectors (cputs -> cputc would otherwise get stock
+# cputc). Rebuild after updating cc65, so the stock modules match the
+# toolchain.
 
 CA65   ?= ca65
 AR65   ?= ar65
 CL65   ?= cl65
+OD65   ?= od65
 TARGET := apple2
 
 # Directory holding the installed cc65 libraries
@@ -43,18 +51,27 @@ STOCK_LIB := $(CC65_LIB)/$(TARGET).lib
 DOS33_SRC := $(wildcard libsrc/dos33/*.s)
 DOS33_OBJ := $(patsubst libsrc/dos33/%.s,build/dos33/%.o,$(DOS33_SRC))
 DOS33_INC := $(wildcard libsrc/dos33/*.inc)
-DOS33_LIB := lib/apple2-dos33.lib
+DOS33_LIB := lib/a2lib-dos33.lib
 
 # Link-time guards (DESIGN.md 4.2): each replaces the stock ProDOS module
 # of the same name, so a call to a function with no DOS 3.3 implementation
-# fails to link instead of failing at run time
+# (or without the add-on that has it) fails to link instead of at run time
 GUARD_SRC := $(wildcard libsrc/guard/*.s)
 GUARD_OBJ := $(patsubst libsrc/guard/%.s,build/guard/%.o,$(GUARD_SRC))
+
+TIMER_SRC := $(wildcard libsrc/timer/*.s)
+TIMER_OBJ := $(patsubst libsrc/timer/%.s,build/timer/%.o,$(TIMER_SRC))
+TIMER_INC := libsrc/timer/timer.inc
+TIMER_LIB := lib/a2lib-timer.lib
+
+REFLOW_SRC := $(wildcard libsrc/reflow/*.s)
+REFLOW_OBJ := $(patsubst libsrc/reflow/%.s,build/reflow/%.o,$(REFLOW_SRC))
+REFLOW_LIB := lib/a2lib-reflow.lib
 
 VT_SRC := $(wildcard libsrc/vt/*.s)
 VT_OBJ := $(patsubst libsrc/vt/%.s,build/vt/%.o,$(VT_SRC))
 VT_INC := $(wildcard libsrc/vt/*.inc)
-VT_LIB := lib/apple2-dos33-vt.lib
+VT_LIB := lib/a2lib-vt.lib
 
 # The shared 80 x 24 model (libsrc/s80) is assembled once for each backend
 # that shows part of it, with that backend's display.inc
@@ -65,7 +82,7 @@ WIN_SRC := $(wildcard libsrc/win/*.s)
 WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC)) \
            $(patsubst libsrc/s80/%.s,build/win/%.o,$(S80_SRC))
 WIN_INC := $(wildcard libsrc/win/*.inc) $(S80_INC)
-VTWIN_LIB := lib/apple2-dos33-vtwin.lib
+VTWIN_LIB := lib/a2lib-c40win.lib
 
 .PHONY: emutest screenshots all test simtest linktest clean
 
@@ -73,7 +90,10 @@ S70_SRC := $(wildcard libsrc/s70/*.s)
 S70_OBJ := $(patsubst libsrc/s70/%.s,build/s70/%.o,$(S70_SRC)) \
            $(patsubst libsrc/s80/%.s,build/s70/%.o,$(S80_SRC))
 S70_INC := $(wildcard libsrc/s70/*.inc) $(S80_INC)
-VTS70_LIB := lib/apple2-dos33-vts70.lib
+VTS70_LIB := lib/a2lib-soft70.lib
+
+# The add-ons' selector objects (libsrc/select)
+SELECT := $(patsubst libsrc/select/%.s,lib/a2lib-%.o,$(wildcard libsrc/select/*.s))
 
 IP65_OBJ := lib/a2lib-ip65.o
 
@@ -85,8 +105,9 @@ IP65 ?=
 IP65_LIBS = $(IP65)/ip65/ip65_tcp.lib $(IP65)/drivers/a2uther2.lib
 NET_TEST := $(if $(IP65),build/test/nettest)
 
-all: $(DOS33_LIB) $(VT_LIB) $(VTWIN_LIB) $(VTS70_LIB) $(IP65_OBJ)
+all: $(DOS33_LIB) $(TIMER_LIB) $(REFLOW_LIB) $(VT_LIB) $(VTWIN_LIB) $(VTS70_LIB) $(SELECT) $(IP65_OBJ)
 
+# The core: stock apple2.lib with the DOS 3.3 modules and the guards
 build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/dos33 -o $@ $<
@@ -100,48 +121,76 @@ $(DOS33_LIB): $(DOS33_OBJ) $(GUARD_OBJ) $(STOCK_LIB)
 	cp $(STOCK_LIB) $@
 	$(AR65) r $@ $(DOS33_OBJ) $(GUARD_OBJ)
 
-# VideoTerm backend: apple2-dos33.lib with VideoTerm-aware conio modules
-build/vt/%.o: libsrc/vt/%.s $(VT_INC) libsrc/dos33/timer.inc
+# Selectors: one object per add-on, linked ahead of it
+lib/a2lib-%.o: libsrc/select/%.s
 	@mkdir -p $(@D)
-	$(CA65) -t $(TARGET) -I libsrc/vt -I libsrc/dos33 -o $@ $<
+	$(CA65) -t $(TARGET) -o $@ $<
 
-$(VT_LIB): $(VT_OBJ) $(DOS33_LIB)
+# Cooperative timer and software clock
+build/timer/%.o: libsrc/timer/%.s $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
-	cp $(DOS33_LIB) $@
-	$(AR65) r $@ $(VT_OBJ)
+	$(CA65) -t $(TARGET) -I libsrc/timer -I libsrc/dos33 -o $@ $<
 
-# IP65 timer driver on the cooperative timer: an object file, listed on the
-# link line before IP65's library (libsrc/ip65/a2timer.s)
-$(IP65_OBJ): libsrc/ip65/a2timer.s libsrc/dos33/timer.inc
+$(TIMER_LIB): $(TIMER_OBJ)
+	@mkdir -p $(@D)
+	rm -f $@
+	$(AR65) r $@ $(TIMER_OBJ)
+
+# Reflow filter, with the vectored COUT and the stock screen's width
+build/reflow/%.o: libsrc/reflow/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/dos33 -o $@ $<
 
-# VideoTerm backend with the 40-column window as its fallback: vt.s and the
-# window's conio modules (which include the VideoTerm paths)
-WIN_FLAGS := -I libsrc/win -I libsrc/s80 -I libsrc/vt -I libsrc/dos33
+$(REFLOW_LIB): $(REFLOW_OBJ)
+	@mkdir -p $(@D)
+	rm -f $@
+	$(AR65) r $@ $(REFLOW_OBJ)
 
-build/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+# VideoTerm backend: VideoTerm-aware conio modules, and the timer's tick
+# hook and kbhit (their cgetc ticks too)
+build/vt/%.o: libsrc/vt/%.s $(VT_INC) $(TIMER_INC)
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) -I libsrc/vt -I libsrc/timer -I libsrc/dos33 -o $@ $<
+
+$(VT_LIB): $(VT_OBJ) build/timer/tick.o build/timer/kbhit.o
+	@mkdir -p $(@D)
+	rm -f $@
+	$(AR65) r $@ $(VT_OBJ) build/timer/tick.o build/timer/kbhit.o
+
+# IP65 timer driver on the cooperative timer: an object file, listed on the
+# link line before IP65's library (libsrc/ip65/a2timer.s)
+$(IP65_OBJ): libsrc/ip65/a2timer.s $(TIMER_INC)
+	@mkdir -p $(@D)
+	$(CA65) -t $(TARGET) -I libsrc/timer -o $@ $<
+
+# VideoTerm backend with the 40-column window as its fallback: vt.s, the
+# window's conio modules (which include the VideoTerm paths), and the timer
+# its gauge uses
+WIN_FLAGS := -I libsrc/win -I libsrc/s80 -I libsrc/vt -I libsrc/timer -I libsrc/dos33
+
+build/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) $(WIN_FLAGS) -o $@ $<
 
-build/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+build/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) $(WIN_FLAGS) -o $@ $<
 
-$(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o $(DOS33_LIB)
+$(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
 	@mkdir -p $(@D)
-	cp $(DOS33_LIB) $@
-	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ)
+	rm -f $@
+	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ) build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
 
 # Soft-70 with the VideoTerm: vt.s and Soft-70's modules, on the shared
-# 80 x 24 model. Programs are linked with --start-addr 0x4000.
-S70_FLAGS := -I libsrc/s70 -I libsrc/s80 -I libsrc/vt -I libsrc/dos33
+# 80 x 24 model, and the timer its gauge and cursor use. Programs are
+# linked with --start-addr 0x4000.
+S70_FLAGS := -I libsrc/s70 -I libsrc/s80 -I libsrc/vt -I libsrc/timer -I libsrc/dos33
 
-build/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+build/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) $(S70_FLAGS) -o $@ $<
 
-build/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+build/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) $(S70_FLAGS) -o $@ $<
 
@@ -149,10 +198,18 @@ build/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
 libsrc/s70/font.s: tools/s70font.txt tools/s70font.py
 	python3 tools/s70font.py $< $@
 
-$(VTS70_LIB): $(S70_OBJ) build/vt/vt.o $(DOS33_LIB)
+$(VTS70_LIB): $(S70_OBJ) build/vt/vt.o build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
 	@mkdir -p $(@D)
-	cp $(DOS33_LIB) $@
-	$(AR65) r $@ build/vt/vt.o $(S70_OBJ)
+	rm -f $@
+	$(AR65) r $@ build/vt/vt.o $(S70_OBJ) build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
+
+# What a test program links: its add-ons' selectors, the add-ons, the core
+L_CORE   := $(DOS33_LIB)
+L_TIMER  := lib/a2lib-timer.o $(TIMER_LIB) $(DOS33_LIB)
+L_REFLOW := lib/a2lib-reflow.o $(REFLOW_LIB) $(DOS33_LIB)
+L_VT     := lib/a2lib-vt.o $(VT_LIB) $(DOS33_LIB)
+L_WIN    := lib/a2lib-c40win.o $(VTWIN_LIB) $(DOS33_LIB)
+L_S70    := lib/a2lib-soft70.o $(VTS70_LIB) $(DOS33_LIB)
 
 S70_LINK := --start-addr 0x4000
 
@@ -177,59 +234,59 @@ test: build/test/filetest build/test/vttest build/test/wintest build/test/timert
       build/test/exectest build/test/exectestvt build/test/execatest build/test/argtest \
       build/test/wptest
 
-build/test/filetest: test/filetest.c test/irqtest.s test/cswcout.s test/coutcount.s $(DOS33_LIB)
+build/test/filetest: test/filetest.c test/irqtest.s test/cswcout.s test/coutcount.s $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/filetest.c test/irqtest.s test/cswcout.s test/coutcount.s $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/filetest.c test/irqtest.s test/cswcout.s test/coutcount.s $(L_CORE)
 
-build/test/vttest: test/vttest.c $(VT_LIB)
+build/test/vttest: test/vttest.c $(L_VT)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(VT_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(L_VT)
 
-build/test/wintest: test/vttest.c $(VTWIN_LIB)
+build/test/wintest: test/vttest.c $(L_WIN)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(VTWIN_LIB)
+	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(L_WIN)
 
-build/test/cswtest: test/cswtest.c test/cswcout.s $(VT_LIB)
+build/test/cswtest: test/cswtest.c test/cswcout.s $(L_VT)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/cswtest.c test/cswcout.s $(VT_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/cswtest.c test/cswcout.s $(L_VT)
 
-build/test/cswwtest: test/cswtest.c test/cswcout.s $(VTWIN_LIB)
+build/test/cswwtest: test/cswtest.c test/cswcout.s $(L_WIN)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ test/cswtest.c test/cswcout.s $(VTWIN_LIB)
+	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ test/cswtest.c test/cswcout.s $(L_WIN)
 
-build/test/reflowtest: test/reflowtest.c $(DOS33_LIB)
+build/test/reflowtest: test/reflowtest.c $(L_REFLOW)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(L_REFLOW)
 
-build/test/reflowvt: test/reflowtest.c $(VT_LIB)
+build/test/reflowvt: test/reflowtest.c lib/a2lib-vt.o lib/a2lib-reflow.o $(VT_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(VT_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< lib/a2lib-vt.o lib/a2lib-reflow.o $(VT_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 
-build/test/reflowwin: test/reflowtest.c $(VTWIN_LIB)
+build/test/reflowwin: test/reflowtest.c lib/a2lib-c40win.o lib/a2lib-reflow.o $(VTWIN_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(VTWIN_LIB)
+	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< lib/a2lib-c40win.o lib/a2lib-reflow.o $(VTWIN_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 
-build/test/s70test: test/vttest.c $(VTS70_LIB)
+build/test/s70test: test/vttest.c $(L_S70)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ $< $(VTS70_LIB)
+	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ $< $(L_S70)
 
-build/test/cswstest: test/cswtest.c test/cswcout.s $(VTS70_LIB)
+build/test/cswstest: test/cswtest.c test/cswcout.s $(L_S70)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ test/cswtest.c test/cswcout.s $(VTS70_LIB)
+	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ test/cswtest.c test/cswcout.s $(L_S70)
 
-build/test/reflows70: test/reflowtest.c $(VTS70_LIB)
+build/test/reflows70: test/reflowtest.c lib/a2lib-soft70.o lib/a2lib-reflow.o $(VTS70_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ $< $(VTS70_LIB)
+	$(CL65) -t $(TARGET) $(S70_LINK) -O -I include -DS70 -m $@.map -o $@ $< lib/a2lib-soft70.o lib/a2lib-reflow.o $(VTS70_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 
-build/test/timertest: test/timertest.c test/timerzp.s $(DOS33_LIB)
+build/test/timertest: test/timertest.c test/timerzp.s $(L_TIMER)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/timertest.c test/timerzp.s $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/timertest.c test/timerzp.s $(L_TIMER)
 
 # The IP65 timer driver with IP65 and the Uthernet II: linked ahead of
 # IP65's libraries, so it replaces IP65's own timer_read
-build/test/nettest: test/nettest.c $(IP65_OBJ) $(DOS33_LIB) $(IP65_LIBS)
+build/test/nettest: test/nettest.c $(IP65_OBJ) $(L_TIMER) $(IP65_LIBS)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -I $(IP65)/inc -m $@.map -o $@ test/nettest.c $(IP65_OBJ) $(IP65_LIBS) $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -I $(IP65)/inc -m $@.map -o $@ test/nettest.c $(IP65_OBJ) $(IP65_LIBS) $(L_TIMER)
 
 # Regression tests that run in cc65's 6502 simulator, sim65, without an
 # Apple II: the timer modules, the window's gauge, the reflow filter and
@@ -240,15 +297,19 @@ SIM_REFLOW := $(SIM_DIR)/reflow.o
 SIM_OBJ  := $(patsubst %,$(SIM_DIR)/%.o,$(SIM_MODS))
 SIM65    ?= sim65
 
-$(SIM_DIR)/%.o: libsrc/dos33/%.s libsrc/dos33/timer.inc
+$(SIM_DIR)/%.o: libsrc/timer/%.s $(TIMER_INC)
+	@mkdir -p $(@D)
+	$(CA65) -t sim6502 -I libsrc/timer -I libsrc/dos33 -o $@ $<
+
+$(SIM_DIR)/%.o: libsrc/reflow/%.s
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 -I libsrc/dos33 -o $@ $<
 
-$(SIM_DIR)/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+$(SIM_DIR)/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 $(WIN_FLAGS) -o $@ $<
 
-$(SIM_DIR)/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) libsrc/dos33/timer.inc
+$(SIM_DIR)/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 $(WIN_FLAGS) -o $@ $<
 
@@ -261,11 +322,11 @@ $(SIM_DIR)/gaugesim: test/sim/gaugesim.c test/sim/shim.s test/sim/winshim.s test
 S70_SIM_MODS := s80 cputc cpeekc gotoxy gotoy wherex wherey clrscr s70 font
 S70_SIM_OBJ  := $(patsubst %,$(SIM_DIR)/s70/%.o,$(S70_SIM_MODS))
 
-$(SIM_DIR)/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+$(SIM_DIR)/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 $(S70_FLAGS) -o $@ $<
 
-$(SIM_DIR)/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) libsrc/dos33/timer.inc
+$(SIM_DIR)/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 $(S70_FLAGS) -o $@ $<
 
@@ -276,9 +337,10 @@ $(SIM_DIR)/reflowsim: test/sim/reflowsim.c test/sim/reflowshim.s $(SIM_REFLOW)
 	$(CL65) -t sim6502 -O -I include -o $@ $^
 
 # Link-time guards (DESIGN.md 4.2): a call to each guarded function must
-# fail to link, naming its guard symbol, while a control program links
-linktest: $(DOS33_LIB)
-	CL65=$(CL65) bash test/linktest.sh $(DOS33_LIB)
+# fail to link, naming its guard symbol, while a control program links;
+# and each add-on's selector must pull in its replacements (DESIGN.md 2)
+linktest: all
+	CL65=$(CL65) OD65=$(OD65) AR65=$(AR65) bash test/linktest.sh lib
 
 simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim $(SIM_DIR)/s70sim
 	$(SIM65) $(SIM_DIR)/timersim
@@ -292,39 +354,39 @@ clean:
 # Probes for exec() under DOS 3.3 (DESIGN.md 5.10): DOS commands through
 # COUT and page 2 across BLOAD; a DOS error after the hand-off, with and
 # without the stub's reset
-build/test/bloadprobe: test/bloadprobe.c test/cswcout.s $(DOS33_LIB)
+build/test/bloadprobe: test/bloadprobe.c test/cswcout.s $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/bloadprobe.c test/cswcout.s $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/bloadprobe.c test/cswcout.s $(L_CORE)
 
-build/test/errprobe: test/errprobe.c test/errstub.s $(DOS33_LIB)
+build/test/errprobe: test/errprobe.c test/errstub.s $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/errprobe.c test/errstub.s $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/errprobe.c test/errstub.s $(L_CORE)
 
-build/test/errproberaw: test/errprobe.c test/errstub.s $(DOS33_LIB)
+build/test/errproberaw: test/errprobe.c test/errstub.s $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DRAW -m $@.map -o $@ test/errprobe.c test/errstub.s $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -DRAW -m $@.map -o $@ test/errprobe.c test/errstub.s $(L_CORE)
 
 # exec() under DOS 3.3 (DESIGN.md 5.10): exectest execs argtest with
 # arguments (also with the VideoTerm backend); execatest execs an
 # Applesoft program
-build/test/exectest: test/exectest.c $(DOS33_LIB)
+build/test/exectest: test/exectest.c $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(L_CORE)
 
-build/test/exectestvt: test/exectest.c $(VT_LIB)
+build/test/exectestvt: test/exectest.c $(L_VT)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(VT_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(L_VT)
 
-build/test/execatest: test/exectest.c $(DOS33_LIB)
+build/test/execatest: test/exectest.c $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DEXECA -m $@.map -o $@ $< $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -DEXECA -m $@.map -o $@ $< $(L_CORE)
 
-build/test/argtest: test/argtest.c $(DOS33_LIB)
+build/test/argtest: test/argtest.c $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(L_CORE)
 
 # A disk write-protected while a file is open (DESIGN.md 5.11): make
 # emutest's script protects drive 2 mid-run
-build/test/wptest: test/wptest.c $(DOS33_LIB)
+build/test/wptest: test/wptest.c $(L_CORE)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(L_CORE)

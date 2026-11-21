@@ -2,7 +2,7 @@
 ; Videx VideoTerm backend for the cc65 apple2 target (DESIGN.md 3.4)
 ;
 ; vt_active:  bit 7 set if the card was found and is in use. The conio
-;             modules of apple2-dos33-vt.lib test it and either drive the
+;             modules of a2lib-vt.lib test it and either drive the
 ;             card or run the stock 40-column code.
 ; vt_write:   write the character in A through the firmware's Pascal 1.1
 ;             WRITE entry. Preserves A, X and Y, so it also serves as the

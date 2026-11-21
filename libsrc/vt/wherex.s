@@ -4,7 +4,7 @@
 ; unsigned char wherex (void);
 ;
 ;
-; VideoTerm backend (apple2-dos33-vt.lib): modified copy of
+; VideoTerm backend (a2lib-vt.lib): modified copy of
 ; libsrc/apple2/wherex.s from cc65; if the card is in use, returns its cursor
 ; column (79 while a wrap is pending at column 80).
 ; (DESIGN.md 3.4).

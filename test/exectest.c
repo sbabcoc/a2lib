@@ -22,7 +22,7 @@
 **   execatest (-DEXECA)   EXECA, an Applesoft program this test writes,
 **                         which prints EXECA OK.
 **
-** exectestvt is built with apple2-dos33-vt.lib and run with the VideoTerm.
+** exectestvt is built with a2lib-vt.lib and run with the VideoTerm.
 ** Run under DOS 3.3 with the test disk in drive 2. Prints no summary of
 ** its own: if exec() returns, the run times out.
 */

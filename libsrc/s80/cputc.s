@@ -2,9 +2,9 @@
 ; void __fastcall__ cputcxy (unsigned char x, unsigned char y, char c);
 ; void __fastcall__ cputc (char c);
 ;
-; 80 x 24 backends (apple2-dos33-vtwin.lib, apple2-dos33-vts70.lib), based
+; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
 ; on cc65's libsrc/apple2/cputc.s (Ullrich von Bassewitz). With a
-; VideoTerm, as in apple2-dos33-vt.lib; otherwise the model (s80.s).
+; VideoTerm, as in a2lib-vt.lib; otherwise the model (s80.s).
 ; Character handling follows the stock module: uppercase unless the
 ; display shows lowercase (uppercasemask), INVFLG (revers) applied by
 ; S80_ATTR (display.inc), controls shown as their letters (screen codes
@@ -64,7 +64,7 @@ putchardirect:
         jmp     s80_putnoadv
 
 ; ------------------------------------------------------------------------
-; VideoTerm, as in apple2-dos33-vt.lib's cputc.s
+; VideoTerm, as in a2lib-vt.lib's cputc.s
 
 vtcputc:
         cmp     #$0D            ; CR only

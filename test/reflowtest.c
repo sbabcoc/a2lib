@@ -1,10 +1,10 @@
 /*
 ** Reflow filter tests (DESIGN.md 3.7). Built three times:
-**   reflowtest  apple2-dos33.lib (stock 40-column screen)
-**   reflowvt    apple2-dos33-vt.lib (VideoTerm, 80 columns; stock without)
-**   reflowwin   apple2-dos33-vtwin.lib, C40WIN (40-column window without
+**   reflowtest  a2lib-dos33.lib (stock 40-column screen)
+**   reflowvt    a2lib-vt.lib (VideoTerm, 80 columns; stock without)
+**   reflowwin   a2lib-c40win.lib, C40WIN (40-column window without
 **               the VideoTerm)
-**   reflows70   apple2-dos33-vts70.lib, S70 (Soft-70 without the
+**   reflows70   a2lib-soft70.lib, S70 (Soft-70 without the
 **               VideoTerm)
 ** Each check prints through the filter, then reads the screen back with
 ** cpeekc. W is the visible width; reflowed lines hold at most W - 1.

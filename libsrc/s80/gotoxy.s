@@ -2,7 +2,7 @@
 ; void __fastcall__ gotoxy (unsigned char x, unsigned char y);
 ; void __fastcall__ gotox (unsigned char x);
 ;
-; 80 x 24 backends (apple2-dos33-vtwin.lib, apple2-dos33-vts70.lib), based
+; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
 ; on cc65's libsrc/apple2/gotoxy.s. With a VideoTerm, firmware GOTOXY;
 ; otherwise the model's cursor. As on the VideoTerm, an out-of-range column
 ; or row is ignored. Moving the cursor doesn't pan; writing or showing it
