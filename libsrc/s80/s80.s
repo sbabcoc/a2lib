@@ -63,14 +63,7 @@ GAUGE_TICKS     = MS_TICKS(1000)
 s80init:
         bit     vt_active
         bmi     initdone
-        lda     CSWL
-        sta     savecsw
-        lda     CSWL+1
-        sta     savecsw+1
-        lda     DOS_CSW
-        sta     savedos
-        lda     DOS_CSW+1
-        sta     savedos+1
+        jsr     a2_savehooks
         jsr     disp_init       ; Clears the display
 
         ; A buffer in BSS is cleared by crt0, and must not be written here:
@@ -88,30 +81,10 @@ s80init:
         bpl     :-
         .endif
 
-        ; Console output into the model.
-        ; Under DOS 3.3 with DOS's video intercept in CSW, become DOS's
-        ; true output routine instead: on every character through its
-        ; intercepts (stdio input included), DOS copies the true handlers
-        ; into CSW and KSW and reinstalls its intercepts on the way out
-        ; ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a
-        ; routine stored in CSW directly (DESIGN.md 3.5, 3.6).
-        lda     CSWL
-        cmp     DOS_VINT
-        bne     direct
-        lda     CSWL+1
-        cmp     DOS_VINT+1
-        bne     direct
+        ; Console output into the model (vt.s: a2_hookout)
         lda     #<s80_cout
-        sta     DOS_CSW
-        lda     #>s80_cout
-        sta     DOS_CSW+1
-        lda     #$80
-        sta     viados
-        rts
-direct: lda     #<s80_cout
-        sta     CSWL
-        lda     #>s80_cout
-        sta     CSWL+1
+        ldx     #>s80_cout
+        jmp     a2_hookout
 initdone:
         rts
 
@@ -147,29 +120,9 @@ s80done:
         jsr     gauge_hide
 :
 
-        ; Restore the output hooks, as vt.s does
-        bit     viados
-        bpl     :+
-        lda     savedos
-        sta     DOS_CSW
-        lda     savedos+1
-        sta     DOS_CSW+1
+        ; Restore the output hooks (vt.s)
+        jsr     a2_unhookout
         jmp     disp_done
-:       lda     savecsw
-        sta     CSWL
-        lda     savecsw+1
-        sta     CSWL+1
-        lda     DOS_CSW
-        cmp     #<s80_cout
-        bne     :+
-        lda     DOS_CSW+1
-        cmp     #>s80_cout
-        bne     :+
-        lda     savedos
-        sta     DOS_CSW
-        lda     savedos+1
-        sta     DOS_CSW+1
-:       jmp     disp_done
 done:   rts
 
 ; ------------------------------------------------------------------------
@@ -514,10 +467,7 @@ s80_y:          .byte   $00
 s80_left:       .byte   $00
 s80_follow:     .byte   $80     ; Bit 7: follow the cursor
 gslot:          .byte   $FF     ; Gauge's timer slot; bit 7: none
-viados:         .byte   $00     ; Bit 7: installed as DOS's true output routine
 need:           .byte   $00
-savecsw:        .word   $0000
-savedos:        .word   $0000
 
         .segment        S80_BUFSEG
 

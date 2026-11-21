@@ -99,7 +99,7 @@ verb:   ldx     #NAME_LEN-1
 
         ; From here on nothing fails. Copy the stub, then build the
         ; command in it: $84, verb, space, name, slot, drive, $8D.
-stub:   ldx     #size - 1
+stub:   ldx     #code - 1
 :       lda     source,x
         sta     target,x
         dex
@@ -246,13 +246,12 @@ source:
         bne     @next
 @done:  jmp     DOSWARM         ; A B program that returns with RTS
 
-len:    .byte   $00
-cmd:    .res    CMDMAX + 1      ; The command and its terminator
-
-size    = * - source
+; After the code at target, not copied: exec() writes both
+code    = * - source        ; Bytes copied
+size    = code + 1 + CMDMAX + 1
 target  = DOSWARM - size
-len_t   = len - source + target
-cmd_t   = cmd - source + target
+len_t   = target + code     ; The command's length (1 byte)
+cmd_t   = len_t + 1         ; The command and its terminator
 
         ; The stub and the tail stay out of each other's way, and the
         ; stub fits in $300-$3CF, as stock exec.s's loader does

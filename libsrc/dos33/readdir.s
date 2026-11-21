@@ -83,34 +83,31 @@ entry:  tax
         cmp     #$FF
         jeq     next            ; Deleted
 
-        ; d_name: 30 characters, bit 7 cleared, trailing blanks removed
-        ldx     #$00
-:       txa
+        ; d_name: 30 characters, bit 7 cleared, trailing blanks removed.
+        ; ptr3 = &d_name - ENT_NAME, so that one Y indexes both names.
         clc
-        adc     #ENT_NAME
-        tay
-        lda     (ptr2),y
+        lda     ptr1
+        adc     #<(DIR::ENT + DIRENT::NAME - ENT_NAME)
+        sta     ptr3
+        lda     ptr1+1
+        adc     #>(DIR::ENT + DIRENT::NAME - ENT_NAME)
+        sta     ptr3+1
+        ldy     #ENT_NAME
+:       lda     (ptr2),y
         and     #HIBIT_OFF
-        pha
-        txa
-        clc
-        adc     #DIR::ENT + DIRENT::NAME
-        tay
-        pla
-        sta     (ptr1),y
-        inx
-        cpx     #NAME_LEN
+        sta     (ptr3),y
+        iny
+        cpy     #ENT_NAME + NAME_LEN
         bne     :-
         lda     #$00
-        ldy     #DIR::ENT + DIRENT::NAME + NAME_LEN
-        sta     (ptr1),y
+        sta     (ptr3),y
 :       dey
-        lda     (ptr1),y
+        lda     (ptr3),y
         cmp     #' '
         bne     :+
         lda     #$00
-        sta     (ptr1),y
-        cpy     #DIR::ENT + DIRENT::NAME
+        sta     (ptr3),y
+        cpy     #ENT_NAME
         bne     :-
 
         ; d_ino: T/S list track * 256 + sector

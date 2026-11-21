@@ -30,12 +30,7 @@
         .code
 
 __opendir_a2lib:
-        sta     ptr1
-        stx     ptr1+1
-
-        lda     ptr1
-        ldx     ptr1+1
-        jsr     fm_location
+        jsr     fm_location     ; Takes the name in AX
         bcc     dir_at
         jmp     nullmapped      ; A = DOSERR_SYNTAX -> EINVAL
 

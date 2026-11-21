@@ -14,6 +14,23 @@
 ; vt_screen:  convert an Apple screen code in A to the character the card
 ;             shows for it (bit 7 clear; controls as @, A-Z, [ \ ] ^ _).
 ;
+; The output hook, for this backend and the 80 x 24 model's (s80.s): only
+; one is in use, so they share these and the hooks they save.
+; a2_savehooks:  keep CSW and DOS's saved true output hook, to restore at
+;                exit (ONCE).
+; a2_hookout:    install the routine in AX as the output hook (ONCE).
+;                Under DOS 3.3 with DOS's video intercept in CSW, it
+;                becomes DOS's true output routine instead: on every
+;                character through its intercepts (stdio input included),
+;                DOS copies the true handlers into CSW and KSW and
+;                reinstalls its intercepts on the way out ("Beneath Apple
+;                DOS" ch. 8, $9ED1 and $A851), which drops a routine
+;                stored in CSW directly (DESIGN.md 3.5, 3.6).
+; a2_unhookout:  restore the hooks a2_savehooks kept: DOS's saved true
+;                hook if a2_hookout installed the routine there;
+;                otherwise CSW, and DOS's saved hook too if its reconnect
+;                routine ($A851) moved the routine into it.
+;
 ; vtinit (constructor) detects the card, initializes it, hides the cursor
 ; (conio shows it only while waiting for a key), allows lowercase, and
 ; hooks COUT. vtdone (destructor) restores the output hooks and the display
@@ -69,14 +86,7 @@ was80:  lda     #$80
         sta     prior80
 
         ; Keep the hooks to restore at exit
-:       lda     CSWL
-        sta     savecsw
-        lda     CSWL+1
-        sta     savecsw+1
-        lda     DOS_CSW
-        sta     savedos
-        lda     DOS_CSW+1
-        sta     savedos+1
+:       jsr     a2_savehooks
 
         ; Full INIT: clear the power-on marker, which about one power-on in
         ; 32 leaves set, making INIT skip the CRTC setup (DESIGN.md 3.4)
@@ -95,67 +105,75 @@ was80:  lda     #$80
         lda     #$FF
         sta     uppercasemask
 
-        ; COUT to the card.
-        ; Under DOS 3.3 with DOS's video intercept in CSW, become DOS's
-        ; true output routine instead: on every character through its
-        ; intercepts (stdio input included), DOS copies the true handlers
-        ; into CSW and KSW and reinstalls its intercepts on the way out
-        ; ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a
-        ; routine stored in CSW directly (DESIGN.md 3.5).
-        lda     CSWL
-        cmp     DOS_VINT
-        bne     direct
-        lda     CSWL+1
-        cmp     DOS_VINT+1
-        bne     direct
+        ; COUT to the card
         lda     #<vt_write
-        sta     DOS_CSW
-        lda     #>vt_write
-        sta     DOS_CSW+1
-        lda     #$80
-        sta     viados
-        bne     hooked          ; Branch always
-direct: lda     #<vt_write
-        sta     CSWL
-        lda     #>vt_write
-        sta     CSWL+1
-hooked:
+        ldx     #>vt_write
+        jsr     a2_hookout
 
         lda     #$80
         sta     vt_active
 none:   bit     CLRROM          ; Release the card's $C800 space
         rts
 
+a2_savehooks:
+        lda     CSWL
+        sta     savecsw
+        lda     CSWL+1
+        sta     savecsw+1
+        lda     DOS_CSW
+        sta     savedos
+        lda     DOS_CSW+1
+        sta     savedos+1
+        rts
+
+a2_hookout:
+        sta     hooked
+        stx     hooked+1
+        ldy     CSWL
+        cpy     DOS_VINT
+        bne     direct
+        ldy     CSWL+1
+        cpy     DOS_VINT+1
+        bne     direct
+        sta     DOS_CSW
+        stx     DOS_CSW+1
+        lda     #$80
+        sta     viados
+        rts
+direct: sta     CSWL
+        stx     CSWL+1
+        rts
+
         .code
 
-vtdone:
-        bit     vt_active
-        bpl     done
-
-        ; Restore the output hooks: DOS's saved true hook if we were
-        ; installed there; otherwise CSW, and DOS's saved hook too if its
-        ; reconnect routine ($A851) moved ours into it.
+a2_unhookout:
         bit     viados
         bpl     :+
         lda     savedos
         sta     DOS_CSW
         lda     savedos+1
         sta     DOS_CSW+1
-        jmp     mode
+        rts
 :       lda     savecsw
         sta     CSWL
         lda     savecsw+1
         sta     CSWL+1
         lda     DOS_CSW
-        cmp     #<vt_write
-        bne     mode
+        cmp     hooked
+        bne     :+
         lda     DOS_CSW+1
-        cmp     #>vt_write
-        bne     mode
+        cmp     hooked+1
+        bne     :+
         lda     savedos
         sta     DOS_CSW
         lda     savedos+1
         sta     DOS_CSW+1
+:       rts
+
+vtdone:
+        bit     vt_active
+        bpl     done
+        jsr     a2_unhookout
 
         ; Back to 40 columns, unless output went to the card before
 mode:   bit     prior80
@@ -225,3 +243,4 @@ prior80:        .byte   $00
 viados:         .byte   $00     ; Bit 7: installed as DOS's true output routine
 savecsw:        .word   $0000
 savedos:        .word   $0000
+hooked:         .word   $0000   ; The routine a2_hookout installed

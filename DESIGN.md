@@ -540,6 +540,9 @@ through `CSW`. Now, when DOS's intercept is in `CSW` (`CSW` equals the
 address DOS keeps at `$9D04`), `vt.s` and `win.s` install their routines
 as DOS's true output routine at `$AA53`, and DOS calls them; otherwise
 they go into `CSW` directly. Exit restores whichever hook was changed.
+Since 10.35 one copy of this code serves both, in `vt.s` (`a2_savehooks`,
+`a2_hookout`, `a2_unhookout`), which `s80.s` calls: only one backend is
+in use, so they share the saved hooks too.
 
 **Exit.** `vtdone` restores `CSW`. If DOS's reconnect routine (`A851`)
 moved the backend's hook into its saved true hook (`$AA53`) while the
@@ -958,7 +961,20 @@ and the scroll figures include the model's own buffer scroll (about
 29,000 cycles, shared with the window). At about 1,000 characters per
 second, Soft-70 keeps up with 9,600 baud text without scrolling and with
 2,400 baud with a scroll per line; over the Uthernet II, TCP flow control
-absorbs the rest. Possible later speedups, if needed: a font transposed
+absorbs the rest.
+
+These figures vary by up to about 1% with where the linker places
+Soft-70's code (10.35): an inner loop's backward branch costs a cycle
+more each time it's taken when it crosses a page, and where `s70.s`
+lands depends on everything linked before it, so each program differs.
+With cc65's `apple2.cfg`, whose segments have no alignment, a module
+can't align its loops without ld65 warning that the program might not
+work. For the same reason the font in LOWBSS isn't page-aligned: at its
+address in the tests, `$0F90`, the glyph loads cross a page on all 8
+scanlines for 18 of every 32 glyphs, about 4.5 cycles a character on
+average. A linker configuration of a2lib's own could align both.
+
+Possible later speedups, if needed: a font transposed
 into 8 planes with an unrolled scanline loop (about 40% less per cell,
 about 300 bytes more code), and batch scrolling.
 
@@ -3120,7 +3136,60 @@ Verified: `tools/samebytes.sh` against 10.33 differs only in `exec.s`
 and the three programs that link it (`exectest`, `exectestvt`,
 `execatest`): the other modules are byte-identical. In `exec.o` 115
 bytes move from DATA to RODATA (DATA 128 to 13, RODATA 0 to 115), and
-the programs keep their sizes.
+the programs keep their sizes. `make emutest` passes, all 23 runs
+(`nettest` included).
+
+### 10.35 Size items S1-S4, S6 and S7 of the review
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/exec.s` | S1: the command's length and text are addressed past the copied code, at the same page-3 targets, not reserved in the stub's source |
+| `libsrc/dos33/rwfile.s` | S2: five long branches that always branch (`jcc`, `jeq`, `jne`, 5 bytes) are `jmp` (3) |
+| `libsrc/dos33/opendir.s` | S3: no store and reload of the name in `ptr1` before `fm_location`, which stores AX in `ptr1` itself |
+| `libsrc/dos33/stat.s` | S4: no `ldy fd / tya` after `sta fd`, with `fd` in A |
+| `libsrc/dos33/readdir.s` | S6: `ptr3` points at `d_name - ENT_NAME`, so one `Y` indexes the entry's name and `d_name`; `readdir` already used `ptr3`, through RWTS |
+| `libsrc/vt/vt.s`, `vt.inc`, `libsrc/s80/s80.s`, `test/sim/winshim.s` | S7: the output hook's save, install and restore once, in `vt.s`, for both backends (3.5); `s80.s` drops its copies and variables; the sim stubs |
+
+S5 was done in 10.33; S8 (the VideoTerm `cgetc` joining the stock wait
+loop) was left, as it departs from the stock module's structure.
+
+Measured as RAM (image and BSS, from the link maps), against 10.34:
+
+| Programs | Bytes | Why |
+|---|---|---|
+| `exectest`, `execatest` | -55 | S1 (-45), S2 (-10) |
+| `exectestvt` | -40 | S1, S2; S7 (+15) |
+| `filetest` | -23 | S2, S3 (-8), S4 (-4), S6 (-1) |
+| `wptest` | -10 | S2 |
+| `wintest`, `reflowwin`, `cswwtest` | -52 | S7 (-93 in the file: the ONCE code it removes lies under BSS) |
+| `s70test`, `reflows70`, `cswstest` | -93 | S7 |
+| `vttest`, `cswtest` | +15 | S7: the calls, and `hooked`, the routine installed, compared in memory instead of as an immediate |
+| `reflowvt` | +6 | S7 |
+
+S7 was proposed at about 45 bytes saved, nothing in programs without
+`s80.s`; measured, those pay 15, which was accepted for the 52 and 93
+saved with it. S6 saves about 23 cycles a character, 30 characters an
+entry: the copy was 43 cycles a character, and is 20.
+
+Verified: `tools/samebytes.sh` against 10.34 differs only in those
+modules, the sim stub's symbols (its bytes are unchanged) and the
+programs that link them. `make simtest` passes; `make linktest`, 87
+checks; `make emutest`, all 23 runs (`nettest` included).
+
+`s70sim` measured Soft-70 0.5% slower (`cputc` 1,018 cycles a
+character, from 1,013; the 70-column scroll 109,304 from 108,437; the
+pan 915,457 from 910,556), though no Soft-70 code changed. S7 shrank
+`s80.s`, which links before `s70.s`, so `s70.s` moved down 103 bytes.
+Three backward branches now cross a page boundary: the per-scanline loop
+of one-byte cells (`bne one`, up to 7 cycles a cell), a loop of the
+scroll and the redraw's copy; two others no longer do. Where they land
+depends on everything linked before them, so every program differs, and
+moving code to restore the sim's old layout would only hide it.
+Aligning the loops, or the font (3.8), needs a linker configuration that
+allows it: a module's `.align` in cc65's `apple2.cfg` makes ld65 warn
+that the program might not work (tried on the font). Accepted, and
+documented in 3.8: Soft-70's timing varies by up to about 1% with the
+program's layout.
 
 ## 11. Sources
 

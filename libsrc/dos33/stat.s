@@ -64,8 +64,6 @@ _stat:
 :       sta     fd
 
         ; Fields from the control block and the parsed name
-        ldy     fd
-        tya
         asl
         asl
         tay

@@ -113,7 +113,7 @@ rwfile:
         lda     #FMC_WRITE
         jsr     fm_rangeio
         jcs     fmerr
-        jcc     setall          ; Branch always
+        jmp     setall
 
         ; Read byte by byte: a range READ that runs into the end of the
         ; data doesn't say how many bytes it transferred
@@ -121,7 +121,7 @@ rawrd:  jsr     fm_readbyte
         jcs     rdend
         jsr     putbyte
         bne     rawrd
-        jeq     ok              ; Branch always
+        jmp     ok
 
 ; ------------------------------------------------------------------------
 ; Header files
@@ -249,7 +249,7 @@ trd:    jsr     fm_readbyte
         jsr     fm_incpos
         plp
         bne     trd
-        jeq     ok              ; Branch always
+        jmp     ok
 
 trdend: cmp     #DOSERR_ENDDATA
         jne     fmerr
@@ -257,7 +257,7 @@ teof:   ldy     #FCB::STATE
         lda     (ptr4),y
         ora     #FCBS_EOF
         sta     (ptr4),y
-        jne     ok              ; Branch always
+        jmp     ok
 
         ; Reject 8-bit data before writing anything
 twrite: lda     ptr1
@@ -305,7 +305,7 @@ twr:    ldy     #$00
         jsr     fm_incpos
         jsr     nextbyte
         bne     twr
-        jeq     ok              ; Branch always
+        jmp     ok
 
 reject: lda     #EINVAL
         jmp     direrr
