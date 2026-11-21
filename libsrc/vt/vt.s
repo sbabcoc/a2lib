@@ -20,10 +20,17 @@
 ; Everything the constructor sets is in DATA: crt0 clears BSS after the
 ; constructors run (DESIGN.md 6.1).
 ;
+; Every module of the display libraries imports vt_active, so this module
+; is linked whenever one of them is. It requires the display library's
+; selector (DESIGN.md 2), which defines a2lib_display_needs_selector_object:
+; without the selector, the link fails naming that symbol, instead of the
+; program's printf silently writing to the stock 40-column screen.
+;
 
         .constructor    vtinit
         .destructor     vtdone
         .import         uppercasemask
+        .forceimport    a2lib_display_needs_selector_object
 
         .macpack        longbranch
 

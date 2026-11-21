@@ -4,13 +4,15 @@
 # DOS 3.3 implementation, or one whose implementation is in an add-on it
 # isn't linked with, must fail to link, and ld65 must name that function's
 # guard symbol. Control programs, calling functions that do have one, must
-# link. Then the add-ons' selectors (DESIGN.md 2): test/selcheck.py checks
-# each pulls in what it must, and a program reaching an add-on only
-# through stock modules must get the add-on's modules.
+# link. Then the add-ons (DESIGN.md 2): a program reaching an add-on only
+# through stock modules must get the add-on's modules; a display library
+# without its selector, or two display libraries, must fail to link; and
+# test/selcheck.py checks each selector pulls in what it must.
 #
 #   bash test/linktest.sh lib
 #
-# CL65, OD65 and AR65 name cl65, od65 and ar65, if not on PATH.
+# CL65, OD65, AR65 and PYTHON name cl65, od65, ar65 and python3, if not on
+# PATH.
 
 set -u
 
@@ -120,30 +122,60 @@ uses () {
     fi
 }
 
-# Selectors: replacements reached only through other modules (cputs ->
-# cputc, cgets -> cgetc, printf -> write -> COUT, time -> clock_gettime)
+# Add-ons reached only through other modules: copies of stock modules in
+# the add-on (cputs -> cputc, cgets -> cgetc, cprintf -> vcprintf -> cputc,
+# time -> clock_gettime), and the selector's (printf -> write -> COUT)
 for d in vt c40win soft70; do
     start=; [[ $d == soft70 ]] && start="--start-addr 0x4000"
-    link "sel$d" - 'char b[4]; cputs ("X"); cgets (b, sizeof b);
-     return printf ("X");' "$start $DIR/a2lib-$d.o $DIR/a2lib-$d.lib"
-    for m in cputc.o cgetc.o gotoxy.o wherex.o cout.o; do
-        uses "sel$d" "$DIR/a2lib-$d.lib" "$m"
+    sel="$start $DIR/a2lib-$d.o $DIR/a2lib-$d.lib"
+    link "${d}cputs" - 'cputs ("X"); return 0;' "$sel"
+    for m in cputs.o cputc.o gotoxy.o; do
+        uses "${d}cputs" "$DIR/a2lib-$d.lib" "$m"
     done
+    link "${d}cgets" - 'char b[4]; return cgets (b, sizeof b) != 0;' "$sel"
+    for m in cgets.o cgetc.o; do
+        uses "${d}cgets" "$DIR/a2lib-$d.lib" "$m"
+    done
+    link "${d}cprintf" - 'return cprintf ("X");' "$sel"
+    for m in vcprintf.o cputc.o; do
+        uses "${d}cprintf" "$DIR/a2lib-$d.lib" "$m"
+    done
+    link "${d}printf" - 'return printf ("X");' "$sel"
+    uses "${d}printf" "$DIR/a2lib-$d.lib" cout.o
+    # Without its selector, the library fails to link (vt.s)
+    link "${d}nosel" a2lib_display_needs_selector_object \
+        'cputs ("X"); return 0;' "$start $DIR/a2lib-$d.lib"
 done
-link seltimer - 'char b[4]; cgets (b, sizeof b); return time (NULL) != 0;' \
-    "$TIMER"
-uses seltimer "$DIR/a2lib-timer.lib" cgetc.o
-uses seltimer "$DIR/a2lib-timer.lib" gettime.o
-link selreflow - 'reflow_on (0); return printf ("X");' \
+link twodisplays a2lib_display_needs_selector_object 'cputs ("X"); return 0;' \
+    "$DIR/a2lib-vt.o $DIR/a2lib-c40win.o $DIR/a2lib-vt.lib
+     $DIR/a2lib-c40win.lib"
+
+link timercgets - 'char b[4]; return cgets (b, sizeof b) != 0;' "$TIMER"
+for m in cgets.o cgetc.o; do
+    uses timercgets "$DIR/a2lib-timer.lib" "$m"
+done
+link timertime - 'return time (NULL) != 0;' "$TIMER"
+for m in time.o gettime.o; do
+    uses timertime "$DIR/a2lib-timer.lib" "$m"
+done
+# The display library, listed first, takes the timer library's place
+link vttimer - 'char b[4]; return cgets (b, sizeof b) != 0;' \
+    "$DIR/a2lib-vt.o $DIR/a2lib-timer.o $DIR/a2lib-vt.lib $TIMER"
+for m in cgets.o cgetc.o; do
+    uses vttimer "$DIR/a2lib-vt.lib" "$m"
+done
+
+link reflow - 'reflow_on (0); return printf ("X");' \
     "$DIR/a2lib-reflow.o $DIR/a2lib-reflow.lib"
-uses selreflow "$DIR/a2lib-reflow.lib" cout.o
-link selvtreflow - 'reflow_on (0); return printf ("X");' \
+uses reflow "$DIR/a2lib-reflow.lib" cout.o
+link vtreflow - 'reflow_on (0); return printf ("X");' \
     "$DIR/a2lib-vt.o $DIR/a2lib-reflow.o $DIR/a2lib-vt.lib
      $DIR/a2lib-reflow.lib"
-uses selvtreflow "$DIR/a2lib-vt.lib" cout.o
-uses selvtreflow "$DIR/a2lib-vt.lib" viewport.o
-uses selvtreflow "$DIR/a2lib-reflow.lib" reflow.o
+for m in cout.o viewport.o wherex.o; do
+    uses vtreflow "$DIR/a2lib-vt.lib" "$m"
+done
+uses vtreflow "$DIR/a2lib-reflow.lib" reflow.o
 
-python3 "$(dirname "$0")/selcheck.py" "$DIR" || fail=1
+"${PYTHON:-python3}" "$(dirname "$0")/selcheck.py" "$DIR" || fail=1
 
 exit $fail

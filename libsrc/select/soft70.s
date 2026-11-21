@@ -2,28 +2,29 @@
 ; Scott Babcock, 2026-11-20
 ;
 ; Selector for a2lib-soft70.lib, the Soft-70 backend (DESIGN.md 2): linked
-; as lib/a2lib-soft70.o, ahead of a2lib-soft70.lib and a2lib-dos33.lib, it
-; pulls in each module of a2lib-soft70.lib that replaces one that a module
-; linked after it may import: stock conio and stdio modules, the core's read
-; and write, and the add-ons listed after it. Without it, ld65, which scans
-; each library once, would take only what the program calls by name from
-; a2lib-soft70.lib, and the rest from the core: a program calling only cputs
-; would get stock cputc. test/linktest.sh checks that this list is that set.
+; as lib/a2lib-soft70.o, ahead of a2lib-soft70.lib and a2lib-dos33.lib.
 ;
-;   _cgetc          cgets, cscanf; dbg
-;   _cputc          cputs, cprintf, cgets, cscanf, cputhex; and with it
-;                   putchar, newline, cputdirect (chline, cvline), _cputcxy
-;   gotoxy          cputs, cclear, chline, cvline (and _gotoxy: cgets)
-;   _wherex         cgets, reflow_on
-;   _wherey         cgets
-;   screensize      screensize()
-;   COUT, RDKEY     write, read; with COUT, a2_coutvec and a2_rawcout for
-;                   reflow_on
-;   _clrscr, _kbhit dbg
+; ld65 scans each library once. A stock module that calls into the backend
+; resolves its calls in the library it comes from: from the core, stock
+; cputs would call stock cputc. So a2lib-soft70.lib holds copies of the
+; core's modules that do (tools/stockcopy.py: cputs, cprintf, cgets, cscanf
+; and the like), taken, with the backend's, when ld65 scans it. That leaves
+; the backend's modules that a module linked after the library may import
+; and that can't be copied: the core's write and read (all of stdio reaches
+; them) and reflow.s, in a2lib-reflow.lib. This object pulls those in:
+;
+;   COUT            write; with it, a2_coutvec and a2_rawcout, for reflow_on
+;   RDKEY           read
+;   _wherex         reflow_on, for the cursor's column
 ;   a2_viewport     reflow_on, for the visible width
 ;
-; _cpeekc, _gotoy and _gotox aren't listed: no other module calls them.
+; It also defines the symbol vt.s requires, so that the display library
+; without its selector fails to link, and two display libraries fail with
+; a duplicate symbol. test/linktest.sh checks this list against the
+; libraries (test/selcheck.py).
 ;
 
-        .forceimport    _cgetc, _cputc, gotoxy, _wherex, _wherey, screensize
-        .forceimport    COUT, RDKEY, _clrscr, _kbhit, a2_viewport
+        .forceimport    COUT, RDKEY, _wherex, a2_viewport
+
+        .export         a2lib_display_needs_selector_object: absolute
+a2lib_display_needs_selector_object := 0

@@ -174,53 +174,81 @@ file layer, its interrupt support and exec, and the link-time guards
 
 | Library | Contents |
 |---|---|
-| `a2lib-timer.lib` | The cooperative timer and software clock (6.3): `timer.s`, `tick.s`, `gettime.s`, `settime.s`, and the ticking `cgetc.s` and `kbhit.s` (`libsrc/timer`) |
+| `a2lib-timer.lib` | The cooperative timer and software clock (6.3): `timer.s`, `tick.s`, `gettime.s`, `settime.s`, and the ticking `cgetc.s` and `kbhit.s` (`libsrc/timer`); copies of stock modules (below) |
 | `a2lib-reflow.lib` | The reflow filter (3.7): `reflow.s`, the vectored `cout.s`, `viewport.s` (`libsrc/reflow`) |
-| `a2lib-vt.lib` | The VideoTerm backend (3.5), with `tick.s` and `kbhit.s` |
-| `a2lib-c40win.lib` | The VideoTerm with the 40-column window (3.6), with `tick.s`, `kbhit.s` and `timer.s` |
+| `a2lib-vt.lib` | The VideoTerm backend (3.5), with `tick.s` and `kbhit.s`; copies of stock modules |
+| `a2lib-c40win.lib` | The VideoTerm with the 40-column window (3.6), with `tick.s`, `kbhit.s` and `timer.s`; copies of stock modules |
 | `a2lib-soft70.lib` | The VideoTerm with Soft-70 (3.8), the same |
 
 A link line lists the add-ons' selectors (below), then the add-ons in
-the order display, reflow, timer, then the core. Each module of an
-add-on replaces the core's module of the same name, or extends a library
-listed before it: a display library's `cout.s` and `viewport.s` take the
-place of `a2lib-reflow.lib`'s. The display libraries carry the timer
+the order display, reflow, timer, then the core. An add-on's modules are
+new, or take the place of modules of the same names in libraries listed
+after it: the core's (a display library's `cputc.s`), or another add-on's
+(its `cout.s` and `viewport.s`, `a2lib-reflow.lib`'s). The display libraries carry the timer
 modules they use, identical to `a2lib-timer.lib`'s, so a program using
 one needs the timer library only for the clock; without it,
 `clock_gettime` and `clock_settime` reach the core's guards and fail to
 link. A program using none of them links the core alone and gets stock
 cc65's conio, `cgetc`, `kbhit` and `COUT`.
 
-**Selectors.** ld65's single scan, which made the core a complete
-library, applies to the add-ons too: listed ahead of the core, an add-on
-supplies only what is open when ld65 reaches it, the program's own
-calls. A program calling `cputs` but not `cputc`, linked with
-`a2lib-vt.lib`, would get stock `cputs` and then stock `cputc` from the
-core. Copying the core into each add-on, as the core copies
-`apple2.lib`, would remove the problem but make the add-ons
-alternatives, not additions. Instead, each add-on has a selector,
-`lib/a2lib-<name>.o` (`libsrc/select`), an object of `.forceimport`s for
-the add-on's modules that a module listed after it may import: the
-core's (stock `cputs` imports `_cputc`; a2lib's `write` imports `COUT`)
-or another add-on's (`reflow.s` imports `a2_viewport`). Objects are
-linked whole, so those names are open before ld65 reads the first
-library. A module no later module imports, such as `cpeekc.s`, isn't
-forced; only the program can call it, and gets the add-on's.
+**Copies and selectors (revised in 10.32).** ld65's single scan, which
+made the core a complete library, applies to the add-ons too: listed
+ahead of the core, an add-on supplies only what is open when ld65 reaches
+it, the program's own calls. A program calling `cputs` but not `cputc`,
+linked with `a2lib-vt.lib`, would get stock `cputs` from the core, and
+then stock `cputc` with it. Copying the whole core into each add-on, as
+the core copies `apple2.lib`, would remove the problem but make the
+add-ons alternatives, not additions. Two narrower means cover it:
 
-`test/selcheck.py`, run by `make linktest`, computes that set from the
-built libraries with `od65` and checks each selector against it, at the
-level of modules: one missing would be a silent fallback to stock, one
-more would cost every program its size. It also checks parity: a
-replacing module defines every symbol of the module it replaces that
-any module imports, so the replaced one can't be linked beside it. A
-module identical to the later library's copy (the bundled timer
-modules) isn't a replacement. `make linktest` also links programs that
+- **Copies.** Each add-on holds copies of the core modules that import a
+  symbol it defines in place of the core, and of the modules that import
+  theirs, and so on: for a display library, the 13 stock conio modules
+  `cputs`, `cprintf`, `vcprintf`, `cgets`, `cscanf`, `vcscanf`, `cclear`,
+  `chline`, `cvline` (`dynchline`, `dyncvline`), `cputhex`, `scrsize`,
+  and cc65's debugger (`dbg`, `dbgsupp`); for the timer, `cgets`,
+  `cscanf`, `vcscanf`, `time` and the debugger. A copy is taken when
+  ld65 scans the add-on, and its calls resolve there, since ld65 keeps
+  taking modules from a library until none resolves an open reference.
+  `tools/stockcopy.py` works out the set from the libraries with `od65`
+  and adds the core's own object files, unchanged, when the Makefile
+  builds the add-on; rebuilding after updating cc65 refreshes them with
+  the core.
+- **Selectors.** What can't be copied is pulled in by a selector,
+  `lib/a2lib-<name>.o` (`libsrc/select`), an object of `.forceimport`s
+  that, linked whole, opens those names before ld65 reads the first
+  library: the add-on's modules that a later module imports where that
+  module isn't copied. a2lib's `write` and `read` call `COUT` and
+  `RDKEY`, and all of stdio reaches them; `reflow.s`, in an add-on, calls
+  `_wherex` and `a2_viewport`. So a display library's selector forces
+  `COUT`, `RDKEY`, `_wherex` and `a2_viewport`; the reflow library's,
+  `COUT`; the timer's, nothing. The timer's exists so that every add-on
+  is linked the same way.
+
+**A display library without its selector fails to link.** `vt.s`, which
+every module of the display libraries imports from, imports
+`a2lib_display_needs_selector_object`, which only the display selectors
+define. Without the selector, ld65 names that symbol; with two display
+libraries, it reports it as a duplicate. A program that links nothing of
+the display library (only stdio, and no selector) can't be caught this
+way: nothing of the library is linked at all, as if it weren't listed.
+Leaving out the reflow or timer selector changes nothing: `reflow_on`
+pulls in the reflow library's `COUT`, and the timer's selector is empty.
+
+`test/selcheck.py`, run by `make linktest`, computes from the built
+libraries which modules each selector must pull in and checks the
+selector against it, at the level of modules: one missing would be a
+silent fallback to stock, one more would cost every program its size.
+A missing copy shows as a module the selector would have to pull in. It
+also checks parity: a module taking the place of another defines every
+symbol of it that any module imports, so the other can't be linked
+beside it. A module identical to a later add-on's (the bundled timer
+modules) takes nobody's place. `make linktest` also links programs that
 reach each add-on only through stock modules and checks their maps.
 
-The cost is what the selector forces in for programs that don't use it.
-A stdio-only program on the VideoTerm library links its `cputc`, `cgetc`
-and `gotoxy` though it calls none of them: `exectestvt` is 556 bytes
-larger than with the combined libraries this replaces (10.31).
+The cost is what the selector forces in for programs that don't use it:
+10 to 72 bytes for a display library (`COUT`, `RDKEY`, `wherex`,
+`viewport`), nothing for the others. Forcing every module that a core
+module may import, without copies, cost up to 556 bytes (10.31, 10.32).
 
 ---
 
@@ -2955,7 +2983,8 @@ libraries had it, through their copy of the core, and without it a
 program polling `kbhit` in the 40-column window or on Soft-70 would stop
 running the timers their gauge and cursor use.
 
-Verified: `make linktest` passes, 53 checks. `test/selcheck.py` was shown
+Verified: `make emutest` passes, all 22 runs (`nettest` not built), and
+`make linktest`, 53 checks. `test/selcheck.py` was shown
 to fail for a selector missing `RDKEY`, for one with `_cpeekc` added,
 and for a VideoTerm `cputc.s` that didn't export `cputdirect`. `make
 simtest` passes. Every test program links the same modules as before,
@@ -2970,6 +2999,44 @@ with these differences (sizes against the previous build):
 | `cswtest`, `cswwtest`, `cswstest` | +119 to +200 | The same, and `_scrsize.s`, `wherex.s` |
 | `timertest` | +266 | The timer's `cgetc.s`, with the stock `cputc.s` and `gotoxy.s` it calls for the cursor |
 | `exectestvt` | +556 | The VideoTerm's conio modules, none of which it calls |
+
+### 10.32 Copies of stock modules in the add-ons; a missing selector fails to link
+
+| File | Change |
+|---|---|
+| `tools/stockcopy.py` | New: adds to an add-on copies of the core modules that call into it (2) |
+| `tools/libobj.py` | New: reads objects and libraries with `od65` and `ar65`, for `stockcopy.py` and `selcheck.py` |
+| `Makefile` | Each add-on library gets its copies when built; `PYTHON` |
+| `libsrc/select/*.s` | Display selectors: `COUT`, `RDKEY`, `_wherex`, `a2_viewport`, and define `a2lib_display_needs_selector_object`. Timer: nothing. Reflow: `COUT` |
+| `libsrc/vt/vt.s` | Imports `a2lib_display_needs_selector_object` |
+| `test/selcheck.py` | A module copied into the add-on needs no forcing; uses `tools/libobj.py` |
+| `test/linktest.sh` | Programs calling only `cputs`, `cgets`, `cprintf`, `printf`, `time` get the add-on's modules; a display library without its selector, and two display libraries, fail to link; the VideoTerm library ahead of the timer library supplies `cgets` and `cgetc` |
+| `README.md`, `DESIGN.md` | 2 |
+
+In 10.31, a selector forced in every module of its add-on that a core
+module may import, so a program paid for the display's `cputc`, `cgetc`
+and `gotoxy` though it called none of them, up to 556 bytes. With the
+callers copied, those are taken only when the program reaches them.
+Measured as the RAM a program occupies (image and BSS, from the link
+maps; zero page unchanged), against the build before 10.31:
+
+| Program | 10.31 | 10.32 |
+|---|---|---|
+| Core only (`filetest`, `exectest`, `wptest`, the probes) | -3 to -11 | -3 to -11 |
+| `reflowtest` | -8 | -8 |
+| `timertest` | +266 | -3 |
+| `exectestvt` | +556 | +45 |
+| `cswtest`, `cswwtest`, `cswstest` | +119 to +200 | +30 to +45 |
+| `vttest`, `wintest`, `s70test` | +78 to +108 | +42 to +72 |
+| `reflowvt`, `reflowwin`, `reflows70` | +87 to +227 | +32 to +62 |
+
+What remains is the selector's `rdkey.s`, `viewport.s` and `wherex.s`,
+and `cout.s` where the program doesn't print.
+
+Verified: `make linktest` passes, 82 checks. `test/selcheck.py` was shown
+to fail for a VideoTerm library without its copy of `cputs` (the
+selector would have to pull in `cputc` and `gotoxy`), and for a selector
+without `RDKEY` and with `_cpeekc`. `make simtest` passes.
 
 ## 11. Sources
 

@@ -17,8 +17,8 @@
 # directory functions.)
 #
 # What stock cc65 doesn't have comes in add-on libraries (DESIGN.md 2),
-# each with a selector object that pulls in its replacements of stock
-# modules. List the selectors first, then the add-ons, then the core:
+# each with a selector object to link ahead of it. List the selectors
+# first, then the add-ons, then the core:
 #   a2lib-timer     cooperative timer and software clock (a2timer.h, time.h)
 #   a2lib-reflow    word-wrapping stdio console output (a2reflow.h)
 #   a2lib-vt        the Videx VideoTerm, or the stock 40-column screen
@@ -34,15 +34,18 @@
 # ld65 scans each library once, in order, and takes only modules that
 # resolve references open at that point. Hence a complete core (a stock
 # module reached through another, fopen -> open, would otherwise come from
-# apple2.lib), and the selectors (cputs -> cputc would otherwise get stock
-# cputc). Rebuild after updating cc65, so the stock modules match the
-# toolchain.
+# apple2.lib), the copies of stock modules in the add-ons (cputs -> cputc
+# would otherwise get stock cputc), and the selectors (printf -> write ->
+# COUT, for which all of stdio would need copying). Rebuild after updating
+# cc65, so the stock modules match the toolchain.
 
 CA65   ?= ca65
 AR65   ?= ar65
 CL65   ?= cl65
 OD65   ?= od65
+PYTHON ?= python3
 TARGET := apple2
+export AR65 OD65
 
 # Directory holding the installed cc65 libraries
 CC65_LIB  ?= $(shell $(CL65) --print-target-path)/../lib
@@ -121,6 +124,10 @@ $(DOS33_LIB): $(DOS33_OBJ) $(GUARD_OBJ) $(STOCK_LIB)
 	cp $(STOCK_LIB) $@
 	$(AR65) r $@ $(DOS33_OBJ) $(GUARD_OBJ)
 
+# Each add-on also gets copies of the core's modules that call into it
+# (tools/stockcopy.py; DESIGN.md 2), so it needs the core and its selector
+STOCKCOPY := tools/stockcopy.py tools/libobj.py $(DOS33_LIB)
+
 # Selectors: one object per add-on, linked ahead of it
 lib/a2lib-%.o: libsrc/select/%.s
 	@mkdir -p $(@D)
@@ -131,20 +138,22 @@ build/timer/%.o: libsrc/timer/%.s $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/timer -I libsrc/dos33 -o $@ $<
 
-$(TIMER_LIB): $(TIMER_OBJ)
+$(TIMER_LIB): $(TIMER_OBJ) lib/a2lib-timer.o $(STOCKCOPY)
 	@mkdir -p $(@D)
 	rm -f $@
 	$(AR65) r $@ $(TIMER_OBJ)
+	$(PYTHON) tools/stockcopy.py $@ $(DOS33_LIB) lib/a2lib-timer.o
 
 # Reflow filter, with the vectored COUT and the stock screen's width
 build/reflow/%.o: libsrc/reflow/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/dos33 -o $@ $<
 
-$(REFLOW_LIB): $(REFLOW_OBJ)
+$(REFLOW_LIB): $(REFLOW_OBJ) lib/a2lib-reflow.o $(STOCKCOPY)
 	@mkdir -p $(@D)
 	rm -f $@
 	$(AR65) r $@ $(REFLOW_OBJ)
+	$(PYTHON) tools/stockcopy.py $@ $(DOS33_LIB) lib/a2lib-reflow.o
 
 # VideoTerm backend: VideoTerm-aware conio modules, and the timer's tick
 # hook and kbhit (their cgetc ticks too)
@@ -152,10 +161,11 @@ build/vt/%.o: libsrc/vt/%.s $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/vt -I libsrc/timer -I libsrc/dos33 -o $@ $<
 
-$(VT_LIB): $(VT_OBJ) build/timer/tick.o build/timer/kbhit.o
+$(VT_LIB): $(VT_OBJ) build/timer/tick.o build/timer/kbhit.o lib/a2lib-vt.o $(STOCKCOPY)
 	@mkdir -p $(@D)
 	rm -f $@
 	$(AR65) r $@ $(VT_OBJ) build/timer/tick.o build/timer/kbhit.o
+	$(PYTHON) tools/stockcopy.py $@ $(DOS33_LIB) lib/a2lib-vt.o
 
 # IP65 timer driver on the cooperative timer: an object file, listed on the
 # link line before IP65's library (libsrc/ip65/a2timer.s)
@@ -176,10 +186,11 @@ build/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) $(WIN_FLAGS) -o $@ $<
 
-$(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
+$(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o build/timer/tick.o build/timer/kbhit.o build/timer/timer.o lib/a2lib-c40win.o $(STOCKCOPY)
 	@mkdir -p $(@D)
 	rm -f $@
 	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ) build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
+	$(PYTHON) tools/stockcopy.py $@ $(DOS33_LIB) lib/a2lib-c40win.o
 
 # Soft-70 with the VideoTerm: vt.s and Soft-70's modules, on the shared
 # 80 x 24 model, and the timer its gauge and cursor use. Programs are
@@ -198,10 +209,11 @@ build/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
 libsrc/s70/font.s: tools/s70font.txt tools/s70font.py
 	python3 tools/s70font.py $< $@
 
-$(VTS70_LIB): $(S70_OBJ) build/vt/vt.o build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
+$(VTS70_LIB): $(S70_OBJ) build/vt/vt.o build/timer/tick.o build/timer/kbhit.o build/timer/timer.o lib/a2lib-soft70.o $(STOCKCOPY)
 	@mkdir -p $(@D)
 	rm -f $@
 	$(AR65) r $@ build/vt/vt.o $(S70_OBJ) build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
+	$(PYTHON) tools/stockcopy.py $@ $(DOS33_LIB) lib/a2lib-soft70.o
 
 # What a test program links: its add-ons' selectors, the add-ons, the core
 L_CORE   := $(DOS33_LIB)
@@ -340,7 +352,7 @@ $(SIM_DIR)/reflowsim: test/sim/reflowsim.c test/sim/reflowshim.s $(SIM_REFLOW)
 # fail to link, naming its guard symbol, while a control program links;
 # and each add-on's selector must pull in its replacements (DESIGN.md 2)
 linktest: all
-	CL65=$(CL65) OD65=$(OD65) AR65=$(AR65) bash test/linktest.sh lib
+	CL65=$(CL65) PYTHON=$(PYTHON) bash test/linktest.sh lib
 
 simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim $(SIM_DIR)/s70sim
 	$(SIM65) $(SIM_DIR)/timersim

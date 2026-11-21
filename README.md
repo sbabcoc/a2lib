@@ -113,13 +113,21 @@ cl65 -t apple2 -I include -o prog prog.c \
 ```
 
 ld65 takes from each library only the modules that resolve references
-open when it reaches it. The selector makes sure the add-on's versions of
-stock functions are taken even when only another stock function calls
-them: without `lib/a2lib-vt.o`, a program calling `cputs` but not `cputc`
-would get stock `cputc`, and `printf` would write to the 40-column screen.
-The selector pulls in only those functions, a few hundred bytes at most
-(`make linktest` checks each list). The display libraries include what
-they use of the timer, so they need the timer library only for the clock.
+open when it reaches it, so an add-on's versions of stock functions must
+be taken even when only another stock function calls them. Each add-on
+holds copies of the stock modules that call into it (`cputs`, `cprintf`,
+`cgets` and the like), so a program calling `cputs` gets the add-on's
+`cputc`, and the selector pulls in what can't be handled that way:
+`printf` reaches `COUT` through the core's `write`, so a display
+library's selector links its `COUT`, which costs a program that doesn't
+print 10 to 70 bytes. A display library linked without its selector, or
+together with another display library, fails to link, naming
+`a2lib_display_needs_selector_object`. The timer library's selector pulls
+in nothing; it is there so every add-on is linked the same way. `make
+linktest` checks each selector against the libraries.
+
+The display libraries include what they use of the timer, so they need
+the timer library only for the clock.
 
 Without the timer library, `time`, `clock_gettime` and `clock_settime`
 fail to link, naming `clock_gettime_needs_a2lib_timer` or
