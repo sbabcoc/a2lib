@@ -174,7 +174,8 @@ test: build/test/filetest build/test/vttest build/test/wintest build/test/timert
       build/test/reflowtest build/test/reflowvt build/test/reflowwin \
       build/test/s70test build/test/cswstest build/test/reflows70 $(NET_TEST) \
       build/test/bloadprobe build/test/errprobe build/test/errproberaw \
-      build/test/exectest build/test/exectestvt build/test/execatest build/test/argtest
+      build/test/exectest build/test/exectestvt build/test/execatest build/test/argtest \
+      build/test/wptest
 
 build/test/filetest: test/filetest.c test/irqtest.s test/cswcout.s test/coutcount.s $(DOS33_LIB)
 	@mkdir -p $(@D)
@@ -319,5 +320,11 @@ build/test/execatest: test/exectest.c $(DOS33_LIB)
 	$(CL65) -t $(TARGET) -O -I include -DEXECA -m $@.map -o $@ $< $(DOS33_LIB)
 
 build/test/argtest: test/argtest.c $(DOS33_LIB)
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)
+
+# A disk write-protected while a file is open (DESIGN.md 5.11): make
+# emutest's script protects drive 2 mid-run
+build/test/wptest: test/wptest.c $(DOS33_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(DOS33_LIB)

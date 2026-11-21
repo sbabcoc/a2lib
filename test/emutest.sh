@@ -45,8 +45,9 @@ EXEC_DISK="$OUT/a2libexec.dsk"
 
 # The exec() probes and tests (DESIGN.md 5.10) have a disk of their own:
 # with the probes on the main disk, filetest ran out of space (12 sectors
-# were left free). argtest is on it too: the exec tests start it.
-EXEC_PROGS=" bloadprobe errprobe errproberaw exectest exectestvt execatest "
+# were left free). argtest is on it too: the exec tests start it. So is
+# wptest (DESIGN.md 5.11), whose run protects its disk.
+EXEC_PROGS=" bloadprobe errprobe errproberaw exectest exectestvt execatest wptest "
 EXEC_EXTRA="argtest"
 on_exec_disk() { [[ "$EXEC_PROGS" == *" $1 "* ]]; }
 
@@ -62,9 +63,11 @@ command -v "$AC" >/dev/null || die "AppleCommander not found: $AC (set AC)"
 #   name | program | card | script | --until text | pass condition
 #
 #   card            vt for the VideoTerm, net for the Uthernet II, or -
-#   script          --type/--expect/--wait steps after BRUN, each step and
-#                   its argument a field of its own; @PORT@ in it is the
-#                   echo server's port; empty for none
+#   script          --type/--expect/--wait/--protect/--writable steps after
+#                   BRUN, each step and its argument a field of its own;
+#                   @PORT@ in it is the echo server's port; empty for none.
+#                   --protect and --writable (wptest) need a runner that
+#                   has them: ReplicApple2Plus after 9ca248e
 #   --until text    the runner stops when it is on the screen
 #   pass condition  an ERE the saved screen must match, or several joined
 #                   by " && "; one starting with ! must not match
@@ -94,6 +97,7 @@ errproberaw|errproberaw|-|--expect|FILE NOT FOUND|--type|PRINT 6*7\r|42|.
 exectest|exectest|-|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|ARGTEST DONE|ALL [0-9]* PASSED && DIRECT OK$
 exectest-vt|exectestvt|vt|--expect|TYPE A WORD|--type|HELLO\r|--expect|PASSED|--type|BRUN ARGTEST,D2\r|ARGTEST DONE|ALL [0-9]* PASSED && DIRECT OK$
 execatest|execatest|-|--expect|TYPE A WORD|--type|HELLO\r|EXECA OK|^EXECA OK && ! ERROR
+wptest|wptest|-|--expect|PROTECT DISK 2|--protect|d2|--type|\r|--expect|MAKE DISK 2 WRITABLE|--writable|d2|--type|\r|PASSED|ALL [0-9]* PASSED
 '
 
 # errproberaw is a diagnostic (DESIGN.md 5.10): it passes whenever BASIC

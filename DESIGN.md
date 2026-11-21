@@ -1688,6 +1688,28 @@ they left `filetest` 12 free sectors, and it failed 14 of 68 checks
 **Upstream:** in a `-t apple2dos33` target (proposal item 2), `exec.s`
 and the `mainargs.s` change go in with the target, not as a separate PR.
 
+### 5.11 A disk write-protected while a file is open
+
+DOS's File Manager holds a file's last data sector, its T/S list and the
+VTOC in buffers, and writes them on CLOSE; `closedirect` (`open.s`) also
+rewrites an A, I or B file's header then. On a disk protected after the
+writes, those fail with WRITE PROTECTED (`EACCES`). Stock `close.s`
+keeps the fd, and its buffer, when `closedirect` fails, so the program
+can make the disk writable and close again, saving every byte: a file
+DOS couldn't close is still open.
+
+`test/wptest.c` checks this, with ReplicApple2Plus's runner protecting
+drive 2 mid-run (`--protect`, `--writable`): bytes appended to a B file,
+the disk protected, `close` failing with `EACCES`, the disk made writable,
+`close` succeeding and the file holding all its bytes. It passes as
+the layer stands (10.29): no change was needed.
+
+Not covered: a header rewrite that fails while CLOSE succeeds, which
+would leave the fd open on a file DOS has closed. Protecting the disk
+should fail both, and nothing else here can fail only the first. Nor is a
+read-only `open` of an A, I or B file with no data at all (it gets a
+header on close): neither a2lib nor DOS's commands make such a file.
+
 ## 6. DOS 3.3 interrupts
 
 **(verified)** cc65's `initirq` simply asks the ProDOS MLI to allocate an
@@ -2811,6 +2833,21 @@ unchanged) before the test existed. Shown on DOS 3.3 before the fix:
 `make emutest` (filetest) failed 1 of 94 checks, "CONSOLE WRITE 256,
 512". The fixed loop was checked in sim65 for every count from 0 to 2048
 and for 65535. `write.o` grows by 8 bytes.
+
+### 10.29 A disk write-protected while a file is open
+
+| File | Change |
+|---|---|
+| `test/wptest.c` | New: `close` on a disk protected after appending to a B file fails with `EACCES` and keeps the file open; made writable, a second `close` saves all 8 bytes (5.11) |
+| `test/emutest.sh` | The `wptest` run, on the exec disk, with the runner's `--protect` and `--writable` steps |
+| `Makefile` | Builds `wptest` |
+| `DESIGN.md` | 5.11 |
+
+Raised by the line-by-line review, which asked whether a failed `close`
+leaves the fd open on a file DOS has closed. ReplicApple2Plus's runner
+gained `--protect` and `--writable` for it. Verified: `make emutest`
+(wptest) passes, 5 of 5, with no library change; the case the review
+raised can't be produced this way (5.11).
 
 ## 11. Sources
 
