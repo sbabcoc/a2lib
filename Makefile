@@ -176,9 +176,9 @@ test: build/test/filetest build/test/vttest build/test/wintest build/test/timert
       build/test/bloadprobe build/test/errprobe build/test/errproberaw \
       build/test/exectest build/test/exectestvt build/test/execatest build/test/argtest
 
-build/test/filetest: test/filetest.c test/irqtest.s $(DOS33_LIB)
+build/test/filetest: test/filetest.c test/irqtest.s test/cswcout.s $(DOS33_LIB)
 	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/filetest.c test/irqtest.s $(DOS33_LIB)
+	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/filetest.c test/irqtest.s test/cswcout.s $(DOS33_LIB)
 
 build/test/vttest: test/vttest.c $(VT_LIB)
 	@mkdir -p $(@D)

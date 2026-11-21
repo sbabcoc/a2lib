@@ -105,7 +105,8 @@ __sysrename:
         sta     (ptr3),y
         lda     #FMC_RENAME
         jsr     fm_simple
-        bcc     free            ; A = 0
+        bcs     fmerr           ; Locked, write protected, I/O error, ...
+        bcc     free            ; Branch always (A = 0)
 elsewhere:
         lda     #DOSERR_SYNTAX  ; -> EINVAL
         bne     free            ; Branch always

@@ -23,7 +23,7 @@
 /* Failure lines shown: 24 rows less the BRUN line, the title, 13 groups,
 ** the overflow line, the summary and the prompt after exit. */
 #define MAX_SHOWN   6
-#define MAX_GROUP   10          /* Most checks in one group */
+#define MAX_GROUP   13          /* Most checks in one group */
 #define MAX_FDS     8           /* cc65's fdtab slots (filedes.inc) */
 
 /* __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, then
@@ -214,6 +214,27 @@ static void make_file (const char* name, const void* data, unsigned len)
     close (fd);
 }
 
+void __fastcall__ mon_cout (char c);    /* cswcout.s: sets the high bit */
+
+/* Send a DOS command through the monitor's COUT: CR (to state 0),
+** Ctrl-D, the command, CR. A DOS error here would end the program, so
+** callers make sure the command can't fail. The CRs move the cursor down
+** over blank lines; it goes back, so the screen keeps its rows for the
+** results (MAX_SHOWN). */
+static void dos_cmd (const char* s)
+{
+    unsigned char x = wherex ();
+    unsigned char y = wherey ();
+
+    mon_cout (0x0D);
+    mon_cout (0x04);
+    while (*s) {
+        mon_cout (*s++);
+    }
+    mon_cout (0x0D);
+    gotoxy (x, y);
+}
+
 /* Read one byte at the current position; -1 at the end */
 static int byte_at (int fd)
 {
@@ -357,6 +378,25 @@ static void remove_rename (void)
     check ("others while one is open", remove ("T.NEW") == 0);
     close (fd);
     check ("remove after close", remove ("T.OPEN") == 0);
+
+    /* A locked file can't be removed or renamed (EACCES, DESIGN.md 5.6).
+    ** DOS's LOCK and UNLOCK commands set it up and clean up; T.LCK must
+    ** exist for each, since a DOS error would end the program. */
+    remove ("T.LCK2");          /* Left over from an earlier run */
+    close (open ("T.LCK", O_RDONLY | O_CREAT));
+    dos_cmd ("UNLOCK T.LCK");
+    dos_cmd ("LOCK T.LCK");
+    errno = 0;
+    check ("remove locked", remove ("T.LCK") == -1 && errno == EACCES);
+    errno = 0;
+    fd = rename ("T.LCK", "T.LCK2");
+    check ("rename locked fails", fd == -1);
+    check ("rename locked EACCES", errno == EACCES);
+    if (fd == 0) {
+        rename ("T.LCK2", "T.LCK");     /* So UNLOCK finds it */
+    }
+    dos_cmd ("UNLOCK T.LCK");
+    remove ("T.LCK");
 }
 
 /* stat (DESIGN.md 5.8) */
@@ -371,6 +411,10 @@ static void stat_tests (void)
     check ("stat B", stat ("B.TEST", &st) == 0 && st.st_type == DOS33_T_BIN);
     check ("stat B load address", st.st_auxtype == 0x2000);
     check ("stat B size", st.st_size == 6);
+
+    /* A library function never sets errno to 0 (ISO C 7.5) */
+    errno = EEXIST;
+    check ("stat keeps errno", stat ("T.TEST", &st) == 0 && errno == EEXIST);
 
     /* R and S: "Beneath Apple DOS" ch. 6 gives the File Manager's codes
     ** for them swapped; OPEN in fact stores and returns the catalog's

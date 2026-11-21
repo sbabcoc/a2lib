@@ -150,9 +150,16 @@ _stat:
         cpx     #$00
         bne     :+
         cmp     #$00
-        beq     error           ; errno set by dir_at
+        jeq     error           ; errno set by dir_at
 :       sta     dirp
         stx     dirp+1
+        ; errno 0 tells readdir's end from an error; the caller's errno is
+        ; put back on success, since no library function sets it to 0
+        ; (ISO C 7.5)
+        lda     ___errno
+        sta     saverr
+        lda     ___errno+1
+        sta     saverr+1
         lda     #$00
         sta     ___errno
         sta     ___errno+1
@@ -204,6 +211,11 @@ notfound:
         jsr     __dos33_closedir
         lda     ___errno
         bne     error
+        lda     saverr          ; Success: the caller's errno again
+        sta     ___errno
+        lda     saverr+1
+        sta     ___errno+1
+        lda     #$00
         tax
         rts
 error:  lda     #$FF
@@ -230,3 +242,4 @@ stbuf:  .res    2
 fd:     .res    1
 type:   .res    1
 dirp:   .res    2
+saverr: .res    2

@@ -3,7 +3,8 @@
 ; unsigned csw (void);          Current output hook ($36)
 ; unsigned dos_csw (void);      DOS 3.3's saved true output hook ($AA53)
 ;
-; For test/cswtest.c: write a character through the monitor's COUT
+; For the tests (cswtest.c; bloadprobe.c and filetest.c, which send DOS
+; commands with it): write a character through the monitor's COUT
 ; ($FDED), which goes through CSW, unlike cc65's own console output.
 ;
 

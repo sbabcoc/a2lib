@@ -1260,7 +1260,8 @@ so paths, first.
 ### 5.5a remove and rename
 
 - `remove` uses the File Manager's DELETE. A locked file fails with
-  `EACCES`, as under ProDOS.
+  `EACCES`, as under ProDOS; so does `rename` (RENAME's own error,
+  through `fm_maperr`; fixed in 10.27).
 - `rename` uses RENAME. Either path may give the slot and drive, but
   **the new one must be where the old one is**: DOS's RENAME can't move a
   file. Another slot or drive fails with `EINVAL` (cc65 has no `EXDEV`).
@@ -1398,6 +1399,10 @@ seeks.
 Filling `st_blocks` means `stat` reads the catalog (through the same
 code as `readdir`), so `stat` pulls in the directory module: about 650
 bytes more in programs that use `stat` (increment 3).
+
+`stat` clears `errno` to tell the end of the catalog from a read error,
+and puts the caller's value back on success: no library function sets
+`errno` to 0 (ISO C 7.5; fixed in 10.27).
 
 ### 5.9 Directories
 
@@ -2768,6 +2773,23 @@ the previous library (the stock modules put back with `ar65 r`), all 16
 checks fail and the control links. `make test` builds every test program
 unchanged; `make simtest` passes. `clock_getres`'s guard goes when the
 software clock gets its own `clock_getres`.
+
+### 10.27 rename of a locked file; stat and errno
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/sysrename.s` | A RENAME error goes through `fm_maperr`; it fell into the syntax-error path, so every RENAME failure gave `EINVAL` |
+| `libsrc/dos33/stat.s` | Puts the caller's `errno` back on success; it was left 0 |
+| `test/filetest.c` | REMOVE, RENAME: a locked file can't be removed or renamed (`EACCES`); the file is locked and unlocked with DOS's LOCK and UNLOCK, sent through COUT (`dos_cmd`, which puts the cursor back so the screen keeps its rows). STAT: a successful `stat` keeps `errno`. `MAX_GROUP` 13 |
+| `test/cswcout.s` | Comment: the tests that use it |
+| `Makefile` | `filetest` links `test/cswcout.s` |
+| `DESIGN.md` | 5.5a, 5.8 |
+
+Found by a line-by-line review of the library. Both failures were shown
+before the fixes: `make emutest` (filetest) failed 2 of 92 checks,
+"RENAME LOCKED EACCES" and "STAT KEEPS ERRNO"; "RENAME LOCKED FAILS"
+passed, so DOS's RENAME does refuse a locked file. `stat.o` grows by 29
+bytes, `sysrename.o` by 2.
 
 ## 11. Sources
 
