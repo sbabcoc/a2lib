@@ -2,10 +2,9 @@
 ** Does output through the monitor's COUT still reach the display backend
 ** after stdio input under DOS 3.3? (DESIGN.md section 9, open item.)
 **
-** Built three times: cswtest with a2lib-vt.lib (run with the
-** VideoTerm in slot 3), cswwtest with a2lib-c40win.lib (run without
-** it, for the 40-column window), and cswstest with a2lib-soft70.lib
-** (run without it, for Soft-70). Run under DOS 3.3. Writes a character through
+** Built twice: cswtest with a2lib-vt.lib (run with the VideoTerm in
+** slot 3), and cswstest with a2lib-soft70.lib (run without it, for
+** Soft-70). Run under DOS 3.3. Writes a character through
 ** COUT ($FDED, through CSW) before and after stdio input, reads it back
 ** from the backend with cpeekc, and shows where CSW and DOS's saved CSW
 ** ($AA53) point at each stage. The backend's output routine should be in
@@ -15,9 +14,6 @@
 
 #include <stdio.h>
 #include <conio.h>
-#ifdef C40WIN
-#include <c40win.h>
-#endif
 #ifdef S70
 #include <soft70.h>
 #endif
@@ -53,9 +49,7 @@ int main (void)
     static char line[40];
 
     clrscr ();
-#if defined(C40WIN)
-    printf ("A2LIB CSW TEST (%s, DOS 3.3)\n", c40_active () ? "40-COL WINDOW" : "VIDEOTERM");
-#elif defined(S70)
+#if defined(S70)
     printf ("A2LIB CSW TEST (%s, DOS 3.3)\n", s70_active () ? "SOFT-70" : "VIDEOTERM");
 #else
     printf ("A2LIB CSW TEST (VIDEOTERM, DOS 3.3)\n");

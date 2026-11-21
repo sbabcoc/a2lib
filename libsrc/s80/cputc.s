@@ -5,13 +5,12 @@
 ; void __fastcall__ cputcxy (unsigned char x, unsigned char y, char c);
 ; void __fastcall__ cputc (char c);
 ;
-; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
-; on cc65's libsrc/apple2/cputc.s (Ullrich von Bassewitz). With a
-; VideoTerm, as in a2lib-vt.lib; otherwise the model (s80.s).
-; Character handling follows the stock module: uppercase unless the
-; display shows lowercase (uppercasemask), INVFLG (revers) applied by
-; S80_ATTR (display.inc), controls shown as their letters (screen codes
-; $80-$9F).
+; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
+; libsrc/apple2/cputc.s (Ullrich von Bassewitz). With a VideoTerm, as in
+; a2lib-vt.lib; otherwise the model (s80.s). Character handling follows the
+; stock module: uppercase unless the display shows lowercase
+; (uppercasemask), INVFLG (revers) applied by S80_ATTR (display.inc),
+; controls shown as their letters (screen codes $80-$9F).
 ;
 ; The implementation of cputs() relies on cputc() not clobbering ptr1;
 ; chline relies on cputdirect() not clobbering tmp1 and tmp2.

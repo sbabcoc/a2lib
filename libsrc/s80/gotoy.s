@@ -4,9 +4,8 @@
 ;
 ; void __fastcall__ gotoy (unsigned char y);
 ;
-; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
-; on cc65's libsrc/apple2/gotoy.s. Same column (79 while a wrap is
-; pending), new row.
+; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
+; libsrc/apple2/gotoy.s. Same column (79 while a wrap is pending), new row.
 ;
 
         .export         _gotoy

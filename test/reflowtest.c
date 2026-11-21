@@ -2,8 +2,6 @@
 ** Reflow filter tests (DESIGN.md 3.7). Built three times:
 **   reflowtest  a2lib-dos33.lib (stock 40-column screen)
 **   reflowvt    a2lib-vt.lib (VideoTerm, 80 columns; stock without)
-**   reflowwin   a2lib-c40win.lib, C40WIN (40-column window without
-**               the VideoTerm)
 **   reflows70   a2lib-soft70.lib, S70 (Soft-70 without the
 **               VideoTerm)
 ** Each check prints through the filter, then reads the screen back with
@@ -14,9 +12,6 @@
 #include <string.h>
 #include <conio.h>
 #include <a2reflow.h>
-#ifdef C40WIN
-#include <c40win.h>
-#endif
 #ifdef S70
 #include <soft70.h>
 #endif
@@ -97,12 +92,6 @@ int main (void)
     unsigned char h, i, win = 0;
 
     screensize (&W, &h);
-#ifdef C40WIN
-    if (c40_active ()) {
-        W = 40;
-        win = 1;
-    }
-#endif
 #ifdef S70
     if (s70_active ()) {
         W = 70;
@@ -115,9 +104,6 @@ int main (void)
     printf ("%s", text);
     reflow_off ();
     check ("PARAGRAPH: WORDS WHOLE, < W", paragraph_ok ());
-#ifdef C40WIN
-    if (win) check ("WINDOW DID NOT PAN", c40_left () == 0);
-#endif
 #ifdef S70
     if (win) check ("SOFT-70 DID NOT PAN", s70_left () == 0);
 #endif
@@ -155,11 +141,7 @@ int main (void)
     check ("INDENT AFTER NEWLINE KEPT", peek_at (3, 1) == 'B');
 
     clrscr ();
-#ifdef S70
     printf ("A2LIB REFLOW TESTS, W=%u%s\n", W, win ? " (SOFT-70)" : "");
-#else
-    printf ("A2LIB REFLOW TESTS, W=%u%s\n", W, win ? " (WINDOW)" : "");
-#endif
     for (i = 0; i < total && i < MAX_CHECKS; ++i) {
         printf ("%s %s\n", results[i] ? "PASS" : "FAIL", names[i]);
     }

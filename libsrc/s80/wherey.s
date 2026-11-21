@@ -4,8 +4,8 @@
 ;
 ; unsigned char wherey (void);
 ;
-; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
-; on cc65's libsrc/apple2/wherey.s. The cursor's row.
+; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
+; libsrc/apple2/wherey.s. The cursor's row.
 ;
 
         .export         _wherey

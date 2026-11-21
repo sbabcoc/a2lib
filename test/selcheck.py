@@ -38,7 +38,6 @@ import libobj  # noqa: E402
 # Each add-on, with the libraries listed after it on a link line
 ORDER = {
     "vt":     ["reflow", "timer", "dos33"],
-    "c40win": ["reflow", "timer", "dos33"],
     "soft70": ["reflow", "timer", "dos33"],
     "reflow": ["timer", "dos33"],
     "timer":  ["dos33"],

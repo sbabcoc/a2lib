@@ -79,16 +79,12 @@ filetest|filetest|-||PASSED|ALL [0-9]* PASSED
 timertest|timertest|-|--expect|TYPE A WORD|--wait|0.2|--type|HELLO\r|PASSED|ALL [0-9]* PASSED
 vttest|vttest|-||PRESS A KEY|ALL [0-9]* PASSED
 vttest-vt|vttest|vt||PRESS A KEY|ALL [0-9]* PASSED
-wintest|wintest|-||PRESS A KEY|ALL [0-9]* PASSED
-wintest-vt|wintest|vt||PRESS A KEY|ALL [0-9]* PASSED
 s70test|s70test|-||PRESS A KEY|ALL [0-9]* PASSED
 s70test-vt|s70test|vt||PRESS A KEY|ALL [0-9]* PASSED
 reflowtest|reflowtest|-||PRESS A KEY|ALL [0-9]* PASSED
 reflowvt-vt|reflowvt|vt||PRESS A KEY|ALL [0-9]* PASSED
-reflowwin|reflowwin|-||PRESS A KEY|ALL [0-9]* PASSED
 reflows70|reflows70|-||PRESS A KEY|ALL [0-9]* PASSED
 cswtest-vt|cswtest|vt|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
-cswwtest|cswwtest|-|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
 cswstest|cswstest|-|--expect|TYPE A WORD|--type|HELLO\r|PRESS A KEY|^0 FAILED
 nettest|nettest|net|--expect|SERVER PORT|--type|@PORT@\r|PRESS A KEY|ALL [0-9]* PASSED
 bloadprobe|bloadprobe|-||PASSED|ALL [0-9]* PASSED

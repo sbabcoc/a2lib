@@ -185,18 +185,18 @@ file layer, its interrupt support and exec, and the link-time guards
 | `a2lib-timer.lib` | The cooperative timer and software clock (6.3): `timer.s`, `tick.s`, `gettime.s`, `settime.s`, and the ticking `cgetc.s` and `kbhit.s` (`libsrc/timer`); copies of stock modules (below) |
 | `a2lib-reflow.lib` | The reflow filter (3.7): `reflow.s`, the vectored `cout.s`, `viewport.s` (`libsrc/reflow`) |
 | `a2lib-vt.lib` | The VideoTerm backend (3.5), with `tick.s` and `kbhit.s`; copies of stock modules |
-| `a2lib-c40win.lib` | The VideoTerm with the 40-column window (3.6), with `tick.s`, `kbhit.s` and `timer.s`; copies of stock modules |
-| `a2lib-soft70.lib` | The VideoTerm with Soft-70 (3.8), the same |
+| `a2lib-soft70.lib` | The VideoTerm with Soft-70 (3.8), with `tick.s`, `kbhit.s` and `timer.s`; copies of stock modules |
 
 A link line lists the add-ons' selectors (below), then the add-ons in
 the order display, reflow, timer, then the core. An add-on's modules are
 new, or take the place of modules of the same names in libraries listed
 after it: the core's (a display library's `cputc.s`), or another add-on's
-(its `cout.s` and `viewport.s`, `a2lib-reflow.lib`'s). The display libraries carry the timer
-modules they use, identical to `a2lib-timer.lib`'s, so a program using
-one needs the timer library only for the clock; without it,
-`clock_gettime` and `clock_settime` reach the core's guards and fail to
-link. A program using none of them links the core alone and gets stock
+(its `cout.s` and `viewport.s`, `a2lib-reflow.lib`'s). The display
+libraries carry the timer modules they use, identical to
+`a2lib-timer.lib`'s: both the tick hook and `kbhit`, and Soft-70's the
+timer, which its gauge and cursor use, so a Soft-70 program needs the
+timer library only for the clock. Without it, `clock_gettime` and
+`clock_settime` reach the core's guards and fail to link. A program using none of them links the core alone and gets stock
 cc65's conio, `cgetc`, `kbhit` and `COUT`.
 
 **Copies and selectors (revised in 10.32).** ld65's single scan, which
@@ -268,7 +268,7 @@ module may import, without copies, cost up to 556 bytes (10.31, 10.32).
 |---|---|---|
 | `vt` | Videx VideoTerm, used automatically when detected | No (the card holds the screen) |
 | stock conio | 40-column default fallback, unchanged cc65 code | No |
-| `c40win` | 40-column scrollable window over an 80-column screen | Yes |
+| `c40win` | 40-column scrollable window over an 80-column screen (removed in 10.36) | Yes |
 | `soft70` | Hi-res "Soft-70"; **opt-in only, off by default** | Yes |
 
 - A binary contains `vt` plus exactly one fallback. At startup, init
@@ -276,8 +276,9 @@ module may import, without copies, cost up to 556 bytes (10.31, 10.32).
   VideoTerm routines or the fallback's routines.
 - The 1,920-byte 80×24 shadow buffer and the screen model around it
   (cursor, wrap, scrolling, panning, the gauge's timer) are shared code
-  in `libsrc/s80/`, linked only by `c40win` and `soft70`; each backend
-  supplies the display (3.8, "Implementation").
+  in `libsrc/s80/`, linked only by `soft70` (and by `c40win` until it
+  was removed, 10.36); the backend supplies the display (3.8,
+  "Implementation").
 - Soft-70 programs are linked with `--start-addr 0x4000`, so the program
   sits above the hi-res page `$2000–$3FFF` (decided in increment 9, in
   place of an own linker config: 3.8). Builds without Soft-70 get that
@@ -294,7 +295,9 @@ reflow.
 
 - **Window** (`c40win`): a cursor-addressed 80×24 virtual screen. Needed
   wherever output uses cursor positioning (e.g. ANSI/VT terminal
-  output, where reflow would break cursor addressing).
+  output, where reflow would break cursor addressing). Removed in 10.36:
+  it showed half the 80 columns, in 20-column steps; Soft-70 (3.8) is
+  the cursor-addressed 80×24 screen without a VideoTerm.
 - **Reflow:** implemented as a **stream output filter**, not as a conio
   backend. Conio is cursor-addressed, and `gotoxy` has no meaning in
   reflowed output, so a "reflowing conio" would contradict itself. The
@@ -361,7 +364,7 @@ reflow.
   screen RAM.
 - Therefore **each backend installs itself as the `CSW` output hook**, so
   stdio and conio take the same path. Without this, `printf` in a
-  `c40win` or `soft70` build would go straight to the 40-column screen
+  `soft70` build would go straight to the 40-column screen
   and bypass the 80-column buffer. The reflow filter fits into the same
   hook chain.
 - **(verified)** On a non-enhanced ][, `write.s` and `cputc.s` force
@@ -560,7 +563,11 @@ function is used (757 against stock's 330), plus 118 bytes of startup
 code that is freed after initialization. Programs link only the modules
 they use.
 
-### 3.6 40-column window implementation (increment 6)
+### 3.6 40-column window implementation (increment 6; removed in 10.36)
+
+*The window was removed in 10.36. This section stays because the 80 ×
+24 model (`libsrc/s80`), Soft-70 (3.8) and the position gauge (6.3)
+were built on it.*
 
 **Packaging.** `lib/a2lib-c40win.lib` holds the VideoTerm backend
 with the 40-column window (`c40win`) as its fallback, in place of the
@@ -904,11 +911,12 @@ made before increment 9, half-pixel shift included.
   `viewport`). Each is assembled once per backend, with the backend's
   directory first on the include path for its `display.inc`: the visible
   width and panning step (40/20, 70/10), the prefix of the C interface
-  (`c40_`, `s70_`), the buffer's segment (`BSS`, `LOWBSS`), and two
-  macros for screen codes. The model calls the display through eight
+  (`c40_`, `s70_`), the buffer's segment (`BSS`, `LOWBSS`; since 10.36
+  always `LOWBSS`, not a parameter), and two macros for screen codes. The model calls the display through eight
   routines (`disp_init`, `disp_done`, `disp_cell`, `disp_redraw`,
   `disp_scroll`, `disp_clear`, `disp_gauge_draw`, `disp_gauge_erase`;
-  `s80.inc`). `libsrc/win/win.s` is now the window's display, and
+  `s80.inc`). `libsrc/win/win.s` was the window's display (until 10.36),
+  and
   `libsrc/s70/` holds Soft-70's display (`s70.s`), `cgetc`, `rdkey` and
   the generated default font (`font.s`, from `tools/s70font.txt` by
   `tools/s70font.py`, which also writes a `.70` file or a preview).
@@ -963,10 +971,14 @@ second, Soft-70 keeps up with 9,600 baud text without scrolling and with
 2,400 baud with a scroll per line; over the Uthernet II, TCP flow control
 absorbs the rest.
 
-These figures vary by up to about 1% with where the linker places
-Soft-70's code (10.35): an inner loop's backward branch costs a cycle
-more each time it's taken when it crosses a page, and where `s70.s`
-lands depends on everything linked before it, so each program differs.
+These figures vary with where the linker places Soft-70's code (10.35,
+10.36): an inner loop's backward branch costs a cycle more each time
+it's taken when it crosses a page, and where `s70.s` lands depends on
+everything linked before it, so each program differs. Measured over 64
+placements (`s70sim` with 0-252 bytes ahead of the library): `cputc`
+1,012-1,018 cycles (0.6%), the 70-column scroll 108,478-111,191
+(2.5%), the 38-column scroll 77,606-79,928 (3.0%), the pan
+904,402-911,377 (0.8%).
 With cc65's `apple2.cfg`, whose segments have no alignment, a module
 can't align its loops without ld65 warning that the program might not
 work. For the same reason the font in LOWBSS isn't page-aligned: at its
@@ -1017,10 +1029,10 @@ The format is documented here, so any program can use it.
 Each byte XOR `$A0` is a screen code: bit 7 set for normal video, clear
 for inverse; bits 0-6 the character, with `$00`-`$1F` standing for
 controls shown as their letters (`$40`-`$5F`). So a blank screen is all
-zeros. Encoding 0 (the text screen's own codes) is reserved for the
-40-column window, which writes no marker: its buffer is in BSS, which the
-constructor must not write (10.12), and the text page already shows its
-visible 40 columns.
+zeros. Encoding 0 (the text screen's own codes) was reserved for the
+40-column window (removed in 10.36), which wrote no marker: its buffer
+was in BSS, which the constructor must not write (10.12), and the text
+page already showed its visible 40 columns.
 
 **Encoding 2 (plain ASCII).** Each byte is the character itself,
 `$20`-`$7E`, in normal video; a blank is `$20`. Readers show anything
@@ -1942,10 +1954,11 @@ need an emulated card that raises IRQ (section 10.5).
 
 **Purpose.** A utility for programs that need a regular "go" interval
 (periodic work while idle, timeouts), with three clients in the library
-itself: the 40-column window's position indicator (a gauge hidden after
-a delay), IP65's timer, and a software clock for `time()` and
-`clock_gettime()` under DOS 3.3, which programs can set from an Internet
-time server (IP65 includes an SNTP client, `sntp_get_time`).
+itself: the 80 × 24 model's position indicator (a gauge hidden after a
+delay; the 40-column window's, then Soft-70's), IP65's timer, and a
+software clock for `time()` and `clock_gettime()` under DOS 3.3, which
+programs can set from an Internet time server (IP65 includes an SNTP
+client, `sntp_get_time`).
 Millisecond accuracy isn't a goal.
 
 **The constraint.** A stock II+ has no timer and no vertical-blank
@@ -2187,8 +2200,9 @@ Apple II-only imports: `test/sim/timersim.c` checks the Bresenham
 arithmetic against an exact model, ms-to-tick rounding (100 ms = 26
 ticks), one-shot and periodic timers, slot limits, zero-page
 preservation and the clock, and measures `a2_tick` with sim65's cycle
-counter; `test/sim/gaugesim.c` links the real `win.s` (at `$0C00`, so
-the text screen is free) and checks what the gauge leaves on screen. It
+counter; `test/sim/gaugesim.c` linked the real `win.s` (at `$0C00`, so
+the text screen is free) and checked what the gauge leaves on screen
+(until 10.36; its timing checks are now in `s70sim.c`). It
 caught a real defect: the 32-bit add and subtract loops in the clock
 modules ended with `CPX #4`, which overwrote the carry chaining the
 bytes, so any nonzero clock offset gave wrong times (the up-time check
@@ -3190,6 +3204,42 @@ allows it: a module's `.align` in cc65's `apple2.cfg` makes ld65 warn
 that the program might not work (tried on the font). Accepted, and
 documented in 3.8: Soft-70's timing varies by up to about 1% with the
 program's layout.
+
+### 10.36 The 40-column window removed
+
+| File | Change |
+|---|---|
+| `libsrc/win/`, `libsrc/select/c40win.s`, `include/c40win.h` | Removed, with `lib/a2lib-c40win.lib` and its selector |
+| `libsrc/s80/s80.s`, `s80.inc`, `libsrc/s70/display.inc` | The buffer is always in LOWBSS: `S80_BUFSEG` and the code for a buffer in BSS removed (the remaining code is byte-identical) |
+| `libsrc/s80/*.s`, `libsrc/timer/timer.s`, `libsrc/reflow/reflow.s`, `include/a2timer.h`, `include/a2reflow.h` | Comments: Soft-70 the only 80 x 24 backend. `a2timer.h` also said every display library includes the timer; only Soft-70's does (`a2lib-vt.lib` has the tick hook and `kbhit`) |
+| `test/vttest.c`, `cswtest.c`, `reflowtest.c` | The `C40WIN` builds removed (`wintest`, `cswwtest`, `reflowwin`) |
+| `test/sim/gaugesim.c`, `bssfill.s`, `sim0c00.cfg` | Removed; the gauge's timing checks moved to `s70sim.c`: still shown at 0.77 s, gone after a second, restarted by a second pan, no gauge after a follow that doesn't move |
+| `test/sim/winshim.s` | Renamed `vtshim.s`: the stubs are `vt.s`'s |
+| `test/emutest.sh`, `test/linktest.sh`, `test/selcheck.py`, `tools/samebytes.sh`, `Makefile` | The window's runs, checks and build removed; `twodisplays` links the VideoTerm and Soft-70 libraries |
+| `README.md`, `DESIGN.md` | 2, 3.1, 3.2, 3.5, 3.6 (kept, marked removed), 3.8, 3.9, 6.3 |
+
+The window showed half of the 80 columns, panning in 20-column steps;
+Soft-70 shows 70 of them. The window's one advantage was memory: it
+leaves programs at `$0803`, where Soft-70's start at `$4000`, above the
+hi-res page. That serves only a large program needing 80 columns
+without a VideoTerm, which wasn't judged worth the backend. The model
+(`libsrc/s80`) keeps its display interface (`display.inc`, the eight
+`disp_` routines), with Soft-70 its only display.
+
+`s70sim`'s timing, measured after 10.35, depended on the test as well as
+the layout: the new gauge checks ended in `s70_follow`, and `cputc`
+measured 1,038 cycles a character with the cursor followed, against
+1,014 when not. The test now restores the earlier state (not following,
+at column 10) before timing. With that, the layout's effect was
+measured by linking `s70sim` with 0-252 bytes of padding ahead of the
+library, in steps of 4: the ranges are in 3.8, and the scroll varies
+more than the 1% stated in 10.35 (up to 3%).
+
+Verified: `tools/samebytes.sh` against 10.35 differs, beyond the removed
+files, only in the test programs whose sources changed (`vttest`,
+`s70test`, `reflowtest`, `reflowvt`, `s70sim`); no library module.
+`make simtest` passes, with the seven gauge checks; `make linktest`, 73
+checks (the window's 14 removed).
 
 ## 11. Sources
 

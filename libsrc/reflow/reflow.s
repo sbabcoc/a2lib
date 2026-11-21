@@ -11,11 +11,11 @@
 ; programs that call them.
 ;
 ; width is the screen width to wrap for, 2-81; 0 means the visible width
-; (a2_viewport: 40 on the stock screen and in the 40-column window, 80 on
-; the VideoTerm). A line holds at most width - 1 characters, so the filter
+; (a2_viewport: 40 on the stock screen, 70 on Soft-70, 80 on the
+; VideoTerm). A line holds at most width - 1 characters, so the filter
 ; never relies on the display's own wrap at the edge, which differs
 ; between backends (immediate on the stock screen, delayed on the
-; VideoTerm and in the window).
+; VideoTerm and on Soft-70).
 ;
 ; Nothing is held back, so a prompt without a trailing space still appears
 ; before input: each character is printed at once, and the filter keeps

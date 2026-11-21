@@ -17,10 +17,10 @@
 #define _A2REFLOW_H
 
 /* Wrap for a screen width columns wide (2-81), or, with 0, the visible
-** width: 40 on the stock screen and in the 40-column window, 80 on the
-** VideoTerm. A line holds at most width - 1 characters. Characters appear
-** at once; a word that would overflow is moved to the next line, and a
-** word longer than a line is broken. The filter counts columns from the
+** width: 40 on the stock screen, 70 on Soft-70, 80 on the VideoTerm. A
+** line holds at most width - 1 characters. Characters appear at once; a
+** word that would overflow is moved to the next line, and a word longer
+** than a line is broken. The filter counts columns from the
 ** cursor's position now, so call reflow_on again after moving the cursor
 ** with conio. */
 void __fastcall__ reflow_on (unsigned char width);

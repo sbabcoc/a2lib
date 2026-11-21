@@ -219,11 +219,31 @@ int main (void)
     printf ("  %u checks\n", checks);
     check ("page matches the model after random operations", bad == 0);
     check ("bit 7 clear throughout", bit7_clear ());
+    /* The position gauge: shown after a pan, gone a second after the last
+    ** (a tick is 3.86 ms: 200 ticks 0.77 s, 270 ticks 1.04 s) */
+    s70_pan (0);
     for (n = 300; n; --n) tick ();
+    check ("no gauge a second after a pan", screen_ok () && barshown == 0);
     s70_pan (10);
     check ("gauge shown after a pan", screen_ok () && barshown == 1);
-    for (n = 270; n; --n) tick ();
+    for (n = 200; n; --n) tick ();
+    check ("gauge still shown at 0.77 s", screen_ok () && barshown == 1);
+    for (n = 70; n; --n) tick ();
     check ("gauge gone after a second", screen_ok () && barshown == 0);
+    s70_pan (0);
+    for (n = 200; n; --n) tick ();
+    s70_pan (10);
+    for (n = 200; n; --n) tick ();
+    check ("gauge restarted by a second pan", screen_ok () && barshown == 1);
+    for (n = 70; n; --n) tick ();
+    check ("gauge gone a second after the last pan", screen_ok () && barshown == 0);
+    gotoxy (20, 5);             /* Visible at either position */
+    s70_follow ();
+    check ("follow without a move: no gauge", screen_ok () && barshown == 0);
+
+    /* Time as before these checks: not following, at column 10, no gauge */
+    s70_pan (10);
+    for (n = 270; n; --n) tick ();
 
     /* Timing, reported */
     INVFLG = 0xFF;

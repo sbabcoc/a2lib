@@ -10,10 +10,10 @@ full-featured on a stock II+:
   stdio work under both DOSes with the same behavior.
 - **Display backends**, selected at link time. Conio and console output
   use a Videx VideoTerm in slot 3 when present. Without one, a program
-  falls back to either the stock 40-column screen or a 40-column window
-  onto an 80 × 24 screen, which follows the cursor or pans under program
-  control, or the optional "Soft-70" display: 70 of the 80 columns, with
-  lowercase, drawn on the hi-res screen.
+  falls back to either the stock 40-column screen or the optional
+  "Soft-70" display: 70 of the 80 columns of an 80 × 24 screen, with
+  lowercase, drawn on the hi-res screen, which follows the cursor or pans
+  under program control.
 - **Reflow.** stdio output can be word-wrapped at the visible width,
   switched on and off as a program runs (`include/a2reflow.h`), for
   running text such as documents.
@@ -60,6 +60,9 @@ for the Uthernet II.
   80 × 24 screen model now shared with the 40-column window. It passes
   all its tests on the emulator, with and without the card, and the sim65
   regression tests.
+- **The 40-column window was removed** after increment 9 (DESIGN.md
+  10.36): it showed only half the 80 columns, in 20-column steps, where
+  Soft-70 shows 70 of them.
 
 ## Building
 
@@ -99,10 +102,9 @@ What stock cc65 doesn't have is in add-on libraries, each with a
 | `lib/a2lib-timer.o` `lib/a2lib-timer.lib` | The cooperative timer (`include/a2timer.h`) and the software clock (`time`, `clock_gettime`, `clock_settime`) |
 | `lib/a2lib-reflow.o` `lib/a2lib-reflow.lib` | Word-wrapped stdio console output (`include/a2reflow.h`) |
 | `lib/a2lib-vt.o` `lib/a2lib-vt.lib` | A Videx VideoTerm in slot 3 when present; the stock 40-column screen otherwise |
-| `lib/a2lib-c40win.o` `lib/a2lib-c40win.lib` | The VideoTerm when present; otherwise a 40-column window onto an 80 × 24 screen (`include/c40win.h`) |
 | `lib/a2lib-soft70.o` `lib/a2lib-soft70.lib` | The VideoTerm when present; otherwise Soft-70, 70 columns of an 80 × 24 screen on hi-res page 1 (`include/soft70.h`) |
 
-Use at most one of the last three. List the selectors first, then the
+Use at most one of the last two. List the selectors first, then the
 libraries in the table's order reversed (display, reflow, timer), then
 `lib/a2lib-dos33.lib`:
 
@@ -126,8 +128,8 @@ together with another display library, fails to link, naming
 in nothing; it is there so every add-on is linked the same way. `make
 linktest` checks each selector against the libraries.
 
-The display libraries include what they use of the timer, so they need
-the timer library only for the clock.
+The Soft-70 library includes the timer, which its gauge and cursor use,
+so a Soft-70 program needs the timer library only for the clock.
 
 Without the timer library, `time`, `clock_gettime` and `clock_settime`
 fail to link, naming `clock_gettime_needs_a2lib_timer` or
@@ -235,8 +237,8 @@ built, and the folder holding the
 make emutest MASTER=... IP65=path/to/ip65 UTHERNET2=path/to/plugins
 ```
 
-`make simtest` runs regression tests for the timer, the window's gauge,
-the reflow filter and Soft-70 in cc65's 6502 simulator, `sim65`, with no
+`make simtest` runs regression tests for the timer, the reflow filter and
+Soft-70 (with the position gauge) in cc65's 6502 simulator, `sim65`, with no
 Apple II needed.
 
 ## Documentation

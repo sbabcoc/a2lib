@@ -4,10 +4,10 @@
 ;
 ; char cpeekc (void);
 ;
-; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based
-; on cc65's libsrc/apple2/cpeekc.s. The character at the cursor: from VRAM
-; on the VideoTerm, as a2lib-vt.lib's cpeekc.s; from the model's
-; buffer otherwise (S80_PEEK, display.inc). A pending wrap reads column 79.
+; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
+; libsrc/apple2/cpeekc.s. The character at the cursor: from VRAM on the
+; VideoTerm, as a2lib-vt.lib's cpeekc.s; from the model's buffer otherwise
+; (S80_PEEK, display.inc). A pending wrap reads column 79.
 ;
 
         .export         _cpeekc

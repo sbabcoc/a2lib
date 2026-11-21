@@ -2,14 +2,14 @@
 ; Soft-70: parameters of the shared 80 x 24 model (s80.inc)
 ;
 ; Soft-70 shows 70 of the 80 columns on hi-res page 1, panning between
-; columns 0-69 and 10-79 (DESIGN.md 3.8). The buffer is outside BSS, below
-; the hi-res page, so that it doesn't take space from the program.
+; columns 0-69 and 10-79 (DESIGN.md 3.8). The model's buffer is in
+; LOWBSS, below the hi-res page, so that it doesn't take space from the
+; program.
 ;
 
 S80_VIEW        = 70
 S80_STEP        = 10
 .define         S80_API         "_s70_"
-.define         S80_BUFSEG      "LOWBSS"
 
 ; Screen codes: bit 7 set for normal video, clear for inverse; bits 0-6 the
 ; character, $00-$1F standing for controls shown as their letters (the

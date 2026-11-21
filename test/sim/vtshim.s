@@ -1,4 +1,4 @@
-; sim65 stubs for win.s: no VideoTerm, no-op monitor routines
+; sim65 stubs for vt.s: no VideoTerm, no-op monitor routines
         .export         vt_active, HOME, VTABZ, vt_write, vt_goto, vt_r10, vt_screen
         .export         a2_savehooks, a2_hookout, a2_unhookout
         .data

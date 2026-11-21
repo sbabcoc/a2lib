@@ -12,9 +12,9 @@
 ; Time advances only while the program waits in the library: the 15-cycle
 ; wait loops of cgetc, kbhit, a2_idle and the replacement KSW input routine
 ; below call a2_tick each time they increment RNDH. Linked only when a
-; program uses the timer (or the software clock, or the 40-column window's
-; position gauge); the constructor then installs a2_tick in the hook vector
-; (tick.s) and the input routine in KSW.
+; program uses the timer (or the software clock, or Soft-70's position
+; gauge and cursor); the constructor then installs a2_tick in the hook
+; vector (tick.s) and the input routine in KSW.
 ;
 ; Callbacks run inside those wait loops, never during other library code.
 ; The dispatcher saves and restores the C runtime's zero page (cgetc keeps
@@ -22,7 +22,7 @@
 ; and the monitor's cursor (CH, CV, BASL, INVFLG), and doesn't dispatch
 ; again while a callback runs.
 ;
-; Internal interface (for win.s, which must not disturb the C zero page
+; Internal interface (for s80.s, which must not disturb the C zero page
 ; while it runs inside cputc): a2_timer_arm takes the interval in ticks in
 ; tmr_ticks, the callback in tmr_fn and the periodic flag in tmr_per, and
 ; returns the handle in A ($FF if no slot is free); a2_timer_restart

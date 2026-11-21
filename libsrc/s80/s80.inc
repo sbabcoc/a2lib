@@ -1,17 +1,15 @@
 ;
-; Shared 80 x 24 screen model (DESIGN.md 3.1, 3.6, 3.8)
+; 80 x 24 screen model (DESIGN.md 3.1, 3.8)
 ;
-; The screen a program sees when no VideoTerm is found, in libraries whose
-; fallback shows part of an 80 x 24 screen: the 40-column window
-; (libsrc/win) and Soft-70 (libsrc/s70). This directory's modules are
-; assembled once for each, with that backend's directory first on the
-; include path for display.inc, which defines:
+; The screen a program sees when no VideoTerm is found, in a library whose
+; fallback shows part of an 80 x 24 screen: Soft-70 (libsrc/s70). This
+; directory's modules are assembled with the backend's directory first on
+; the include path for display.inc, which defines:
 ;
-;   S80_VIEW        visible columns (40, 70)
-;   S80_STEP        panning step: the window shows columns left to
+;   S80_VIEW        visible columns (70)
+;   S80_STEP        panning step: the display shows columns left to
 ;                   left + S80_VIEW - 1, left a multiple of S80_STEP
-;   S80_API         prefix of the C interface ("_c40_", "_s70_")
-;   S80_BUFSEG      segment of the buffer ("BSS", "LOWBSS")
+;   S80_API         prefix of the C interface ("_s70_")
 ;   S80_ATTR        macro: apply INVFLG to the screen code in A
 ;   S80_PEEK        macro: the character for the screen code in A
 ;

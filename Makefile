@@ -22,14 +22,13 @@
 #   a2lib-timer     cooperative timer and software clock (a2timer.h, time.h)
 #   a2lib-reflow    word-wrapping stdio console output (a2reflow.h)
 #   a2lib-vt        the Videx VideoTerm, or the stock 40-column screen
-#   a2lib-c40win    the VideoTerm, or a 40-column window onto 80 x 24
-#                   (c40win.h)
 #   a2lib-soft70    the VideoTerm, or Soft-70: 70 of 80 columns in hi-res
 #                   (soft70.h); link with --start-addr 0x4000
 # For example:
 #   cl65 -t apple2 -I include -o prog prog.c lib/a2lib-vt.o lib/a2lib-timer.o \
 #       lib/a2lib-vt.lib lib/a2lib-timer.lib lib/a2lib-dos33.lib
-# The display libraries carry what they need of the timer, and its kbhit.
+# The display libraries carry the timer's kbhit, and the Soft-70 library the
+# timer, which its gauge and cursor use.
 #
 # ld65 scans each library once, in order, and takes only modules that
 # resolve references open at that point. Hence a complete core (a stock
@@ -76,16 +75,10 @@ VT_OBJ := $(patsubst libsrc/vt/%.s,build/vt/%.o,$(VT_SRC))
 VT_INC := $(wildcard libsrc/vt/*.inc)
 VT_LIB := lib/a2lib-vt.lib
 
-# The shared 80 x 24 model (libsrc/s80) is assembled once for each backend
-# that shows part of it, with that backend's display.inc
+# The 80 x 24 model (libsrc/s80), assembled with the display.inc of the
+# backend that shows it, Soft-70's (libsrc/s70)
 S80_SRC := $(wildcard libsrc/s80/*.s)
 S80_INC := $(wildcard libsrc/s80/*.inc)
-
-WIN_SRC := $(wildcard libsrc/win/*.s)
-WIN_OBJ := $(patsubst libsrc/win/%.s,build/win/%.o,$(WIN_SRC)) \
-           $(patsubst libsrc/s80/%.s,build/win/%.o,$(S80_SRC))
-WIN_INC := $(wildcard libsrc/win/*.inc) $(S80_INC)
-VTWIN_LIB := lib/a2lib-c40win.lib
 
 .PHONY: emutest screenshots all test simtest linktest clean
 
@@ -108,7 +101,7 @@ IP65 ?=
 IP65_LIBS = $(IP65)/ip65/ip65_tcp.lib $(IP65)/drivers/a2uther2.lib
 NET_TEST := $(if $(IP65),build/test/nettest)
 
-all: $(DOS33_LIB) $(TIMER_LIB) $(REFLOW_LIB) $(VT_LIB) $(VTWIN_LIB) $(VTS70_LIB) $(SELECT) $(IP65_OBJ)
+all: $(DOS33_LIB) $(TIMER_LIB) $(REFLOW_LIB) $(VT_LIB) $(VTS70_LIB) $(SELECT) $(IP65_OBJ)
 
 # The core: stock apple2.lib with the DOS 3.3 modules and the guards
 build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
@@ -173,25 +166,6 @@ $(IP65_OBJ): libsrc/ip65/a2timer.s $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/timer -o $@ $<
 
-# VideoTerm backend with the 40-column window as its fallback: vt.s, the
-# window's conio modules (which include the VideoTerm paths), and the timer
-# its gauge uses
-WIN_FLAGS := -I libsrc/win -I libsrc/s80 -I libsrc/vt -I libsrc/timer -I libsrc/dos33
-
-build/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
-	@mkdir -p $(@D)
-	$(CA65) -t $(TARGET) $(WIN_FLAGS) -o $@ $<
-
-build/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
-	@mkdir -p $(@D)
-	$(CA65) -t $(TARGET) $(WIN_FLAGS) -o $@ $<
-
-$(VTWIN_LIB): $(WIN_OBJ) build/vt/vt.o build/timer/tick.o build/timer/kbhit.o build/timer/timer.o lib/a2lib-c40win.o $(STOCKCOPY)
-	@mkdir -p $(@D)
-	rm -f $@
-	$(AR65) r $@ build/vt/vt.o $(WIN_OBJ) build/timer/tick.o build/timer/kbhit.o build/timer/timer.o
-	$(PYTHON) tools/stockcopy.py $@ $(DOS33_LIB) lib/a2lib-c40win.o
-
 # Soft-70 with the VideoTerm: vt.s and Soft-70's modules, on the shared
 # 80 x 24 model, and the timer its gauge and cursor use. Programs are
 # linked with --start-addr 0x4000.
@@ -220,7 +194,6 @@ L_CORE   := $(DOS33_LIB)
 L_TIMER  := lib/a2lib-timer.o $(TIMER_LIB) $(DOS33_LIB)
 L_REFLOW := lib/a2lib-reflow.o $(REFLOW_LIB) $(DOS33_LIB)
 L_VT     := lib/a2lib-vt.o $(VT_LIB) $(DOS33_LIB)
-L_WIN    := lib/a2lib-c40win.o $(VTWIN_LIB) $(DOS33_LIB)
 L_S70    := lib/a2lib-soft70.o $(VTS70_LIB) $(DOS33_LIB)
 
 S70_LINK := --start-addr 0x4000
@@ -239,8 +212,8 @@ emutest: test
 screenshots: test
 	SNAP=docs/images bash test/emutest.sh s70test
 
-test: build/test/filetest build/test/vttest build/test/wintest build/test/timertest build/test/cswtest build/test/cswwtest \
-      build/test/reflowtest build/test/reflowvt build/test/reflowwin \
+test: build/test/filetest build/test/vttest build/test/timertest build/test/cswtest \
+      build/test/reflowtest build/test/reflowvt \
       build/test/s70test build/test/cswstest build/test/reflows70 $(NET_TEST) \
       build/test/bloadprobe build/test/errprobe build/test/errproberaw \
       build/test/exectest build/test/exectestvt build/test/execatest build/test/argtest \
@@ -254,17 +227,9 @@ build/test/vttest: test/vttest.c $(L_VT)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< $(L_VT)
 
-build/test/wintest: test/vttest.c $(L_WIN)
-	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< $(L_WIN)
-
 build/test/cswtest: test/cswtest.c test/cswcout.s $(L_VT)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ test/cswtest.c test/cswcout.s $(L_VT)
-
-build/test/cswwtest: test/cswtest.c test/cswcout.s $(L_WIN)
-	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ test/cswtest.c test/cswcout.s $(L_WIN)
 
 build/test/reflowtest: test/reflowtest.c $(L_REFLOW)
 	@mkdir -p $(@D)
@@ -273,10 +238,6 @@ build/test/reflowtest: test/reflowtest.c $(L_REFLOW)
 build/test/reflowvt: test/reflowtest.c lib/a2lib-vt.o lib/a2lib-reflow.o $(VT_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 	@mkdir -p $(@D)
 	$(CL65) -t $(TARGET) -O -I include -m $@.map -o $@ $< lib/a2lib-vt.o lib/a2lib-reflow.o $(VT_LIB) $(REFLOW_LIB) $(DOS33_LIB)
-
-build/test/reflowwin: test/reflowtest.c lib/a2lib-c40win.o lib/a2lib-reflow.o $(VTWIN_LIB) $(REFLOW_LIB) $(DOS33_LIB)
-	@mkdir -p $(@D)
-	$(CL65) -t $(TARGET) -O -I include -DC40WIN -m $@.map -o $@ $< lib/a2lib-c40win.o lib/a2lib-reflow.o $(VTWIN_LIB) $(REFLOW_LIB) $(DOS33_LIB)
 
 build/test/s70test: test/vttest.c $(L_S70)
 	@mkdir -p $(@D)
@@ -301,8 +262,8 @@ build/test/nettest: test/nettest.c $(IP65_OBJ) $(L_TIMER) $(IP65_LIBS)
 	$(CL65) -t $(TARGET) -O -I include -I $(IP65)/inc -m $@.map -o $@ test/nettest.c $(IP65_OBJ) $(IP65_LIBS) $(L_TIMER)
 
 # Regression tests that run in cc65's 6502 simulator, sim65, without an
-# Apple II: the timer modules, the window's gauge, the reflow filter and
-# Soft-70's drawing, built for sim6502.
+# Apple II: the timer modules, the reflow filter, and Soft-70's drawing
+# with the 80 x 24 model and its gauge, built for sim6502.
 SIM_DIR  := build/sim
 SIM_MODS := timer tick kbhit gettime settime
 SIM_REFLOW := $(SIM_DIR)/reflow.o
@@ -317,19 +278,8 @@ $(SIM_DIR)/%.o: libsrc/reflow/%.s
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 -I libsrc/dos33 -o $@ $<
 
-$(SIM_DIR)/win/%.o: libsrc/win/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
-	@mkdir -p $(@D)
-	$(CA65) -t sim6502 $(WIN_FLAGS) -o $@ $<
-
-$(SIM_DIR)/win/%.o: libsrc/s80/%.s $(WIN_INC) $(VT_INC) $(TIMER_INC)
-	@mkdir -p $(@D)
-	$(CA65) -t sim6502 $(WIN_FLAGS) -o $@ $<
-
 $(SIM_DIR)/timersim: test/sim/timersim.c test/sim/shim.s test/timerzp.s $(SIM_OBJ)
 	$(CL65) -t sim6502 -O -I include -o $@ $^
-
-$(SIM_DIR)/gaugesim: test/sim/gaugesim.c test/sim/shim.s test/sim/winshim.s test/sim/bssfill.s $(SIM_DIR)/win/s80.o $(SIM_DIR)/win/win.o $(SIM_OBJ)
-	$(CL65) -t sim6502 -C test/sim/sim0c00.cfg -O -I include -o $@ $^
 
 S70_SIM_MODS := s80 cputc cpeekc gotoxy gotoy wherex wherey clrscr s70 font
 S70_SIM_OBJ  := $(patsubst %,$(SIM_DIR)/s70/%.o,$(S70_SIM_MODS))
@@ -342,7 +292,7 @@ $(SIM_DIR)/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 $(S70_FLAGS) -o $@ $<
 
-$(SIM_DIR)/s70sim: test/sim/s70sim.c test/sim/shim.s test/sim/winshim.s test/sim/s70shim.s $(S70_SIM_OBJ) $(SIM_OBJ)
+$(SIM_DIR)/s70sim: test/sim/s70sim.c test/sim/shim.s test/sim/vtshim.s test/sim/s70shim.s $(S70_SIM_OBJ) $(SIM_OBJ)
 	$(CL65) -t sim6502 -C test/sim/sim4000.cfg -O -I include -o $@ $^
 
 $(SIM_DIR)/reflowsim: test/sim/reflowsim.c test/sim/reflowshim.s $(SIM_REFLOW)
@@ -354,9 +304,8 @@ $(SIM_DIR)/reflowsim: test/sim/reflowsim.c test/sim/reflowshim.s $(SIM_REFLOW)
 linktest: all
 	CL65=$(CL65) PYTHON=$(PYTHON) bash test/linktest.sh lib
 
-simtest: $(SIM_DIR)/timersim $(SIM_DIR)/gaugesim $(SIM_DIR)/reflowsim $(SIM_DIR)/s70sim
+simtest: $(SIM_DIR)/timersim $(SIM_DIR)/reflowsim $(SIM_DIR)/s70sim
 	$(SIM65) $(SIM_DIR)/timersim
-	$(SIM65) $(SIM_DIR)/gaugesim
 	$(SIM65) $(SIM_DIR)/reflowsim
 	$(SIM65) $(SIM_DIR)/s70sim
 

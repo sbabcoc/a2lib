@@ -8,16 +8,16 @@
 ** 3.86 ms (NTSC Apple II+). See DESIGN.md section 6.3.
 **
 ** Link lib/a2lib-timer.o and lib/a2lib-timer.lib ahead of
-** lib/a2lib-dos33.lib. The display libraries (a2lib-vt, a2lib-c40win,
-** a2lib-soft70) include the timer, so with one of them only the clock
-** (time, clock_gettime, clock_settime) needs the timer library.
+** lib/a2lib-dos33.lib. a2lib-soft70 includes the timer, which its gauge
+** and cursor use, so with it only the clock (time, clock_gettime,
+** clock_settime) needs the timer library; a2lib-vt doesn't.
 **
 ** Timer callbacks run inside those waits. They must be short, may use
 ** conio and stdio output, and must not wait for keys (cgetc, stdio input),
 ** call a2_idle, or call IP65. The C runtime's zero page and the monitor's
 ** cursor (CH, CV, BASL, INVFLG) are saved and restored around them; on
-** the VideoTerm and in the 40-column window, a callback that moves the
-** conio cursor must put it back (wherex, wherey, gotoxy).
+** the VideoTerm and on Soft-70, a callback that moves the conio cursor
+** must put it back (wherex, wherey, gotoxy).
 **
 ** Under DOS 3.3, clock_gettime and time() return the software clock: the
 ** up-time until clock_settime sets it (for example, from IP65's SNTP

@@ -30,8 +30,8 @@
 ;   s80_clear:      clear, home, and show columns 0 to S80_VIEW - 1
 ;   s80_cout:       the COUT hook: console output (bit 7 set)
 ;
-; C interface, named S80_API + pan, follow, left, active (include/c40win.h,
-; include/soft70.h). They do nothing (or report 0) while the VideoTerm is
+; C interface, named S80_API + pan, follow, left, active
+; (include/soft70.h). They do nothing (or report 0) while the VideoTerm is
 ; in use.
 ;
 ; Position gauge (DESIGN.md 6.3): after each pan, the display shows which
@@ -66,10 +66,9 @@ s80init:
         jsr     a2_savehooks
         jsr     disp_init       ; Clears the display
 
-        ; A buffer in BSS is cleared by crt0, and must not be written here:
-        ; apple2.cfg starts BSS where ONCE starts, so clearing it would
-        ; overwrite this code
-        .if .not .xmatch(S80_BUFSEG, "BSS")
+        ; The buffer is in LOWBSS, which crt0 doesn't clear. (One in BSS
+        ; couldn't be written here: apple2.cfg starts BSS where ONCE starts,
+        ; so clearing it would overwrite this code.)
         jsr     clearbuf
 
         ; The text marker, for emulators and other tools that copy the
@@ -79,7 +78,6 @@ s80init:
         sta     s80_marker,x
         dex
         bpl     :-
-        .endif
 
         ; Console output into the model (vt.s: a2_hookout)
         lda     #<s80_cout
@@ -87,8 +85,6 @@ s80init:
         jmp     a2_hookout
 initdone:
         rts
-
-        .if .not .xmatch(S80_BUFSEG, "BSS")
 
 ; The text marker (DESIGN.md 3.9): written before the buffer at startup,
 ; its first byte cleared at exit
@@ -101,7 +97,6 @@ marktpl:
         .addr   s80_buf         ; The buffer: rows of S80_COLS bytes
 MARKLEN = * - marktpl
         .assert MARKLEN = 16, error, "text marker is 16 bytes"
-        .endif
 
         .code
 
@@ -109,10 +104,8 @@ s80done:
         bit     vt_active
         bmi     done
 
-        .if .not .xmatch(S80_BUFSEG, "BSS")
         lda     #$00            ; No text marker after exit
         sta     s80_marker
-        .endif
 
         ; Remove the gauge, if shown
         bit     gslot
@@ -469,9 +462,7 @@ s80_follow:     .byte   $80     ; Bit 7: follow the cursor
 gslot:          .byte   $FF     ; Gauge's timer slot; bit 7: none
 need:           .byte   $00
 
-        .segment        S80_BUFSEG
+        .segment        "LOWBSS"
 
-        .if .not .xmatch(S80_BUFSEG, "BSS")
 s80_marker:     .res    MARKLEN         ; Directly before the buffer
-        .endif
 s80_buf:        .res    S80_COLS * S80_ROWS

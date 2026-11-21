@@ -147,7 +147,7 @@ uses () {
 # Add-ons reached only through other modules: copies of stock modules in
 # the add-on (cputs -> cputc, cgets -> cgetc, cprintf -> vcprintf -> cputc,
 # time -> clock_gettime), and the selector's (printf -> write -> COUT)
-for d in vt c40win soft70; do
+for d in vt soft70; do
     start=; [[ $d == soft70 ]] && start="--start-addr 0x4000"
     sel="$start $DIR/a2lib-$d.o $DIR/a2lib-$d.lib"
     link "${d}cputs" - 'cputs ("X"); return 0;' "$sel"
@@ -169,8 +169,8 @@ for d in vt c40win soft70; do
         'cputs ("X"); return 0;' "$start $DIR/a2lib-$d.lib"
 done
 link twodisplays a2lib_display_needs_selector_object 'cputs ("X"); return 0;' \
-    "$DIR/a2lib-vt.o $DIR/a2lib-c40win.o $DIR/a2lib-vt.lib
-     $DIR/a2lib-c40win.lib"
+    "--start-addr 0x4000 $DIR/a2lib-vt.o $DIR/a2lib-soft70.o $DIR/a2lib-vt.lib
+     $DIR/a2lib-soft70.lib"
 
 link timercgets - 'char b[4]; return cgets (b, sizeof b) != 0;' "$TIMER"
 for m in cgets.o cgetc.o; do
