@@ -96,7 +96,14 @@ found:  sty     slot
         beq     :+
         dex
         bpl     :-
-        lda     #EINVAL         ; Not a type the File Manager creates
+        ; Not a type the File Manager creates: open the file only if it
+        ; exists, since O_CREAT matters only when it doesn't (POSIX)
+        ldx     #$01            ; Don't allocate
+        jsr     fmopen
+        bcc     exists
+        cmp     #DOSERR_NOTFOUND
+        bne     jerrfreefm
+        lda     #EINVAL         ; Can't create it
         jmp     errfreedirect
 :       sta     type
         ldx     #$00            ; Allocate the file if it isn't found

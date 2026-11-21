@@ -1193,7 +1193,10 @@ type codes**, as a catalog entry stores them and `CATALOG` lists them.
 OPEN takes the same codes, so `open` passes `_filetype` through (4.4).
 Nothing verified shows the File Manager creating the "new" A and B types,
 so they fail with `EINVAL`, as any other code does. `stat` and `readdir`
-report the same codes (5.8, 5.9).
+report the same codes (5.8, 5.9). `_filetype` applies only to a file
+`O_CREAT` creates: an existing file opens whatever it says, since
+`O_CREAT` matters only when the file doesn't exist (POSIX; fixed in
+10.30).
 
 **Before increment 13**, `_filetype` took ProDOS's codes (`$04`→T,
 `$06`→B, `$FC`→A, `$FA`→I, `$FE`→R), so source written for ProDOS would
@@ -1262,6 +1265,9 @@ so paths, first.
 - `remove` uses the File Manager's DELETE. A locked file fails with
   `EACCES`, as under ProDOS; so does `rename` (RENAME's own error,
   through `fm_maperr`; fixed in 10.27).
+- A file renamed to its own name is left as it is and `rename` returns 0
+  (POSIX; fixed in 10.30). It must exist, and not be open, as for any
+  rename.
 - `rename` uses RENAME. Either path may give the slot and drive, but
   **the new one must be where the old one is**: DOS's RENAME can't move a
   file. Another slot or drive fails with `EINVAL` (cc65 has no `EXDEV`).
@@ -2848,6 +2854,19 @@ leaves the fd open on a file DOS has closed. ReplicApple2Plus's runner
 gained `--protect` and `--writable` for it. Verified: `make emutest`
 (wptest) passes, 5 of 5, with no library change; the case the review
 raised can't be produced this way (5.11).
+
+### 10.30 POSIX: rename to the same name; O_CREAT on an existing file
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/sysrename.s` | After the open-file check, a new name equal to the old one returns 0 without RENAME; it failed with `EEXIST` |
+| `libsrc/dos33/open.s` | With `O_CREAT` and a `_filetype` the File Manager doesn't create, OPEN without allocating: an existing file opens (`O_EXCL` still gives `EEXIST`), a missing one fails with `EINVAL` as before; it failed with `EINVAL` either way |
+| `test/filetest.c` | OPEN FLAGS, NAMES: an existing file opens with `O_CREAT` and a type DOS can't create. REMOVE, RENAME: a file renamed to its own name is left as it is. `MAX_GROUP` 14 |
+| `DESIGN.md` | 5.4, 5.5a |
+
+Found by the line-by-line review. Shown before the fixes: `make emutest`
+(filetest) failed 2 of 96 checks, "O_CREAT EXISTING, ANY TYPE" and
+"RENAME TO OWN NAME". `open.o` grows by 11 bytes, `sysrename.o` by 17.
 
 ## 11. Sources
 

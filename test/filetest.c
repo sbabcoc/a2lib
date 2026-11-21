@@ -23,7 +23,7 @@
 /* Failure lines shown: 24 rows less the BRUN line, the title, 13 groups,
 ** the overflow line, the summary and the prompt after exit. */
 #define MAX_SHOWN   6
-#define MAX_GROUP   13          /* Most checks in one group */
+#define MAX_GROUP   14          /* Most checks in one group */
 #define MAX_FDS     8           /* cc65's fdtab slots (filedes.inc) */
 
 /* __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, then
@@ -203,6 +203,12 @@ static void open_flags_names (void)
     errno = 0;
     check ("type DOS can't create", open ("X.NEWA", O_WRONLY | O_CREAT) == -1
                                     && errno == EINVAL);
+
+    /* O_CREAT only matters when the file doesn't exist (POSIX): an
+    ** existing file opens, whatever _filetype says */
+    fd = open ("T.TEST", O_RDONLY | O_CREAT);
+    check ("O_CREAT existing, any type", fd >= 0);
+    close (fd);
 }
 
 /* Write a file of the current _filetype with the given contents */
@@ -361,6 +367,9 @@ static void remove_rename (void)
     errno = 0;
     check ("rename onto existing", rename ("T.TEST", "T.NEW") == -1 && errno == EEXIST
                                    && _oserror == LIBERR_EXISTS);
+    /* A file renamed to its own name is left as it is (POSIX) */
+    check ("rename to own name", rename ("T.TEST", "T.TEST") == 0
+                                 && close (open ("T.TEST", O_RDONLY)) == 0);
     errno = 0;
     check ("rename to another drive", rename ("T.NEW", "1/T.X") == -1 && errno == EINVAL);
     errno = 0;

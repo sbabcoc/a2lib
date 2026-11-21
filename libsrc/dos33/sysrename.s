@@ -15,6 +15,7 @@
 ;     existing new name fails with EEXIST.
 ;   - A locked file fails with EACCES, and an open file with EINVAL, as
 ;     under ProDOS (DESIGN.md 5.5a).
+;   - A file renamed to its own name is left as it is, as POSIX says.
 ;
 ; See DESIGN.md 5.5.
 ;
@@ -78,6 +79,18 @@ __sysrename:
         ldx     oldname+1
         jsr     fm_name
         bcs     free
+
+        ; A file renamed to its own name is left as it is (POSIX); it
+        ; exists, as fm_isopen found it
+        ldx     #NAME_LEN-1
+:       lda     fm_namebuf,x
+        cmp     newbuf,x
+        bne     :+
+        dex
+        bpl     :-
+        lda     #$00            ; The same name: done
+        beq     free            ; Branch always
+:
 
         ; Refuse a new name that's in use: OPEN it without allocating
         lda     #<newbuf
