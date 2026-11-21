@@ -47,14 +47,19 @@ fingerprint() {
     mkdir -p "$out/asm" "$out/c" "$out/bin"
     (
         cd "$tree"
+        # The Makefile's flags for each directory
         local d33="-I libsrc/dos33"
-        local vt="-I libsrc/vt -I libsrc/dos33"
-        local win="-I libsrc/win -I libsrc/s80 -I libsrc/vt -I libsrc/dos33"
-        local s70="-I libsrc/s70 -I libsrc/s80 -I libsrc/vt -I libsrc/dos33"
-        local tst="-I test -I test/sim -I libsrc/dos33"
+        local tim="-I libsrc/timer -I libsrc/dos33"
+        local vt="-I libsrc/vt -I libsrc/timer -I libsrc/dos33"
+        local win="-I libsrc/win -I libsrc/s80 -I libsrc/vt -I libsrc/timer -I libsrc/dos33"
+        local s70="-I libsrc/s70 -I libsrc/s80 -I libsrc/vt -I libsrc/timer -I libsrc/dos33"
+        local tst="-I test -I test/sim -I libsrc/timer -I libsrc/dos33"
         asm() {  # asm TAG TARGET FLAGS FILE
             local key="${1}_${2}_${4//\//_}"
-            ca65 -t "$2" $3 -I "$ASMINC" --list-bytes 0 -l "$out/l.lst" -o "$out/l.o" "$4"
+            # set -e doesn't hold in this subshell (its status is tested):
+            # a module that doesn't assemble must stop the comparison
+            ca65 -t "$2" $3 -I "$ASMINC" --list-bytes 0 -l "$out/l.lst" -o "$out/l.o" "$4" \
+                || { echo "samebytes: $4 doesn't assemble in $tree" >&2; exit 1; }
             python3 - "$out/l.lst" > "$out/asm/$key.bytes" <<'PY'
 import re, sys
 for line in open(sys.argv[1], errors='replace'):
@@ -63,10 +68,12 @@ for line in open(sys.argv[1], errors='replace'):
 PY
             od65 --dump-imports --dump-exports --dump-segsize "$out/l.o" | sed 1d > "$out/asm/$key.syms"
         }
-        for s in libsrc/dos33/*.s; do asm d33 apple2 "$d33" "$s"; done
-        for s in timer tick kbhit gettime settime reflow; do asm d33 sim6502 "$d33" "libsrc/dos33/$s.s"; done
+        for s in libsrc/dos33/*.s libsrc/reflow/*.s; do asm d33 apple2 "$d33" "$s"; done
+        for s in libsrc/guard/*.s libsrc/select/*.s; do asm d33 apple2 "" "$s"; done
+        for s in libsrc/timer/*.s; do asm tim apple2 "$tim" "$s"; asm tim sim6502 "$tim" "$s"; done
+        asm d33 sim6502 "$d33" libsrc/reflow/reflow.s
         for s in libsrc/vt/*.s; do asm vt apple2 "$vt" "$s"; done
-        for s in libsrc/ip65/*.s; do asm ip65 apple2 "$d33" "$s"; done
+        for s in libsrc/ip65/*.s; do asm ip65 apple2 "$tim" "$s"; done
         for s in libsrc/win/*.s libsrc/s80/*.s; do asm win apple2 "$win" "$s"; asm win sim6502 "$win" "$s"; done
         for s in libsrc/s70/*.s libsrc/s80/*.s; do asm s70 apple2 "$s70" "$s"; asm s70 sim6502 "$s70" "$s"; done
         for s in test/*.s; do asm tst apple2 "$tst" "$s"; done

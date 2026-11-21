@@ -161,8 +161,12 @@ buffer lets an emulator copy the screen's text, all 80 columns of it --
 ReplicApple2Plus's Copy Screen Text does -- since none of it is on the
 text page; DESIGN.md 3.9 describes the marker.
 
-Compiling with a2lib's `dirent.h` but linking without an a2lib library
-fails at link time, so the two can't be mixed up silently.
+a2lib's `struct dirent` isn't cc65's, so its `dirent.h` and its
+directory functions only work together: compiling with a2lib's
+`dirent.h` but linking without `lib/a2lib-dos33.lib`, or linking it but
+compiling without `-I include`, fails at link time (naming
+`_opendir_a2lib`, or `opendir_needs_a2lib_dirent_h`), so the two can't
+be mixed up silently.
 
 Rebuild a2lib after updating cc65, so the stock modules it contains match
 your toolchain.

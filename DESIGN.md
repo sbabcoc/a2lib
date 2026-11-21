@@ -131,15 +131,23 @@ that selects the DOS 3.3 header; there is no separate define to keep in
 sync with it. The header is needed only by programs that use the
 directory functions.
 
-**Link guard:** the header maps `opendir`, `readdir`, `closedir` and
-`rewinddir` to `_dos33_*` symbols that exist only in `a2lib-dos33.lib`.
+**Link guard (revised in 10.33):** the header maps `opendir`, `readdir`,
+`closedir` and `rewinddir` to `_opendir_a2lib` and the like, which exist
+only in `a2lib-dos33.lib`. The names follow the principle that a
+function's name doesn't name an operating system; they name the library
+whose `struct dirent` the caller was compiled with. The DOS 3.3 modules
+(`opendir.s`, `readdir.s`, `closedir.s`, `rewinddir.s`) take the place of
+cc65's of the same names.
 
-- Header without the library: the link fails (verified: ld65 reports
-  `__dos33_opendir` as unresolved).
-- Library without the header: the program uses cc65's stock directory
-  modules, which are still in the library under their stock names. They
-  fail visibly with `EINVAL`, because this layer's `open` rejects the
-  ProDOS pathnames they pass.
+- Header without the library: the link fails, naming `__opendir_a2lib`
+  and the others the program calls (verified).
+- Library without the header: the program calls `opendir`, which `cl65`
+  would find in cc65's own `apple2.lib`, appended after the core, and run
+  ProDOS code on the DOS 3.3 layout. Guards in the core
+  (`libsrc/guard/opendir_stock.s` and the like, 4.2) define those names
+  instead, so the link fails, naming `opendir_needs_a2lib_dirent_h`
+  (verified; until 10.33 the stock modules were in the core and failed at
+  run time with `EINVAL`).
 
 Either way, the DOS 3.3 `struct dirent` is never mixed with the ProDOS
 implementation.
@@ -1072,8 +1080,11 @@ function as an alias of an undefined symbol that names it:
 symbol, and the guard's file and line, for a program that calls it.
 Programs that don't call one link no guard. Guarded: `getcurrentdevice`,
 `getdevicedir`, `getfirstdevice`, `getnextdevice`, the `dio_*` calls,
-`file_set_type`, `file_set_auxtype`, `statvfs`, `mkdir`, `rmdir` and
-`clock_getres`. `make linktest` checks every one of them.
+`file_set_type`, `file_set_auxtype`, `statvfs`, `mkdir`, `rmdir`,
+`clock_getres` and `dir_entry_count` (which reads cc65's ProDOS `DIR`).
+`opendir`, `readdir`, `closedir` and `rewinddir` have guards under their
+stock names too, for programs compiled without a2lib's `dirent.h`
+(section 2). `make linktest` checks every one of them.
 `clock_gettime` and `clock_settime` have a DOS 3.3 version, the software
 clock, but in `a2lib-timer.lib` (section 2): their guards' symbols say
 so, `clock_gettime_needs_a2lib_timer`, and the timer library, linked
@@ -3033,10 +3044,49 @@ maps; zero page unchanged), against the build before 10.31:
 What remains is the selector's `rdkey.s`, `viewport.s` and `wherex.s`,
 and `cout.s` where the program doesn't print.
 
-Verified: `make linktest` passes, 82 checks. `test/selcheck.py` was shown
-to fail for a VideoTerm library without its copy of `cputs` (the
+Verified: `make emutest` passes, all 23 runs (`nettest` included), and
+`make linktest`, 82 checks. `test/selcheck.py` was shown to fail for a
+VideoTerm library without its copy of `cputs` (the
 selector would have to pull in `cputc` and `gotoxy`), and for a selector
 without `RDKEY` and with `_cpeekc`. `make simtest` passes.
+
+### 10.33 Directory modules under cc65's names; guards for cc65's dirent.h
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/opendir.s`, `readdir.s`, `closedir.s`, `rewinddir.s` | New, from `dir.s` (removed), as in cc65's `libsrc/apple2`: `opendir.s` holds `dir_at` and `read_dir_sector_ptr1`, as stock's holds `read_dir_block_ptr1`; `rewinddir.s` exports `rewinddir_ptr1`, as stock `closedir.s` exports `closedir_ptr1`. NULL and 0 are returned through the runtime's `return0`, as in stock |
+| `libsrc/dos33/dir.inc` | New, as stock's: the catalog's layout and `DIR` and `DIRENT`, from `fm.inc` |
+| `include/dirent.h`, `libsrc/dos33/stat.s` | `_opendir_a2lib` and the like in place of `_dos33_opendir` |
+| `libsrc/guard/opendir_stock.s`, `readdir_stock.s`, `closedir_stock.s`, `rewinddir_stock.s` | New: guards under the stock names (2) |
+| `libsrc/guard/dir_entry_count.s` | New: guard (4.2) |
+| `test/linktest.sh` | The four functions compiled with cc65's `dirent.h`, and `dir_entry_count`, must fail to link; the control program calls the directory functions. `link` takes `stock` to compile without a2lib's headers |
+| `tools/samebytes.sh` | Assembles each module with the Makefile's flags since 10.31, and the guards and selectors; stops when a module doesn't assemble |
+| `README.md`, `DESIGN.md` | 2, 4.2 |
+
+Template alignment (the ProDOS implementation as the model, so that
+maintainers find the DOS 3.3 code where they find stock's) and the
+naming principle (section 2). Splitting the modules also took cc65's
+ProDOS directory modules out of the core, so a program compiled with
+cc65's `dirent.h` reached them in `apple2.lib`, which `cl65` appends:
+shown with a test program before the guards, which linked. With them,
+it fails to link. `dir_entry_count`, a cc65 extension in `apple2.h`,
+reads cc65's ProDOS `DIR`, so on a2lib's it returned a wrong count; it
+had no guard.
+
+`tools/samebytes.sh` had stayed with the layout before 10.31: it
+assembled the timer and reflow modules from `libsrc/dos33`, where they
+no longer were, and kept going when ca65 failed, because `set -e` is off
+in a subshell whose status is tested. Both trees failing alike, it could
+report IDENTICAL without comparing them; it wasn't used for 10.31 or
+10.32.
+
+Verified: `tools/samebytes.sh` against 10.32 differs only in the
+directory modules and guards (new and removed), `stat.s`'s symbol names
+(its bytes are identical), `filetest`'s generated C (the four names) and
+the `filetest` program, 4 bytes larger: the four modules are 500 bytes,
+`dir.s` was 496, as `readdir`'s exits through `return0` no longer reach
+with a short branch. `make linktest` passes, 87 checks; `make simtest`
+passes.
 
 ## 11. Sources
 

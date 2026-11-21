@@ -28,17 +28,22 @@ trap 'rm -rf "$TMP"' EXIT
 
 fail=0
 
-# link NAME EXPECT BODY [ADDONS]: build a program whose main is BODY,
-# linked with ADDONS (selectors and libraries) ahead of the core. EXPECT is
-# the guard symbol ld65 must name, or "-" when the program must link.
+# link NAME EXPECT BODY [ADDONS [stock]]: build a program whose main is
+# BODY, linked with ADDONS (selectors and libraries) ahead of the core, and
+# compiled with a2lib's headers, or cc65's alone with "stock". EXPECT is the
+# guard symbol ld65 must name, or "-" when the program must link.
 link () {
-    local name=$1 expect=$2 body=$3 addons=${4:-}
+    local name=$1 expect=$2 body=$3 addons=${4:-} inc=(-I "$INC")
+    [[ ${5:-} == stock ]] && inc=(-DSTOCK)
     cat > "$TMP/$name.c" <<EOF
 #include <device.h>
 #include <dio.h>
 #include <apple2.h>
+#ifndef STOCK
 #include <a2reflow.h>
+#endif
 #include <conio.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <sys/statvfs.h>
 #include <time.h>
@@ -47,7 +52,7 @@ int main (void) { $body }
 EOF
     local out
     # shellcheck disable=SC2086
-    out=$("$CL65" -t apple2 -O -I "$INC" -m "$TMP/$name.map" -o "$TMP/$name" \
+    out=$("$CL65" -t apple2 -O "${inc[@]}" -m "$TMP/$name.map" -o "$TMP/$name" \
         "$TMP/$name.c" $addons "$LIB" 2>&1)
     local status=$?
     if [[ $expect == - ]]; then
@@ -96,6 +101,21 @@ link rmdir rmdir_has_no_DOS_3_3_implementation \
 link clock_getres clock_getres_has_no_DOS_3_3_implementation \
     'struct timespec t; return clock_getres (CLOCK_REALTIME, &t);'
 
+link dir_entry_count dir_entry_count_has_no_DOS_3_3_implementation \
+    'return dir_entry_count (opendir ("."));'
+
+# The directory functions with cc65's <dirent.h>, whose struct dirent isn't
+# a2lib's (DESIGN.md 2)
+for f in opendir readdir closedir rewinddir; do
+    case $f in
+        opendir) body='return opendir (".") != NULL;' ;;
+        readdir) body='return readdir ((DIR*) 0) != NULL;' ;;
+        closedir) body='return closedir ((DIR*) 0);' ;;
+        rewinddir) body='rewinddir ((DIR*) 0); return 0;' ;;
+    esac
+    link "stock$f" "${f}_needs_a2lib_dirent_h" "$body" "" stock
+done
+
 # The software clock is in a2lib-timer.lib
 link clock_gettime clock_gettime_needs_a2lib_timer \
     'struct timespec t; return clock_gettime (CLOCK_REALTIME, &t);'
@@ -107,7 +127,9 @@ link time clock_gettime_needs_a2lib_timer \
 # Controls: functions with DOS 3.3 versions, including remove(), which
 # shares _sysremove with the stock rmdir; and the clock, with the timer
 link control - \
-    'FILE* f = fopen ("X", "r"); if (f) fclose (f);
+    'FILE* f = fopen ("X", "r"); DIR* d = opendir (".");
+     if (f) fclose (f);
+     if (d) { readdir (d); rewinddir (d); closedir (d); }
      remove ("X"); rename ("X", "Y"); return chdir ("/6/1");'
 link clock - \
     'struct timespec t = {0, 0}; clock_settime (CLOCK_REALTIME, &t);

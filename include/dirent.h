@@ -6,10 +6,12 @@
 **
 **   cl65 -t apple2 -I a2lib/include -o prog prog.c a2lib/lib/a2lib-dos33.lib
 **
-** The directory functions keep their names in C, but map to DOS 3.3
-** symbols that exist only in a2lib-dos33.lib. Compiling with this header
-** and linking without the library fails to link, rather than mixing this
-** struct dirent with cc65's ProDOS implementation (DESIGN.md section 2).
+** The directory functions keep their names in C, but map to symbols that
+** exist only in a2lib-dos33.lib (_opendir_a2lib and the like), whose
+** directory modules take the place of cc65's. This struct dirent isn't
+** cc65's, so neither can be used with the other's: this header without
+** the library, or the library with cc65's header, fails to link (DESIGN.md
+** section 2).
 **
 ** opendir() takes a directory path: "/6/2" (slot 6, drive 2), "2" (drive
 ** 2 in the current slot), "." or "" (the current directory). DOS 3.3 has
@@ -51,14 +53,14 @@ struct dirent {
 #define _DE_ISLBL(t)  (0)
 #define _DE_ISLNK(t)  (0)
 
-DIR* __fastcall__ _dos33_opendir (const char* name);
-struct dirent* __fastcall__ _dos33_readdir (DIR* dir);
-int __fastcall__ _dos33_closedir (DIR* dir);
-void __fastcall__ _dos33_rewinddir (DIR* dir);
+DIR* __fastcall__ _opendir_a2lib (const char* name);
+struct dirent* __fastcall__ _readdir_a2lib (DIR* dir);
+int __fastcall__ _closedir_a2lib (DIR* dir);
+void __fastcall__ _rewinddir_a2lib (DIR* dir);
 
-#define opendir     _dos33_opendir
-#define readdir     _dos33_readdir
-#define closedir    _dos33_closedir
-#define rewinddir   _dos33_rewinddir
+#define opendir     _opendir_a2lib
+#define readdir     _readdir_a2lib
+#define closedir    _closedir_a2lib
+#define rewinddir   _rewinddir_a2lib
 
 #endif

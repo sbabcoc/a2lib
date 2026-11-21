@@ -23,7 +23,7 @@
 
         .export         _stat
         .import         _open, _close, _lseek
-        .import         __dos33_readdir, __dos33_closedir
+        .import         __readdir_a2lib, __closedir_a2lib
         .import         popax, pushax, pusha0
 
         .macpack        longbranch
@@ -34,6 +34,7 @@
         .include        "filedes.inc"
         .include        "stat.inc"
         .include        "fm.inc"
+        .include        "dir.inc"
 
         .code
 
@@ -165,7 +166,7 @@ _stat:
         sta     ___errno+1
 find:   lda     dirp
         ldx     dirp+1
-        jsr     __dos33_readdir
+        jsr     __readdir_a2lib
         sta     ptr2
         stx     ptr2+1
         ora     ptr2+1
@@ -208,7 +209,7 @@ blank:  lda     #' '            ; Past the end of d_name: blanks
 notfound:
         lda     dirp
         ldx     dirp+1
-        jsr     __dos33_closedir
+        jsr     __closedir_a2lib
         lda     ___errno
         bne     error
         lda     saverr          ; Success: the caller's errno again
