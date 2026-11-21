@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-12
+;
 ; 40-column window display for the shared 80 x 24 model (DESIGN.md 3.6)
 ;
 ; Shows columns s80_left to s80_left + 39 of the model (libsrc/s80) on the

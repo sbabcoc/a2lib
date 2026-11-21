@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-12
+;
 ; DOS 3.3 File Manager glue for the cc65 apple2 target
 ;
 ; On entry to the routines below, ptr4 points to the open file's control

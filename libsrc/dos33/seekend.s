@@ -1,5 +1,5 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Scott Babcock, 2026-11-12
 ;
 ; seekend: move the file in fdtab slot Y to its end, for O_APPEND.
 ; Preserves Y. Returns carry clear, or carry set with an __oserror value

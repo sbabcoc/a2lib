@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-14
+;
 ; Soft-70 display for the shared 80 x 24 model (DESIGN.md 3.8)
 ;
 ; Shows columns s80_left to s80_left + 69 of the model (libsrc/s80) on

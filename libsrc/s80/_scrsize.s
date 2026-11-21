@@ -1,4 +1,7 @@
 ;
+; Ullrich von Bassewitz, 26.10.2000
+; Scott Babcock, 2026-11-14
+;
 ; Screen size variables
 ;
 ; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based

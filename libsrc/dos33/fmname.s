@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-12
+;
 ; DOS 3.3 path names for the cc65 apple2 target (DESIGN.md 5.5)
 ;
 ; DOS 3.3 has a slot and drive for every file, and no subdirectories, so a

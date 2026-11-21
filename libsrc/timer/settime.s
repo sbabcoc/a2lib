@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-13
+;
 ; int __fastcall__ clock_settime (clockid_t clk_id, const struct timespec *tp);
 ; unsigned long a2_clock_age (void);
 ;

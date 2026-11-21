@@ -1,5 +1,5 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Scott Babcock, 2026-11-18
 ;
 ; int __fastcall__ exec (const char* progname, const char* cmdline);
 ;
@@ -197,7 +197,11 @@ drivedigit:
 
 ; ------------------------------------------------------------------------
 ; The stub. Runs at target, entered from done with ROM banked in: only
-; relative branches inside it, and its data is addressed at target.
+; relative branches inside it, and its data is addressed at target. Read
+; only here, as stock exec.s's loader: exec() copies it to target and
+; builds the command there.
+
+        .rodata
 
 source:
         jsr     DOS_CONNECT     ; Reconnect DOS's intercepts

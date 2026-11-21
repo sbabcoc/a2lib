@@ -1,4 +1,7 @@
 ;
+; 2020-07-12, Oliver Schmidt
+; Scott Babcock, 2026-11-12
+;
 ; char cpeekc (void);
 ;
 ; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based

@@ -1,4 +1,7 @@
 ;
+; Ullrich von Bassewitz, 06.08.1998
+; Scott Babcock, 2026-11-12
+;
 ; void __fastcall__ gotoxy (unsigned char x, unsigned char y);
 ; void __fastcall__ gotox (unsigned char x);
 ;

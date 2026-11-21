@@ -1,4 +1,7 @@
 ;
+; Kevin Ruland
+; Scott Babcock, 2026-11-14
+;
 ; void clrscr (void);
 ;
 ; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based

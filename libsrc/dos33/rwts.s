@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-12
+;
 ; DOS 3.3 RWTS access for the cc65 apple2 target
 ;
 ; rwts_read: read the sector rwts_track/rwts_sector from slot rwts_slot

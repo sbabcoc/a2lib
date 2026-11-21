@@ -1,4 +1,7 @@
 ;
+; Oliver Schmidt, 03.03.2007
+; Scott Babcock, 2026-11-12
+;
 ; RDKEY routine
 ;
 ; 40-column window backend (a2lib-c40win.lib), based on cc65's

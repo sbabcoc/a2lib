@@ -1,5 +1,5 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Scott Babcock, 2026-11-12
 ;
 ; Control blocks (FCB, fm.inc) are DOS's own file buffers ("Beneath Apple
 ; DOS" ch. 6, DOS BUFFERS; DESIGN.md 4.4): MAXFILES of them, between

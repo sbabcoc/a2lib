@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-20
+;
 ; Tick hook for the cc65 apple2 target (DESIGN.md 6.3)
 ;
 ; The wait loops of a2lib-timer.lib's cgetc and kbhit, and of the display

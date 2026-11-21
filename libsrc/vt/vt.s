@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-12
+;
 ; Videx VideoTerm backend for the cc65 apple2 target (DESIGN.md 3.4)
 ;
 ; vt_active:  bit 7 set if the card was found and is in use. The conio

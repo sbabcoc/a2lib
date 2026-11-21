@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-13
+;
 ; a2_viewport: the visible width of the text screen, in A (DESIGN.md 3.7)
 ;
 ; VideoTerm library: 80 on the card, otherwise the stock 40-column screen.

@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-13
+;
 ; Reflow filter for stdio console output (DESIGN.md 3.7)
 ;
 ; void __fastcall__ reflow_on (unsigned char width);

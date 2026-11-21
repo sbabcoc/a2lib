@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-12
+;
 ; IRQ handling under DOS 3.3
 ;
 ; Replaces libsrc/apple2/irq.s from cc65, which allocates a ProDOS

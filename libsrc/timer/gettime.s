@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-13
+;
 ; int __fastcall__ clock_gettime (clockid_t clk_id, struct timespec *tp);
 ;
 ; Software clock for DOS 3.3 (DESIGN.md 6.3). Replaces

@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-13
+;
 ; Cooperative timer for the cc65 apple2 target (DESIGN.md 6.3)
 ;
 ; unsigned long a2_millis (void);

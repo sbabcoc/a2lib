@@ -1,5 +1,6 @@
 ;
 ; Ullrich von Bassewitz, 26.10.2000
+; Scott Babcock, 2026-11-12
 ;
 ; Screen size variables
 ;

@@ -1,4 +1,7 @@
 ;
+; Kevin Ruland
+; Scott Babcock, 2026-11-12
+;
 ; char cgetc (void);
 ;
 ; 40-column window backend (a2lib-c40win.lib), based on cc65's

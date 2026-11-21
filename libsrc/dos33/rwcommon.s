@@ -1,5 +1,5 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Scott Babcock, 2026-11-12
 ;
 ; Replaces libsrc/apple2/rwcommon.s from cc65 and exports the same symbols,
 ; for the stock read.s and for write.s:

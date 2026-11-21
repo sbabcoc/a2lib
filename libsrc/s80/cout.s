@@ -1,4 +1,7 @@
 ;
+; Oliver Schmidt, 03.03.2007
+; Scott Babcock, 2026-11-12
+;
 ; COUT routine
 ;
 ; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based

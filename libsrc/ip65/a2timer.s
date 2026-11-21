@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-13
+;
 ; IP65 timer driver using a2lib's cooperative timer (DESIGN.md 6.3)
 ;
 ; Replaces IP65's drivers/a2timer.s, which has no time base and makes each

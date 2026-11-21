@@ -1,4 +1,7 @@
 ;
+; Ullrich von Bassewitz, 06.08.1998
+; Scott Babcock, 2026-11-14
+;
 ; void __fastcall__ gotoy (unsigned char y);
 ;
 ; 80 x 24 backends (a2lib-c40win.lib, a2lib-soft70.lib), based

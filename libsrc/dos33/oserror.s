@@ -1,5 +1,6 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Ullrich von Bassewitz, 17.05.2000
+; Scott Babcock, 2026-11-19
 ;
 ; int __fastcall__ __osmaperrno (unsigned char oserror);
 ;

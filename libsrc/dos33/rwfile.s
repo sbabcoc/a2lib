@@ -1,5 +1,5 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Scott Babcock, 2026-11-12
 ;
 ; rwfile: read or write an open file, for rwcommon (rwcommon.s), which
 ; jumps here once this module's constructor has pointed it here. open.s

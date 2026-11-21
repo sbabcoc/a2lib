@@ -1,5 +1,5 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Scott Babcock, 2026-11-12
 ;
 ; int open (const char* name, int flags, ...);
 ;

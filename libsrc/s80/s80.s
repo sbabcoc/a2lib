@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-14
+;
 ; Shared 80 x 24 screen model (DESIGN.md 3.1, 3.6, 3.8; s80.inc)
 ;
 ; An 80 x 24 screen kept in memory (s80_buf), of which columns s80_left to

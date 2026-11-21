@@ -1,4 +1,7 @@
 ;
+; Oliver Schmidt, 03.03.2007
+; Scott Babcock, 2026-11-12
+;
 ; RDKEY routine
 ;
 ; Soft-70 backend (a2lib-soft70.lib), based on cc65's

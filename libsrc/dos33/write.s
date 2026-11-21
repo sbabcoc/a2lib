@@ -1,15 +1,15 @@
 ;
 ; Oliver Schmidt, 12.01.2005
+; Scott Babcock, 2026-11-12
 ;
 ; int __fastcall__ write (int fd, const void* buf, unsigned count);
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target: modified copy of
-; libsrc/apple2/write.s from cc65. The O_APPEND path, which issued ProDOS
-; MLI calls, is gone: rwfile.s moves to the end of the file (seekend.s).
-; The device path leaves its count in rw_count (rwcommon.s), not in
-; ProDOS's parameter block, and counts its passes through the low byte
-; first: stock's loop wrote 256 characters too many for a count that is a
-; nonzero multiple of 256 (DESIGN.md 10.28).
+; DOS 3.3 version of libsrc/apple2/write.s from cc65. The O_APPEND path,
+; which issued ProDOS MLI calls, is gone: rwfile.s moves to the end of the
+; file (seekend.s). The device path leaves its count in rw_count
+; (rwcommon.s), not in ProDOS's parameter block, and counts its passes
+; through the low byte first: stock's loop wrote 256 characters too many
+; for a count that is a nonzero multiple of 256 (DESIGN.md 10.28).
 ;
 
         .export         _write

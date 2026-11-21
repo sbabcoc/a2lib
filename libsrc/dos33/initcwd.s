@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-19
+;
 ; initcwd: set __cwd to "/S/D", DOS 3.3's last-used slot and drive, which
 ; are the current directory (fmname.s, syschdir.s; DESIGN.md 5.5).
 ; Replaces libsrc/apple2/initcwd.s from cc65, which asks ProDOS for its

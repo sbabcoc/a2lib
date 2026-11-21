@@ -1,5 +1,6 @@
 ;
-; DOS 3.3 file I/O for the cc65 apple2 target
+; Stefan Haubenthal, 2003-12-24
+; Scott Babcock, 2026-11-19
 ;
 ; Defines the platform specific error list: replaces
 ; libsrc/apple2/oserrlist.s from cc65 (DESIGN.md 5.6). DOS 3.3's own

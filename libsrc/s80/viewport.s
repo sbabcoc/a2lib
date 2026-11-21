@@ -1,4 +1,6 @@
 ;
+; Scott Babcock, 2026-11-14
+;
 ; a2_viewport: the visible width of the text screen, in A (DESIGN.md 3.7)
 ;
 ; 80 x 24 backends: 80 on the VideoTerm; otherwise S80_VIEW (display.inc),
