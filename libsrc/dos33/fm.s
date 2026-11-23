@@ -3,9 +3,9 @@
 ;
 ; DOS 3.3 File Manager glue for the cc65 apple2 target
 ;
-; On entry to the routines below, ctlblock points to the open file's
-; control block (FCB). fm_begin sets fm_parmlist to the File Manager
-; parameter list.
+; Calls into DOS 3.3's File Manager ("Beneath Apple DOS" ch. 6, 8) through
+; its parameter list (fm_parmlist), for a file whose buffers are a control
+; block (FCB, fm.inc; ctlblock).
 ;
 
         .include        "zeropage.inc"
@@ -17,10 +17,17 @@ call_type       = tmp1          ; byte: FMC_READ or FMC_WRITE (fm_rangeio)
 
         .code
 
-; ------------------------------------------------------------------------
-; fm_fdfcb: ctlblock = the control block of fdtab slot Y. Preserves X and Y;
-; returns Z set if the slot has none (the console).
-; fm_fdbegin: the same, then fm_begin (falls into it).
+;-----------------------------------------------------------------------------
+; fm_fdfcb: Find the control block of an fdtab slot.
+;
+; Input:        Y             byte      the fdtab slot's offset (fd *
+;                                       .sizeof(FD))
+; Output:       ctlblock      FCB*      the slot's control block; 0 for the
+;                                       console
+;               A             byte      ctlblock's high byte
+;               Z             flag      set: the slot has no control block
+;                                       (the console)
+; Changes:      N set from A. X and Y are unchanged.
 
 fm_fdfcb:
         lda     fdtab + FD::BUFFER,y
@@ -29,13 +36,29 @@ fm_fdfcb:
         sta     ctlblock+1
         rts
 
+;-----------------------------------------------------------------------------
+; fm_fdbegin: Find the control block of an fdtab slot and begin File Manager
+; calls on it: fm_fdfcb, then fm_begin (falls into it).
+;
+; Input:        Y             byte      the fdtab slot's offset, of an open
+;                                       file
+; Output:       ctlblock      FCB*      the slot's control block
+;               fm_parmlist   byte*     as fm_begin sets it
+; Changes:      A, X and Y.
+
 fm_fdbegin:
         jsr     fm_fdfcb        ; Falls into fm_begin
 
-; fm_begin: locate the parameter list (fm_parmlist) and point its buffer
-; fields at the control block in ctlblock: its work area, and the T/S list and data
-; buffers below it. Must precede every series of File Manager calls,
-; because DOS owns the parameter list between calls.
+;-----------------------------------------------------------------------------
+; fm_begin: Begin a series of File Manager calls: locate the parameter list
+; and point its buffer fields at the control block's work area and the T/S
+; list and data buffers below it. Needed before each series, because DOS owns
+; the parameter list between calls.
+;
+; Input:        ctlblock      FCB*      the control block
+; Output:       fm_parmlist   byte*     the parameter list, with FM_WORK,
+;                                       FM_TSL and FM_DATA set
+; Changes:      A, X and Y.
 
 fm_begin:
         jsr     FM_LOCATE       ; Y = low, A = high
@@ -58,20 +81,52 @@ fm_begin:
         bne     :-
         rts
 
-; ------------------------------------------------------------------------
-; fm_simple: call type in A, no other parameters (CLOSE; or DELETE after
-; fm_name has set the name fields).
-; fm_op: the same, with X as for fm_call.
+;-----------------------------------------------------------------------------
+; fm_simple: Make a File Manager call that takes no parameters but the call
+; type (CLOSE, or DELETE once fm_name has set the name fields). Falls into
+; fm_op.
+;
+; Prepare:      fm_begin
+; Input:        A             byte      the call type (FMC_*)
+;               fm_parmlist   byte*     the parameter list
+; Output:       C             flag      as fm_call
+;               A             byte      as fm_call
+; Changes:      X (1) and Y.
 
 fm_simple:
-        ldx     #$01
+        ldx     #$01            ; Falls into fm_op
+
+;-----------------------------------------------------------------------------
+; fm_op: Make a File Manager call of the given type, its other parameters
+; already set.
+;
+; Prepare:      fm_begin
+; Input:        A             byte      the call type (FMC_*)
+;               X             byte      as fm_call
+;               fm_parmlist   byte*     the parameter list
+; Output:       C             flag      as fm_call
+;               A             byte      as fm_call
+; Changes:      Y.
+
 fm_op:  ldy     #FM_CALL
         sta     (fm_parmlist),y
         jmp     fm_call         ; fm_call is in another segment
 
-; ------------------------------------------------------------------------
-; fm_open: OPEN the file the name fields name (fm_name), with variable-
-; length records; A is the type for a new file. X as for fm_call.
+;-----------------------------------------------------------------------------
+; fm_open: OPEN the file that the name fields name, with variable-length
+; records.
+;
+; Prepare:      fm_begin, fm_name
+; Input:        A             byte      the type for a new file (FMT_*);
+;                                       ignored for one that exists
+;               X             byte      0: create the file if it isn't found;
+;                                       else don't (fm_call)
+;               fm_parmlist   byte*     the parameter list
+; Output:       C             flag      as fm_call
+;               A             byte      as fm_call
+;               fm_parmlist   byte*     if C clear: FM_TYPE is the file's
+;                                       type, with its lock bit
+; Changes:      Y.
 
 fm_open:
         ldy     #FM_TYPE
@@ -84,15 +139,23 @@ fm_open:
         lda     #FMC_OPEN
         bne     fm_op           ; Branch always
 
-; ------------------------------------------------------------------------
-; fm_call: call the File Manager. X = 0 allocates the file on OPEN if it
-; isn't found; X <> 0 doesn't. Returns the File Manager's return code in A,
-; with carry set if it is nonzero.
-;
-; cc65 leaves Language Card bank 2 enabled for reading. Switch ROM in
-; around the call, as rdkey.s does around the monitor's RDKEY.
-
         .segment        "LOWCODE"
+
+;-----------------------------------------------------------------------------
+; fm_call: Call the File Manager. cc65 leaves Language Card bank 2 enabled for
+; reading, so ROM is switched in around the call, as rdkey.s does around the
+; monitor's RDKEY.
+;
+; Prepare:      fm_begin, and the call's parameters
+; Input:        X             byte      OPEN only: 0 creates the file if it
+;                                       isn't found; else it doesn't
+;               fm_parmlist   byte*     the parameter list
+; Output:       C             flag      clear: the call succeeded; set: it
+;                                       failed
+;               A             byte      the File Manager's return code: 0, or
+;                                       a DOS 3.3 error number (DOSERR_*)
+; Changes:      X and Y; DOS's own state and zero page. Language Card bank 2
+;               is enabled for reading on return.
 
 fm_call:
         bit     LC_ROM_RO
@@ -105,9 +168,16 @@ fm_call:
 
         .code
 
-; ------------------------------------------------------------------------
-; fm_position: POSITION to the absolute byte offset in AX (record 0).
-; Returns as fm_call.
+;-----------------------------------------------------------------------------
+; fm_position: POSITION an open file to a byte offset from its start (record
+; 0).
+;
+; Prepare:      fm_begin
+; Input:        AX            unsigned  the byte offset
+;               fm_parmlist   byte*     the parameter list
+; Output:       C             flag      as fm_call
+;               A             byte      as fm_call
+; Changes:      X and Y.
 
 fm_position:
         ldy     #FM_OFFSET
@@ -123,9 +193,16 @@ fm_position:
         lda     #FMC_POSITION
         bne     fm_simple       ; Branch always
 
-; ------------------------------------------------------------------------
-; fm_readbyte: read one byte. Returns carry clear with the byte in A, or
-; carry set with the return code in A.
+;-----------------------------------------------------------------------------
+; fm_readbyte: READ one byte from an open file.
+;
+; Prepare:      fm_begin
+; Input:        fm_parmlist   byte*     the parameter list
+; Output:       C             flag      clear: read; set: failed
+;                                       (DOSERR_ENDDATA at the file's end)
+;               A             byte      if C clear: the byte; if C set: the
+;                                       return code (DOSERR_*)
+; Changes:      X and Y.
 
 fm_readbyte:
         ldy     #FM_CALL
@@ -142,8 +219,15 @@ fm_readbyte:
         clc
 :       rts
 
-; ------------------------------------------------------------------------
-; fm_writebyte: write the byte in A. Returns as fm_call.
+;-----------------------------------------------------------------------------
+; fm_writebyte: WRITE one byte to an open file.
+;
+; Prepare:      fm_begin
+; Input:        A             byte      the byte
+;               fm_parmlist   byte*     the parameter list
+; Output:       C             flag      as fm_call
+;               A             byte      as fm_call
+; Changes:      X and Y.
 
 fm_writebyte:
         ldy     #FM_BYTE
@@ -157,10 +241,19 @@ fm_writebyte:
         ldx     #$01
         jmp     fm_call
 
-; ------------------------------------------------------------------------
-; fm_rangeio: READ or WRITE (call type in A) fm_rio_count bytes at
-; fm_rio_addr. The count must not be zero. Returns as fm_call.
-; Uses call_type.
+;-----------------------------------------------------------------------------
+; fm_rangeio: READ or WRITE a range of bytes of an open file. A WRITE passes
+; the File Manager the count less FM_WRITE_ADJUST, as "Beneath Apple DOS" ch.
+; 6 says a range WRITE takes (fm.inc).
+;
+; Prepare:      fm_begin
+; Input:        A             byte      FMC_READ or FMC_WRITE
+;               fm_rio_addr   byte*     the buffer
+;               fm_rio_count  unsigned  the number of bytes; not 0
+;               fm_parmlist   byte*     the parameter list
+; Output:       C             flag      as fm_call
+;               A             byte      as fm_call
+; Changes:      X, Y and call_type.
 
 fm_rangeio:
         sta     call_type
@@ -197,8 +290,12 @@ fm_rangeio:
         ldx     #$01
         jmp     fm_call
 
-; ------------------------------------------------------------------------
-; fm_incpos: increment the control block's logical position.
+;-----------------------------------------------------------------------------
+; fm_incpos: Add 1 to the control block's logical position.
+;
+; Input:        ctlblock      FCB*      the control block
+; Output:       ctlblock      FCB*      FCB::POS one higher, modulo 65536
+; Changes:      A and Y; C set if POS wrapped to 0. X is unchanged.
 
 fm_incpos:
         ldy     #FCB::POS
@@ -212,10 +309,14 @@ fm_incpos:
         sta     (ctlblock),y
         rts
 
-; ------------------------------------------------------------------------
-; fm_maperr: translate a File Manager return code (A) into the
-; __oserror value. The File Manager's codes are DOS 3.3's own error
-; numbers (fm.inc), so they pass through; anything else is an I/O error.
+;-----------------------------------------------------------------------------
+; fm_maperr: Translate a File Manager return code into an __oserror value. The
+; File Manager's codes are DOS 3.3's own error numbers (fm.inc), so they pass
+; through; anything else is an I/O error.
+;
+; Input:        A             byte      the return code, not 0
+; Output:       A             byte      the __oserror value (DOSERR_*)
+; Changes:      C, N and Z. X and Y are unchanged.
 
 fm_maperr:
         cmp     #DOSERR_LOCKED + 1
@@ -225,5 +326,5 @@ fm_maperr:
 
         .bss
 
-fm_rio_addr:    .res    2
-fm_rio_count:   .res    2
+fm_rio_addr:    .res    2       ; byte*: fm_rangeio's buffer
+fm_rio_count:   .res    2       ; unsigned: fm_rangeio's byte count

@@ -3,17 +3,9 @@
 ;
 ; DOS 3.3 RWTS access for the cc65 apple2 target
 ;
-; rwts_read: read the sector rwts_track/rwts_sector from slot rwts_slot
-; (1-7), drive rwts_drive, volume rwts_volume (0 = any) into the 256-byte
-; buffer at rwts_buf. Returns carry clear, or carry set with the RWTS
-; return code in A.
-;
-; Uses DOS's own IOB (from $3E3), so the device characteristics table
-; and last-access fields that DOS maintains stay valid ("Beneath Apple
-; DOS" ch. 6). Uses iob.
-;
-; rwts_maperr: translate an RWTS return code (A) into the DOS 3.3 error
-; number DOS itself reports for it, as fm_maperr does for the File Manager.
+; Reads a sector through DOS's own IOB (from $3E3), so the device
+; characteristics table and last-access fields that DOS maintains stay
+; valid ("Beneath Apple DOS" ch. 6).
 ;
 
         .include        "zeropage.inc"
@@ -23,6 +15,22 @@
 iob             = ptr3          ; byte*: DOS's IOB
 
         .code
+
+;-----------------------------------------------------------------------------
+; rwts_read: Read one sector through RWTS.
+;
+; Input:        rwts_slot     byte      the slot (1-7)
+;               rwts_drive    byte      the drive (1-2)
+;               rwts_volume   byte      the volume; 0 for any
+;               rwts_track    byte      the track
+;               rwts_sector   byte      the sector
+;               rwts_buf      byte*     256 bytes for the sector
+; Output:       C             flag      clear: read; set: failed
+;               A             byte      RWTS's return code: 0, or RWTS_*
+;                                       (rwts_maperr)
+;               rwts_buf      byte*     if C clear: the sector
+; Changes:      X, Y and iob; DOS's IOB and its own state. Language Card bank
+;               2 is enabled for reading on return.
 
 rwts_read:
         jsr     RWTS_LOCATE     ; Y = low, A = high
@@ -72,10 +80,18 @@ rwts_read:
         lda     iob+1
         jmp     call
 
-; cc65 leaves Language Card bank 2 enabled for reading; switch ROM in
-; around the call, as fm_call does.
-
         .segment        "LOWCODE"
+
+;-----------------------------------------------------------------------------
+; call: Call RWTS. cc65 leaves Language Card bank 2 enabled for reading, so
+; ROM is switched in around the call, as fm_call does.
+;
+; Input:        Y             byte      the IOB's low byte
+;               A             byte      the IOB's high byte
+;               iob           byte*     the IOB, set up for the call
+; Output:       C             flag      as rwts_read
+;               A             byte      as rwts_read
+; Changes:      X and Y.
 
 call:   bit     LC_ROM_RO
         jsr     RWTS_ENTRY
@@ -86,6 +102,16 @@ call:   bit     LC_ROM_RO
         rts
 
         .code
+
+;-----------------------------------------------------------------------------
+; rwts_maperr: Translate an RWTS return code into the DOS 3.3 error number
+; that DOS itself reports for it, as fm_maperr does for the File Manager.
+;
+; Input:        A             byte      RWTS's return code, not 0
+; Output:       A             byte      the __oserror value: DOSERR_WPROT
+;                                       (EACCES), DOSERR_VOLUME (ENOENT) or
+;                                       DOSERR_IO (EIO)
+; Changes:      C, N and Z. X and Y are unchanged.
 
 rwts_maperr:
         cmp     #RWTS_WPROT
@@ -101,9 +127,9 @@ rwts_maperr:
 
         .bss
 
-rwts_slot:      .res    1
-rwts_drive:     .res    1
-rwts_volume:    .res    1
-rwts_track:     .res    1
-rwts_sector:    .res    1
-rwts_buf:       .res    2
+rwts_slot:      .res    1       ; byte: the slot (1-7)
+rwts_drive:     .res    1       ; byte: the drive (1-2)
+rwts_volume:    .res    1       ; byte: the volume, 0 for any
+rwts_track:     .res    1       ; byte: the track (0-34)
+rwts_sector:    .res    1       ; byte: the sector (0-15)
+rwts_buf:       .res    2       ; byte*: 256 bytes for the sector

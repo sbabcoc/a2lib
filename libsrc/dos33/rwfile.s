@@ -1,15 +1,9 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; rwfile: read or write an open file, for rwcommon (rwcommon.s), which
-; jumps here once this module's constructor has pointed it here. open.s
-; forces this module in, so programs that never open a file don't link it.
-; Called as rwcommon is, with:
-;   A     REF_NUM of the file (see open.s)
-;   Y     READ_CALL or WRITE_CALL
-;   buffer  (ptr1) the caller's buffer
-;   count   (ptr2) the number of bytes
-; and returns the number of bytes transferred in AX, through rwepilog.
+; Reading and writing open files, for read() and write() through
+; rwcommon (rwcommon.s). open.s forces this module in, so programs that
+; never open a file don't link it.
 ;
 ; O_APPEND: a write first moves to the end of the file (seekend.s).
 ;
@@ -24,8 +18,9 @@
 ; Other files are transferred raw.
 ;
 ; Zero page: like the stock rwcommon, this may change ptr1-ptr3, but it
-; preserves ptr4, which it uses for the control block (ctlblock). cc65's fgets keeps
-; its destination pointer in ptr4 across fgetc -> read (DESIGN.md 10.1).
+; preserves ptr4, which it uses for the control block (ctlblock). cc65's
+; fgets keeps its destination pointer in ptr4 across fgetc -> read
+; (DESIGN.md 10.1).
 ;
 
         .export         rwfile
@@ -54,6 +49,13 @@ COUNT = rw_count                ; Bytes transferred, for rwepilog
 
         .segment        "ONCE"
 
+;-----------------------------------------------------------------------------
+; initrwfile: Point rwcommon's JMP at rwfile (a constructor).
+;
+; Input:        none
+; Output:       none
+; Changes:      A.
+
 initrwfile:
         lda     #<rwfile
         sta     rwcommon+1
@@ -62,6 +64,27 @@ initrwfile:
         rts
 
         .code
+
+;-----------------------------------------------------------------------------
+; rwfile: Read or write an open file, for read() and write(), through
+; rwcommon.
+;
+; Input:        A             byte      the file's REF_NUM (open.s)
+;               Y             byte      READ_CALL or WRITE_CALL
+;               buffer        byte*     the caller's buffer
+;               count         unsigned  the number of bytes
+; Output:       AX            int       the number of bytes transferred (fewer
+;                                       at the end of a file), or -1
+;               errno         int       if -1: EINVAL (a byte $80-$FF for a T
+;                                       file; O_APPEND on a raw file), ENOSPC
+;                                       (past a header file's 64K), or as
+;                                       __oserror maps
+;               __oserror     byte      0, or the DOS 3.3 or library error
+;               rw_count      unsigned  the number of bytes transferred,
+;                                       unless -1
+; Changes:      Y; buffer, count, remaining_low, remaining_high, newpos_low,
+;               newpos_high, scan_ptr and fm_parmlist. ctlblock (ptr4) is
+;               preserved, for cc65's fgets.
 
 rwfile:
         ; Save the caller's ptr4
@@ -172,7 +195,7 @@ header: lda     op
         lda     remaining_high
         sta     fm_rio_count+1
         lda     #FMC_READ
-        jsr     fm_rangeio      ; Uses tmp1 (remaining_low)
+        jsr     fm_rangeio      ; Changes tmp1 (remaining_low)
         jcs     fmerr
 
         ; COUNT = bytes read; POS += COUNT
@@ -338,10 +361,12 @@ ok:     jsr     restore
         lda     #$00
         jmp     rwepilog
 
-; ------------------------------------------------------------------------
-; Helpers
-
-; restore: restore the caller's ptr4. Preserves A.
+;-----------------------------------------------------------------------------
+; restore: Restore the caller's ptr4, which rwfile used as ctlblock.
+;
+; Input:        none
+; Output:       A             byte      unchanged
+; Changes:      N and Z set from A. X, Y and C are unchanged.
 
 restore:
         pha
@@ -352,7 +377,14 @@ restore:
         pla
         rts
 
-; whole: set up fm_rangeio for the whole request (buffer, count).
+;-----------------------------------------------------------------------------
+; whole: Point fm_rangeio at the whole request.
+;
+; Input:        buffer        byte*     the caller's buffer
+;               count         unsigned  the number of bytes
+; Output:       fm_rio_addr   byte*     buffer
+;               fm_rio_count  unsigned  count
+; Changes:      A. X and Y are unchanged.
 
 whole:  lda     buffer
         sta     fm_rio_addr
@@ -364,12 +396,29 @@ whole:  lda     buffer
         sta     fm_rio_count+1
         rts
 
-; putbyte: store A at buffer, then fall into nextbyte.
-; nextbyte: advance ptr1 and COUNT. Returns Z set when COUNT = ptr2.
+;-----------------------------------------------------------------------------
+; putbyte: Store a byte in the caller's buffer, and advance past it (falls
+; into nextbyte).
+;
+; Input:        A             byte      the byte
+;               buffer        byte*     where it goes
+; Output:       Z             flag      as nextbyte
+; Changes:      A and Y (0); as nextbyte.
 
 putbyte:
         ldy     #$00
-        sta     (buffer),y
+        sta     (buffer),y      ; Falls into nextbyte
+
+;-----------------------------------------------------------------------------
+; nextbyte: Advance past one byte of the caller's buffer, and count it.
+;
+; Input:        buffer        byte*     the byte
+;               count         unsigned  the bytes asked for
+; Output:       Z             flag      set: COUNT has reached count
+;               buffer        byte*     one higher
+;               COUNT         unsigned  one higher
+; Changes:      A, C and N. X and Y are unchanged.
+
 nextbyte:
         inc     buffer
         bne     :+
@@ -384,7 +433,13 @@ nextbyte:
         cmp     count+1
 :       rts
 
-; swapnl: exchange $0A and $0D (DESIGN.md 5.1, newlines).
+;-----------------------------------------------------------------------------
+; swapnl: Exchange $0A and $0D (DESIGN.md 5.1, newlines).
+;
+; Input:        A             char      the character
+; Output:       A             char      $0D for $0A, $0A for $0D, else
+;                                       unchanged
+; Changes:      C, N and Z. X and Y are unchanged.
 
 swapnl: cmp     #$0A
         bne     :+
@@ -397,6 +452,6 @@ swapnl: cmp     #$0A
 
         .bss
 
-op:     .res    1
+op:     .res    1               ; byte: READ_CALL or WRITE_CALL
 saveptr4:
-        .res    2
+        .res    2               ; The caller's ptr4 (ctlblock), restored

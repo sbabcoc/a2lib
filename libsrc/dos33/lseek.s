@@ -34,14 +34,32 @@ offset_high     = ptr2          ; unsigned: the offset's high word
 
         .code
 
+;-----------------------------------------------------------------------------
+; _lseek: Move an open file's position: off_t __fastcall__ lseek (int fd,
+; off_t offset, int whence).
+;
+; Input:        C stack       int       fd: an open file, not the console
+;               C stack       long      offset: from the position whence names
+;               AX            int       whence: SEEK_CUR (0), SEEK_END (1) or
+;                                       SEEK_SET (2)
+; Output:       sreg:AX       long      the new position, or -1
+;               errno         int       if -1: EBADF, EINVAL (the console, a
+;                                       bad whence, a position below 0 or
+;                                       above $FFFF), ESPIPE (past a header
+;                                       file's length), or as __oserror maps
+;               __oserror     byte      0, or the DOS 3.3 or library error
+; Changes:      Y; offset_low, offset_high, fm_parmlist and ctlblock. Pops fd
+;               and offset. SEEK_END on a T or raw file reads it from the
+;               start to find the end. The file's end-of-data state is
+;               cleared.
+
 _lseek:
         ; Save whence
         sta     whence
         stx     whence+1
 
-        ; Get and save offset: low word in offset_low, high word in
-        ; offset_high
-        jsr     popptr1
+        ; Get and save offset
+        jsr     popptr1         ; Low word: into offset_low (ptr1)
         jsr     popax
         sta     offset_high
         stx     offset_high+1
@@ -202,7 +220,7 @@ oserr:  jsr     ___mappederrno  ; Leaves -1 in AX
 
         .bss
 
-whence: .res    2
-base:   .res    2
-newpos: .res    2
-fmpos:  .res    2
+whence: .res    2               ; int: SEEK_CUR, SEEK_END or SEEK_SET
+base:   .res    2               ; unsigned: the position whence names
+newpos: .res    2               ; unsigned: the new logical position
+fmpos:  .res    2               ; unsigned: the File Manager's offset for it

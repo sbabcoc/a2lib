@@ -21,6 +21,19 @@
 
         .code
 
+;-----------------------------------------------------------------------------
+; __syschdir: Change the current directory, for chdir(): unsigned char
+; __fastcall__ _syschdir (const char* name).
+;
+; Input:        AX            char*     name: "/S/D", "D" or ".", each
+;                                       optionally ending in "/"
+; Output:       A             byte      0, or DOSERR_SYNTAX (EINVAL) for any
+;                                       other path
+;               X             byte      unchanged (name's high byte), not 0:
+;                                       cc65's chdir reads only A
+; Changes:      Y and ptr1 (fm_location). On success: DOS_SLOT and DOS_DRIVE,
+;               which outlast the program, and __cwd (initcwd).
+
 __syschdir:
         jsr     fm_location     ; From AX
         bcs     done            ; A = DOSERR_SYNTAX

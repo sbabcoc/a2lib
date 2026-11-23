@@ -1,9 +1,7 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; seekend: move the file in fdtab slot Y to its end, for O_APPEND.
-; Preserves Y. Returns carry clear, or carry set with an __oserror value
-; in A (for ___mappederrno).
+; The end of a file, for O_APPEND:
 ;
 ;   Header files: the end is the length recorded in the header.
 ;   T files:      the end is the first $00 on disk, found by scanning
@@ -21,6 +19,22 @@
         .include        "fm.inc"
 
         .code
+
+;-----------------------------------------------------------------------------
+; seekend: Move an open file to its end, before a write with O_APPEND.
+;
+; Input:        Y             byte      the fdtab slot's offset, of an open
+;                                       file
+; Output:       C             flag      clear: at the end; set: an error
+;               A             byte      if C set: the __oserror value:
+;                                       LIBERR_NOEND (EINVAL) for a raw file,
+;                                       which has no recorded end, or a DOS
+;                                       3.3 error
+;               Y             byte      unchanged
+;               ctlblock      FCB*      the slot's control block, POS at the
+;                                       end
+; Changes:      X; fm_parmlist. A T file is read from its position to its
+;               first $00, and its end-of-data state cleared.
 
 seekend:
         sty     sslot
@@ -84,7 +98,14 @@ fail:   jsr     fm_maperr
 out:    ldy     sslot
         rts
 
-; topos: POSITION to the logical position POS (T files have no header).
+;-----------------------------------------------------------------------------
+; topos: POSITION a T file, which has no header, to its logical position.
+;
+; Prepare:      fm_begin
+; Input:        ctlblock      FCB*      the control block
+; Output:       C             flag      as fm_call
+;               A             byte      as fm_call
+; Changes:      X and Y.
 
 topos:  ldy     #FCB::POS+1
         lda     (ctlblock),y
@@ -95,4 +116,4 @@ topos:  ldy     #FCB::POS+1
 
         .bss
 
-sslot:  .res    1
+sslot:  .res    1               ; byte: the fdtab slot's offset

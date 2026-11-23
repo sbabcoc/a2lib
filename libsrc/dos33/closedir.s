@@ -10,6 +10,14 @@
         .export         __closedir_a2lib
         .import         _free, return0
 
+;-----------------------------------------------------------------------------
+; __closedir_a2lib: Close a directory: int __fastcall__ _closedir_a2lib (DIR*
+; dir), which dirent.h names closedir().
+;
+; Input:        AX            DIR*      dir: from opendir()
+; Output:       AX            int       0
+; Changes:      Y and what free changes. dir is freed.
+
 __closedir_a2lib:
         jsr     _free
         jmp     return0

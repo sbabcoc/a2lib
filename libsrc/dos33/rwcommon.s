@@ -2,13 +2,8 @@
 ; Scott Babcock, 2026-11-12
 ;
 ; Replaces libsrc/apple2/rwcommon.s from cc65 and exports the same symbols,
-; for the stock read.s and for write.s:
-;   rwprolog  pop fd and buf, save count (count) and buf (ptr1), getfd
-;   rwcommon  transfer to or from a file: a JMP to rwfile (rwfile.s), set
-;             by its constructor when a program opens files; a program
-;             that doesn't has no file to pass here
-;   rwepilog  return rw_count, the bytes transferred, with __oserror = A
-;             (0)
+; for the stock read.s and for write.s. The file code is in rwfile.s, which
+; only programs that open files link.
 ;
 
         .export         rwprolog, rwcommon, rwepilog, rw_count
@@ -23,6 +18,21 @@ count           = ptr2          ; unsigned: the bytes asked for
 
         .code
 
+;-----------------------------------------------------------------------------
+; rwprolog: Take read()'s or write()'s arguments: int __fastcall__ read (int
+; fd, void* buf, unsigned count), and write's.
+;
+; Input:        C stack       int       fd
+;               C stack       void*     buf
+;               AX            unsigned  count
+; Output:       ptr1          byte*     buf (rwfile's buffer)
+;               count         unsigned  count
+;               C             flag      set: fd isn't open (getfd)
+;               A             byte      if C set: the errno code (EBADF); else
+;                                       fdtab's REF_NUM
+;               Y             byte      if C clear: the fdtab slot's offset
+; Changes:      X. Pops fd and buf.
+
 rwprolog:
         ; Save count
         sta     count
@@ -35,6 +45,15 @@ rwprolog:
         jsr     popax
         jmp     getfd           ; Returns A, Y and C
 
+;-----------------------------------------------------------------------------
+; rwepilog: Return the number of bytes transferred, from read() or write().
+;
+; Input:        A             byte      the __oserror value (0)
+;               rw_count      unsigned  the bytes transferred
+; Output:       AX            int       rw_count
+;               __oserror     byte      A
+; Changes:      Y is unchanged.
+
 rwepilog:
         ; Return success
         sta     ___oserror      ; A = 0
@@ -42,10 +61,27 @@ rwepilog:
         ldx     rw_count+1
         rts
 
+;-----------------------------------------------------------------------------
+; nofile: Fail a transfer that rwcommon got before any file was opened.
+;
+; Input:        none
+; Output:       AX            int       -1
+;               errno         int       EINVAL
+; Changes:      As ___directerrno.
+
 nofile: lda     #EINVAL
         jmp     ___directerrno
 
         .data
+
+;-----------------------------------------------------------------------------
+; rwcommon: Read or write an open file: a JMP to rwfile (rwfile.s), which
+; its constructor sets. A program that opens no file has no file to pass
+; here; until then it fails with EINVAL.
+;
+; Input:        as rwfile
+; Output:       as rwfile
+; Changes:      as rwfile
 
 rwcommon:
         jmp     nofile          ; Patched to rwfile
@@ -53,4 +89,4 @@ rwcommon:
         .bss
 
 rw_count:
-        .res    2
+        .res    2               ; unsigned: bytes transferred (rwepilog)

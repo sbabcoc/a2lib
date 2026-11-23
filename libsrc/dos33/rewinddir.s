@@ -14,13 +14,26 @@
 
         .code
 
+;-----------------------------------------------------------------------------
+; __rewinddir_a2lib: Start a directory again from its first entry: void
+; __fastcall__ _rewinddir_a2lib (DIR* dir), which dirent.h names rewinddir().
+; Falls into rewind_dir.
+;
+; Input:        AX            DIR*      dir: from opendir()
+; Output:       none
+; Changes:      A, Y and dirptr. X is unchanged.
+
 __rewinddir_a2lib:
         sta     dirptr
-        stx     dirptr+1
-        ; Fall through
+        stx     dirptr+1        ; Falls into rewind_dir
 
-; rewind_dir: start the DIR at dirptr again at the first catalog sector
-; (read on the next readdir). Used by opendir too.
+;-----------------------------------------------------------------------------
+; rewind_dir: Start the directory again at its first catalog sector, which the
+; next readdir reads. Used by opendir too.
+;
+; Input:        dirptr        DIR*      the directory, FIRSTT and FIRSTS set
+; Output:       none
+; Changes:      A and Y. X is unchanged.
 
 rewind_dir:
         ldy     #DIR::FIRSTT

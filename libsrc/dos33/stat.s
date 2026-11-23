@@ -44,6 +44,25 @@ name_char       = tmp1          ; char: one of d_name's characters (cmpname)
 
         .code
 
+;-----------------------------------------------------------------------------
+; _stat: Describe a file: int __fastcall__ stat (const char* pathname, struct
+; stat* statbuf). Opens it with open() and takes the size from lseek (fd, 0,
+; SEEK_END), then finds its catalog entry for st_blocks.
+;
+; Input:        C stack       char*     pathname: the file's path
+;               AX            struct stat*
+;                                       statbuf: where the description goes
+; Output:       AX            int       0, or -1
+;               errno         int       if -1: as open(), lseek() or readdir()
+;                                       set it; if 0: the caller's, unchanged
+;               statbuf       struct stat*
+;                                       the fields this file's header lists;
+;                                       the rest 0. Cleared even if stat fails
+; Changes:      Y; statbuf, entry, size_low, size_high, sreg, fm_parmlist,
+;               ctlblock, and what open(), lseek(), close(), readdir() and
+;               closedir() change. Pops pathname. Opens and closes the file,
+;               reads its disk's catalog, and takes and frees a DIR (malloc).
+
 _stat:
         sta     stbuf
         stx     stbuf+1
@@ -241,8 +260,8 @@ fail:   lda     ___errno
 
         .bss
 
-stbuf:  .res    2
-fd:     .res    1
-type:   .res    1
-dirp:   .res    2
-saverr: .res    2
+stbuf:  .res    2               ; struct stat*: the caller's (statbuf)
+fd:     .res    1               ; byte: the file, open for reading
+type:   .res    1               ; byte: OPEN's type, with the lock bit
+dirp:   .res    2               ; DIR*: the catalog of the file's disk
+saverr: .res    2               ; int: the caller's errno, while reading it

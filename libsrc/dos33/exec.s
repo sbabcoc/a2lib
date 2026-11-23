@@ -37,6 +37,28 @@ CMDMAX  = 1 + 4 + 1 + NAME_LEN + 6 + 1 ; ^D BRUN sp name ,S7,D2 CR
 
         .code
 
+;-----------------------------------------------------------------------------
+; _exec: Run another program: int __fastcall__ exec (const char* progname,
+; const char* cmdline). On success, doesn't return: the C library shuts down,
+; as at exit, and DOS runs the program. Every check comes before that, so a
+; failure leaves the program running.
+;
+; Input:        C stack       char*     progname: the program's path, a B or A
+;                                       file
+;               AX            char*     cmdline: its arguments for main (B
+;                                       files), or NULL or ""
+; Output:       AX            int       -1, if it returns
+;               errno         int       EINVAL (a bad path, a name with a
+;                                       comma, or an A file with a cmdline),
+;                                       ENOENT and OPEN's other errors,
+;                                       ENOEXEC (not a B or A file), ENOMEM
+;                                       (no free DOS buffer)
+;               __oserror     byte      the DOS 3.3 or library error, where
+;                                       there is one
+; Changes:      Y; args, name_end, fm_parmlist and ctlblock. Pops progname. If
+;               it doesn't return: the stub's page-3 area (target), the stack
+;               page (cmdline), BASIC's input buffer, and what exit() changes.
+
 _exec:
         ; Store cmdline; get progname
         sta     cmdline
@@ -141,7 +163,7 @@ stub:   ldx     #code - 1
         sta     drivedigit
         ldy     #suffix - strings
         jsr     puts
-        stx     len_t           ; DOS stores ^D through CR: the tail goes after
+        stx     len_t           ; DOS stores ^D through CR; the tail follows
         lda     #$00
         sta     cmd_t,x
 
@@ -172,14 +194,28 @@ stub:   ldx     #code - 1
         stx     done+2
         jmp     exit_with_params
 
-; put: store A at cmd_t + X, X + 1. Preserves A and Y.
+;-----------------------------------------------------------------------------
+; put: Add a byte to the stub's command.
+;
+; Input:        A             byte      the byte
+;               X             byte      its offset in the command
+; Output:       X             byte      one higher
+;               A             byte      unchanged
+; Changes:      N and Z set from X. Y and C are unchanged.
 
 put:    sta     cmd_t,x
         inx
         rts
 
-; puts: put the string at strings + Y, up to its $00, with the high bit
-; set.
+;-----------------------------------------------------------------------------
+; puts: Add one of the command's fixed parts to the stub's command, with the
+; high bit set.
+;
+; Input:        Y             byte      the part's offset from strings: run -
+;                                       strings or suffix - strings
+;               X             byte      the offset in the command
+; Output:       X             byte      past the part
+; Changes:      A and Y.
 
 puts:   lda     strings,y
         beq     :+
@@ -191,7 +227,7 @@ puts:   lda     strings,y
 
         .data
 
-strings:
+strings:                        ; The command's fixed parts, for puts
 run:    .byte   "RUN ", $00     ; BRUN: 'B' put first
 suffix: .byte   ",S"
 slotdigit:
@@ -199,13 +235,25 @@ slotdigit:
 drivedigit:
         .byte   "0", $0D, $00
 
-; ------------------------------------------------------------------------
-; The stub. Runs at target, entered from done with ROM banked in: only
-; relative branches inside it, and its data is addressed at target. Read
-; only here, as stock exec.s's loader: exec() copies it to target and
-; builds the command there.
-
         .rodata
+
+;-----------------------------------------------------------------------------
+; source: The stub, which exec() copies to target and done enters when the C
+; library has shut down, with ROM banked in. Only relative branches inside it,
+; and its data is addressed at target. Read-only here, as stock exec.s's
+; loader is. It reconnects DOS, sets DOS's state to the ] prompt's, puts the
+; argument tail after where DOS will store the command, prints the command,
+; and ends in DOSWARM, where a B program that returns with RTS lands too.
+;
+; Input:        len_t         byte      the command's length, through its CR
+;               cmd_t         char[]    the command: $84, verb, space, name,
+;                                       slot, drive, $8D, $00
+;               STACK_PAGE    char[]    cmdline: up to 127 bytes with its $00
+; Output:       none
+; Changes:      A, X and Y; CURLIN+1, PROMPT, ERRFLG and BASIC_BUF; DOS's
+;               intercepts.
+; Note:         It runs after the stack has been reset, with the C library
+;               gone.
 
 source:
         jsr     DOS_CONNECT     ; Reconnect DOS's intercepts
@@ -264,6 +312,6 @@ cmd_t   = len_t + 1         ; The command and its terminator
 
         .bss
 
-progname:       .res    2
-cmdline:        .res    2
-type:           .res    1
+progname:       .res    2       ; char*: the program's path
+cmdline:        .res    2       ; char*: its arguments, or NULL
+type:           .res    1       ; byte: the program file's type (FMT_*)

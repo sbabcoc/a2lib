@@ -92,6 +92,17 @@ follows them, so the code stays as readable as they left it.
   `samebytes.sh` reports; a `.define` name must be unique across the
   sources, as it replaces the word wherever it appears. Vendored modules
   keep stock's names, so they stay easy to compare.
+- **Routine headers (10.40).** Every exported routine, and each
+  internal one worth a name, has a header after a 78-column rule: the
+  name and what it does, then `Prepare:` (routines that must come
+  first), `Input:` and `Output:` (one line per value: where it is, its
+  type, what it means), `Changes:` (registers, flags and storage changed
+  besides the outputs, and other effects) and `Note:`, each only where
+  it applies. Types are C's where C sees the value (`int`, `char*`,
+  `unsigned`), else `byte`, `word`, `flag` or `T*`. A module's storage
+  is given by its name; another module's cells as `ptr1 (fm_name)`. The
+  stack is mentioned only where its use is out of the ordinary, such as
+  exec()'s reset.
 - **Labels.** An anonymous label is only for a jump to the nearest one
   (`:+`, `:-`). A jump past another label (`:++`, `:--`), including the
   outer loop of a nested pair, gets a named label (`@row`, `@col`).
@@ -3307,6 +3318,20 @@ The vendored `write.s` and `mainargs.s` keep stock's names.
 Verified: `tools/samebytes.sh` against `f85d189` reports only the
 symbol tables of `opendir.s`, `readdir.s` and `rewinddir.s`, for the two
 renamed routines; with those two names put back, it reports the tree
+IDENTICAL, every module and program.
+
+### 10.40 Routine headers: the file layer
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/fm.s`, `fmbuf.s`, `fmname.s`, `rwts.s` | Headers for the File Manager, buffer, name and RWTS routines |
+| `libsrc/dos33/open.s`, `rwfile.s`, `rwcommon.s`, `write.s`, `lseek.s`, `seekend.s` | Headers for open(), the read and write paths, lseek() and O_APPEND |
+| `libsrc/dos33/stat.s`, `opendir.s`, `readdir.s`, `rewinddir.s`, `closedir.s` | Headers for stat() and the directory routines |
+| `libsrc/dos33/sysremove.s`, `sysrename.s`, `syschdir.s`, `initcwd.s`, `exec.s`, `oserror.s`, `oserrlist.s` | Headers for the remaining entry points, exec()'s stub and the error tables |
+
+Each module's storage is commented with its type. Comments only.
+
+Verified: `tools/samebytes.sh` against `674ba13` reports the tree
 IDENTICAL, every module and program.
 
 ## 11. Sources

@@ -15,6 +15,16 @@
         .include        "errno.inc"
         .include        "fm.inc"
 
+;-----------------------------------------------------------------------------
+; ___osmaperrno: Map an __oserror value to an errno value, for cc65's
+; ___mappederrno.
+;
+; Input:        A             byte      oserror: a DOS 3.3 error number or a
+;                                       library code (fm.inc)
+; Output:       AX            int       the errno value, or EUNKNOWN for a
+;                                       code not in the table
+; Changes:      Flags. Y is unchanged.
+
 ___osmaperrno:
         ldx     #ErrTabSize
 :       cmp     ErrTab-2,x      ; Search for the error code

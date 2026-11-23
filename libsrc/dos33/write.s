@@ -25,6 +25,20 @@
         .include        "mli.inc"
         .include        "filedes.inc"
 
+;-----------------------------------------------------------------------------
+; _write: Write to a file or the console: int __fastcall__ write (int fd,
+; const void* buf, unsigned count). The console gets each byte through COUT,
+; '\n' as CR, uppercase on a II+ as stock's does (uppercasemask).
+;
+; Input:        C stack       int       fd: open for writing
+;               C stack       void*     buf: the bytes
+;               AX            unsigned  count: how many
+; Output:       AX            int       the number of bytes written, or -1
+;               errno         int       if -1: EBADF, EINVAL (fd not open for
+;                                       writing), or as rwfile sets it
+;               __oserror     byte      0, or as rwfile sets it
+; Changes:      Y; ptr1 and ptr2; for a file, as rwfile. Pops fd and buf.
+
 _write:
         ; Get parameters
         jsr     rwprolog

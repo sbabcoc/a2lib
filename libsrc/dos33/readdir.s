@@ -27,6 +27,20 @@ sectors_high    = tmp2          ; sectors, then in blocks
 
         .code
 
+;-----------------------------------------------------------------------------
+; __readdir_a2lib: Read the next file's entry: struct dirent* __fastcall__
+; _readdir_a2lib (DIR* dir), which dirent.h names readdir().
+;
+; Input:        AX            DIR*      dir: from opendir()
+; Output:       AX            struct dirent*
+;                                       the entry, inside dir and valid until
+;                                       the next call; NULL at the end, with
+;                                       errno unchanged, or after an error
+;               errno         int       if NULL after an error: as rwts_maperr
+;                                       maps
+; Changes:      Y; dirptr, catentry, name_base, sectors_low, sectors_high and
+;               iob (ptr3). A catalog sector may be read.
+
 __readdir_a2lib:
         sta     dirptr
         stx     dirptr+1
@@ -186,7 +200,7 @@ end:    lda     #$01
 
         .rodata
 
-entryofs:
+entryofs:                       ; byte[7]: each entry's offset in a sector
         .repeat CAT_PERSECTOR, i
         .byte   i * CAT_ENTRYLEN
         .endrepeat

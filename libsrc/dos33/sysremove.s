@@ -16,6 +16,22 @@
 
         .code
 
+;-----------------------------------------------------------------------------
+; __sysremove: Delete a file, for remove(): unsigned char __fastcall__
+; _sysremove (const char* name).
+;
+; Input:        AX            char*     name: the file's path
+; Output:       A             byte      0, or the __oserror value:
+;                                       DOSERR_LOCKED (EACCES) for a locked
+;                                       file, LIBERR_OPEN (EINVAL) for an open
+;                                       one, DOSERR_NOBUFS (ENOMEM) with no
+;                                       free DOS buffer, DOSERR_SYNTAX
+;                                       (EINVAL) for a bad path, or another
+;                                       DOS 3.3 error
+;               X             byte      0
+; Changes:      Y; ptr1 (fm_name), ptr2 (fm_isopen), fm_parmlist and ctlblock.
+;               Takes a DOS buffer for the call and releases it.
+
 __sysremove:
         sta     name
         stx     name+1
@@ -44,4 +60,4 @@ done:   ldx     #$00
 
         .bss
 
-name:   .res    2
+name:   .res    2               ; char*: the file's path

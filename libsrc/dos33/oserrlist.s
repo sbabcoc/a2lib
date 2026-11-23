@@ -46,6 +46,10 @@ End:
 
 .rodata
 
+; __sys_oserrlist: The messages for __oserror values, which cc65's
+; common/stroserr.s searches for _stroserror(). Entries as described above,
+; ending with the sentinel's "Unknown error".
+
 __sys_oserrlist:
         sys_oserr_entry         DOSERR_LANG,      "Language not available"
         sys_oserr_entry         DOSERR_RANGE,     "Range error"

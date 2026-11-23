@@ -15,9 +15,6 @@
 ; catalog sector, and each catalog sector links to the next and holds
 ; seven file entries (readdir.s).
 ;
-; dir_at: open the catalog at fm_slot, fm_drive and fm_volume (used by
-; opendir and stat). Returns the DIR* in AX, or NULL with errno set.
-;
 
         .export         __opendir_a2lib
         .import         _malloc, _free, return0
@@ -29,10 +26,37 @@
 
         .code
 
+;-----------------------------------------------------------------------------
+; __opendir_a2lib: Open a directory: DIR* __fastcall__ _opendir_a2lib (const
+; char* name), which dirent.h names opendir().
+;
+; Input:        AX            char*     name: "", ".", "D" or "/S/D"
+;                                       (fm_location)
+; Output:       AX            DIR*      the directory, or NULL
+;               errno         int       if NULL: EINVAL (not a directory
+;                                       path), or as dir_at
+; Changes:      Y; dirptr, path (ptr1, fm_location) and what dir_at changes.
+
 __opendir_a2lib:
         jsr     fm_location     ; Takes the name in AX
         bcc     dir_at
         jmp     nullmapped      ; A = DOSERR_SYNTAX -> EINVAL
+
+;-----------------------------------------------------------------------------
+; dir_at: Open the catalog of a disk, for opendir() and stat(): read its VTOC
+; through RWTS, check that it's a DOS 3.3 disk, and take its first catalog
+; sector.
+;
+; Input:        fm_slot       byte      the slot (1-7)
+;               fm_drive      byte      the drive (1-2)
+;               fm_volume     byte      the volume, 0 for any
+; Output:       AX            DIR*      the directory (malloc), or NULL
+;               errno         int       if NULL: ENOMEM, ENODEV (no DOS 3.3
+;                                       VTOC), or as rwts_maperr maps
+;               __oserror     byte      if NULL, unless ENOMEM: the DOS 3.3 or
+;                                       library error
+; Changes:      Y; dirptr, iob (ptr3) and what malloc changes. The disk's VTOC
+;               is read.
 
 dir_at:
         lda     #<.sizeof(DIR)
@@ -108,9 +132,15 @@ nulldirect:
         jsr     ___directerrno
         jmp     return0
 
-; ------------------------------------------------------------------------
-; read_dir_sector: read track A, sector X of the disk of the DIR at
-; dirptr into its BUF. Returns as rwts_read.
+;-----------------------------------------------------------------------------
+; read_dir_sector: Read a sector of the directory's disk into its BUF.
+;
+; Input:        A             byte      the track
+;               X             byte      the sector
+;               dirptr        DIR*      the directory
+; Output:       C             flag      as rwts_read
+;               A             byte      as rwts_read
+; Changes:      X, Y and iob (ptr3); the rwts_* inputs, set for the sector.
 
 read_dir_sector:
         sta     rwts_track
