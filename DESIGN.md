@@ -3265,6 +3265,23 @@ Verified: `tools/samebytes.sh` reports the tree IDENTICAL to 10.36, every
 module and program, the C tests compiled with the changed `a2timer.h`
 included.
 
+### 10.38 The symbol index (`make tags`)
+
+| File | Change |
+|---|---|
+| `tools/ca65.ctags` | New: a Universal Ctags definition of ca65 source (labels, `=` and `:=` constants, `.define` names, macros, structs and their fields, `.proc` and `.scope` names) |
+| `Makefile` | `tags`: a2lib's sources (`libsrc`, `include`, `test`) and cc65's (`libsrc/apple2`, `common`, `runtime`, `asminc`, `include` of `CC65_SRC`, by default the checkout of the `cl65` in use) indexed with it; rebuilt when an a2lib source changes; part of `make` when Universal Ctags is found (`CTAGS`, a Homebrew one looked for too) |
+| `.gitignore` | `/tags` |
+| `README.md` | Building: the index |
+
+For go-to-definition in an editor while working through the sources.
+`--options=NONE` keeps a local `.ctags.d` from defining ca65 twice.
+Verified on Debian with Universal Ctags 5.9: `make` builds `tags` (it
+finds `fm_getfcb`, `DOS_BUFS`, `fdtab`, `popax`), a second `make` does
+nothing, touching a source rebuilds it, and with `CTAGS=` `make` skips it
+while `make tags` says why and fails. `tools/samebytes.sh`: identical, as
+nothing that's built changed.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

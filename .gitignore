@@ -20,3 +20,6 @@
 
 # Python (tools/)
 __pycache__/
+
+# Editor symbol index (make tags)
+/tags

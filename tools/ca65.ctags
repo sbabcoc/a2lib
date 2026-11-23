@@ -1,0 +1,22 @@
+# Universal Ctags definition of ca65 source, for `make tags`
+# (https://ctags.io). Indexes labels, constants (= and :=), .define names,
+# macros, structs, unions, enums, .proc and .scope names, and struct
+# fields. Cheap local (@name) and anonymous (:) labels are left out: they
+# mean something only inside their routine.
+--langdef=ca65
+--map-Asm=-.s
+--map-Asm=-.inc
+--map-ca65=+.s
+--map-ca65=+.inc
+--kinddef-ca65=l,label,labels
+--kinddef-ca65=c,constant,constants
+--kinddef-ca65=m,macro,macros
+--kinddef-ca65=s,struct,structs
+--kinddef-ca65=f,field,struct fields
+--regex-ca65=/^([A-Za-z_][A-Za-z0-9_]*):/\1/l/
+--regex-ca65=/^[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*:?=/\1/c/
+--regex-ca65=/^[ \t]*\.define[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\1/c/i
+--regex-ca65=/^[ \t]*\.(mac|macro)[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/m/i
+--regex-ca65=/^[ \t]*\.(struct|union|enum)[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/s/i
+--regex-ca65=/^[ \t]*\.(proc|scope)[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/l/i
+--regex-ca65=/^[ \t]+([A-Z_][A-Z0-9_]*)[ \t]+\.(byte|word|addr|dword|res|tag)/\1/f/

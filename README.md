@@ -79,6 +79,15 @@ make          # lib/a2lib-dos33.lib and the add-on libraries
 make test     # also the test programs, in build/test
 ```
 
+With [Universal Ctags](https://ctags.io) installed, `make` also keeps
+`tags`, a symbol index of a2lib's sources and the cc65 sources they build
+on, for an editor's go-to-definition (in VS Code, the ctagsx extension).
+macOS's own `ctags` won't do; a Homebrew one (`brew install
+universal-ctags`) is found even when it isn't first on the PATH. The cc65
+sources are taken from the checkout whose `cl65` builds a2lib; set
+`CC65_SRC=` to use another. `make tags` rebuilds the index alone, and
+`make -B tags` after updating cc65.
+
 ## Using the DOS 3.3 file layer
 
 `lib/a2lib-dos33.lib` is a complete replacement for cc65's `apple2.lib`,

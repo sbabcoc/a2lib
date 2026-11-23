@@ -6,6 +6,7 @@
 #   make linktest   check the link-time guards and the add-ons' selectors
 #   make emutest    run the test programs on ReplicApple2Plus (below)
 #   make screenshots  the README's screenshot, from an emutest run
+#   make tags       the symbol index for editors (below); make does it too
 #   make clean      remove build/ and lib/
 #
 # lib/a2lib-dos33.lib, the core, is a complete replacement for cc65's
@@ -49,6 +50,19 @@ export AR65 OD65
 # Directory holding the installed cc65 libraries
 CC65_LIB  ?= $(shell $(CL65) --print-target-path)/../lib
 STOCK_LIB := $(CC65_LIB)/$(TARGET).lib
+
+# The symbol index (tags), for an editor's go-to-definition: a2lib's
+# sources and the cc65 sources it builds on, read with tools/ca65.ctags.
+# It needs Universal Ctags (https://ctags.io); macOS's own ctags can't
+# read that definition, so a Homebrew one is looked for too. Without
+# either, make leaves the index out. CC65_SRC is a cc65 checkout; an
+# installed cc65 has no library sources, and then only a2lib's are
+# indexed.
+CTAGS    ?= $(shell for c in ctags "$$(brew --prefix universal-ctags 2>/dev/null)/bin/ctags"; do \
+              "$$c" --version 2>/dev/null | grep -q 'Universal Ctags' && { echo "$$c"; break; }; done)
+CC65_SRC ?= $(CC65_LIB)/..
+TAGS_CC65 := $(abspath $(wildcard $(addprefix $(CC65_SRC)/,libsrc/apple2 libsrc/common libsrc/runtime asminc include)))
+TAGS_SRC  := $(wildcard libsrc/*/*.s libsrc/*/*.inc include/*.h test/*.c test/*.s test/*/*.s test/*/*.c)
 
 DOS33_SRC := $(wildcard libsrc/dos33/*.s)
 DOS33_OBJ := $(patsubst libsrc/dos33/%.s,build/dos33/%.o,$(DOS33_SRC))
@@ -101,7 +115,14 @@ IP65 ?=
 IP65_LIBS = $(IP65)/ip65/ip65_tcp.lib $(IP65)/drivers/a2uther2.lib
 NET_TEST := $(if $(IP65),build/test/nettest)
 
-all: $(DOS33_LIB) $(TIMER_LIB) $(REFLOW_LIB) $(VT_LIB) $(VTS70_LIB) $(SELECT) $(IP65_OBJ)
+all: $(DOS33_LIB) $(TIMER_LIB) $(REFLOW_LIB) $(VT_LIB) $(VTS70_LIB) $(SELECT) $(IP65_OBJ) $(if $(CTAGS),tags)
+
+# The symbol index: rebuilt when a2lib's sources change (after a cc65
+# update, make -B tags)
+tags: $(TAGS_SRC) tools/ca65.ctags
+	@test -n "$(CTAGS)" || { echo "make tags: Universal Ctags not found (set CTAGS=)"; false; }
+	$(CTAGS) --quiet --options=NONE --options=tools/ca65.ctags -R -f $@ \
+	  $(abspath libsrc include test) $(TAGS_CC65)
 
 # The core: stock apple2.lib with the DOS 3.3 modules and the guards
 build/dos33/%.o: libsrc/dos33/%.s $(DOS33_INC)
