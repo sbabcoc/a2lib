@@ -27,6 +27,10 @@
         .include        "apple2.inc"
         .include        "fm.inc"
 
+; Shared storage
+args            = ptr1          ; char*: cmdline
+name_end        = tmp1          ; byte: just past the name's last character
+
 ERRFLG  := $D8                  ; Applesoft: bit 7 set while ONERR is active
 REM     = $B2                   ; Applesoft's REM token: mainargs' marker
 CMDMAX  = 1 + 4 + 1 + NAME_LEN + 6 + 1 ; ^D BRUN sp name ,S7,D2 CR
@@ -53,7 +57,7 @@ _exec:
         jsr     fm_open
         bcs     fail
         ldy     #FM_TYPE
-        lda     (ptr3),y
+        lda     (fm_parmlist),y
         and     #FMT_TYPE_MASK
         sta     type
         lda     #FMC_CLOSE
@@ -88,11 +92,11 @@ verb:   ldx     #NAME_LEN-1
         bne     oserr           ; Branch always
 :       lda     cmdline+1       ; NULL?
         beq     stub
-        sta     ptr1+1
+        sta     args+1
         lda     cmdline
-        sta     ptr1
+        sta     args
         ldy     #$00
-        lda     (ptr1),y        ; ""?
+        lda     (args),y        ; ""?
         beq     stub
         lda     #EINVAL
         jmp     ___directerrno
@@ -122,11 +126,11 @@ stub:   ldx     #code - 1
         jsr     put
         cmp     #HI_SPACE
         beq     :+
-        stx     tmp1            ; Just past the last character so far
+        stx     name_end        ; Just past the last character so far
 :       iny
         cpy     #NAME_LEN
         bne     @name
-        ldx     tmp1
+        ldx     name_end
 
         ; ",S<slot>,D<drive>" and CR
         lda     fm_slot
@@ -149,10 +153,10 @@ stub:   ldx     #code - 1
         ldy     #$00
         lda     cmdline+1       ; NULL?
         beq     @store          ; Yes, store as '\0'
-        sta     ptr1+1
+        sta     args+1
         lda     cmdline
-        sta     ptr1
-@copy:  lda     (ptr1),y
+        sta     args
+@copy:  lda     (args),y
 @store: sta     STACK_PAGE,y
         beq     @handoff        ; '\0' stored, done
         iny

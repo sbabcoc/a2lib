@@ -7,8 +7,8 @@
 ; Called as rwcommon is, with:
 ;   A     REF_NUM of the file (see open.s)
 ;   Y     READ_CALL or WRITE_CALL
-;   ptr1  buffer
-;   ptr2  count
+;   buffer  (ptr1) the caller's buffer
+;   count   (ptr2) the number of bytes
 ; and returns the number of bytes transferred in AX, through rwepilog.
 ;
 ; O_APPEND: a write first moves to the end of the file (seekend.s).
@@ -24,7 +24,7 @@
 ; Other files are transferred raw.
 ;
 ; Zero page: like the stock rwcommon, this may change ptr1-ptr3, but it
-; preserves ptr4, which it uses for the control block. cc65's fgets keeps
+; preserves ptr4, which it uses for the control block (ctlblock). cc65's fgets keeps
 ; its destination pointer in ptr4 across fgetc -> read (DESIGN.md 10.1).
 ;
 
@@ -40,6 +40,15 @@
         .include        "mli.inc"
         .include        "filedes.inc"
         .include        "fm.inc"
+
+; Shared storage
+buffer          = ptr1          ; byte*: the caller's buffer
+count           = ptr2          ; unsigned: the bytes asked for
+remaining_low   = tmp1          ; unsigned: bytes left to read or check
+remaining_high  = tmp2
+newpos_low      = tmp3          ; unsigned: a header file's position
+newpos_high     = tmp4          ; after a write
+scan_ptr        = sreg          ; byte*: the byte being checked (twrite)
 
 COUNT = rw_count                ; Bytes transferred, for rwepilog
 
@@ -57,9 +66,9 @@ initrwfile:
 rwfile:
         ; Save the caller's ptr4
         pha
-        lda     ptr4
+        lda     ctlblock
         sta     saveptr4
-        lda     ptr4+1
+        lda     ctlblock+1
         sta     saveptr4+1
         pla
 
@@ -83,24 +92,24 @@ rwfile:
 
         ; Find the control block
 :       lda     fdtab + FD::BUFFER,x
-        sta     ptr4
+        sta     ctlblock
         lda     fdtab + FD::BUFFER+1,x
-        sta     ptr4+1
+        sta     ctlblock+1
         sty     op
 
         lda     #$00
         sta     COUNT
         sta     COUNT+1
-        lda     ptr2
-        ora     ptr2+1
+        lda     count
+        ora     count+1
         jeq     ok              ; Nothing to do
 
         jsr     fm_begin
         ldy     #FCB::KIND
-        lda     (ptr4),y
+        lda     (ctlblock),y
         jmi     text
         ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         jne     header
 
 ; ------------------------------------------------------------------------
@@ -132,38 +141,38 @@ header: lda     op
 
         ; Read at most LEN - POS bytes
         ldy     #FCB::LEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ldy     #FCB::POS
         sec
-        sbc     (ptr4),y
-        sta     tmp1
+        sbc     (ctlblock),y
+        sta     remaining_low
         ldy     #FCB::LEN+1
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ldy     #FCB::POS+1
-        sbc     (ptr4),y
-        sta     tmp2
+        sbc     (ctlblock),y
+        sta     remaining_high
         jcc     ok              ; Past the end
-        ora     tmp1
+        ora     remaining_low
         jeq     ok              ; At the end
-        lda     ptr2            ; Count < remaining?
-        cmp     tmp1
-        lda     ptr2+1
-        sbc     tmp2
+        lda     count           ; Count < remaining?
+        cmp     remaining_low
+        lda     count+1
+        sbc     remaining_high
         bcs     :+
-        lda     ptr2
-        sta     tmp1
-        lda     ptr2+1
-        sta     tmp2
-:       lda     ptr1
+        lda     count
+        sta     remaining_low
+        lda     count+1
+        sta     remaining_high
+:       lda     buffer
         sta     fm_rio_addr
-        lda     ptr1+1
+        lda     buffer+1
         sta     fm_rio_addr+1
-        lda     tmp1
+        lda     remaining_low
         sta     fm_rio_count
-        lda     tmp2
+        lda     remaining_high
         sta     fm_rio_count+1
         lda     #FMC_READ
-        jsr     fm_rangeio      ; Uses tmp1
+        jsr     fm_rangeio      ; Uses tmp1 (remaining_low)
         jcs     fmerr
 
         ; COUNT = bytes read; POS += COUNT
@@ -172,26 +181,26 @@ header: lda     op
         lda     fm_rio_count+1
         sta     COUNT+1
         ldy     #FCB::POS
-        lda     (ptr4),y
+        lda     (ctlblock),y
         clc
         adc     COUNT
-        sta     (ptr4),y
+        sta     (ctlblock),y
         iny
-        lda     (ptr4),y
+        lda     (ctlblock),y
         adc     COUNT+1
-        sta     (ptr4),y
+        sta     (ctlblock),y
         jmp     ok
 
         ; The new position must fit the header's 16-bit length
 hwrite: ldy     #FCB::POS
-        lda     (ptr4),y
+        lda     (ctlblock),y
         clc
-        adc     ptr2
-        sta     tmp3
+        adc     count
+        sta     newpos_low
         iny
-        lda     (ptr4),y
-        adc     ptr2+1
-        sta     tmp4
+        lda     (ctlblock),y
+        adc     count+1
+        sta     newpos_high
         bcc     :+
         lda     #ENOSPC
         jmp     direrr
@@ -203,27 +212,27 @@ hwrite: ldy     #FCB::POS
 
         ; POS = new position; if past LEN, LEN = POS and mark for close
         ldy     #FCB::POS
-        lda     tmp3
-        sta     (ptr4),y
+        lda     newpos_low
+        sta     (ctlblock),y
         iny
-        lda     tmp4
-        sta     (ptr4),y
+        lda     newpos_high
+        sta     (ctlblock),y
         ldy     #FCB::LEN
-        lda     tmp3
-        cmp     (ptr4),y
+        lda     newpos_low
+        cmp     (ctlblock),y
         iny
-        lda     tmp4
-        sbc     (ptr4),y
+        lda     newpos_high
+        sbc     (ctlblock),y
         jcc     setall          ; Within the old length
-        lda     tmp4
-        sta     (ptr4),y
+        lda     newpos_high
+        sta     (ctlblock),y
         dey
-        lda     tmp3
-        sta     (ptr4),y
+        lda     newpos_low
+        sta     (ctlblock),y
         ldy     #FCB::STATE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ora     #FCBS_DIRTY
-        sta     (ptr4),y
+        sta     (ctlblock),y
         jmp     setall
 
 ; ------------------------------------------------------------------------
@@ -235,7 +244,7 @@ text:   lda     op
 
         ; Nothing more once the end has been read
         ldy     #FCB::STATE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         jmi     ok
 
 trd:    jsr     fm_readbyte
@@ -254,50 +263,50 @@ trd:    jsr     fm_readbyte
 trdend: cmp     #DOSERR_ENDDATA
         jne     fmerr
 teof:   ldy     #FCB::STATE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ora     #FCBS_EOF
-        sta     (ptr4),y
+        sta     (ctlblock),y
         jmp     ok
 
         ; Reject 8-bit data before writing anything
-twrite: lda     ptr1
-        sta     sreg
-        lda     ptr1+1
-        sta     sreg+1
-        lda     ptr2
-        sta     tmp1
-        lda     ptr2+1
-        sta     tmp2
+twrite: lda     buffer
+        sta     scan_ptr
+        lda     buffer+1
+        sta     scan_ptr+1
+        lda     count
+        sta     remaining_low
+        lda     count+1
+        sta     remaining_high
         ldy     #$00
-scan:   lda     (sreg),y
+scan:   lda     (scan_ptr),y
         jmi     reject
         iny
         bne     :+
-        inc     sreg+1
-:       lda     tmp1
+        inc     scan_ptr+1
+:       lda     remaining_low
         bne     :+
-        dec     tmp2
-:       dec     tmp1
-        lda     tmp1
-        ora     tmp2
+        dec     remaining_high
+:       dec     remaining_low
+        lda     remaining_low
+        ora     remaining_high
         bne     scan
 
         ; After reading the end, write over the terminator, not after it
         ldy     #FCB::STATE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         bpl     twr
         and     #<~FCBS_EOF
-        sta     (ptr4),y
+        sta     (ctlblock),y
         ldy     #FCB::POS+1
-        lda     (ptr4),y
+        lda     (ctlblock),y
         tax
         dey
-        lda     (ptr4),y
+        lda     (ctlblock),y
         jsr     fm_position
         jcs     fmerr
 
 twr:    ldy     #$00
-        lda     (ptr1),y
+        lda     (buffer),y
         jsr     swapnl
         ora     #$80
         jsr     fm_writebyte
@@ -321,9 +330,9 @@ oserr:  jsr     restore
 direrr: jsr     restore
         jmp     ___directerrno
 
-setall: lda     ptr2            ; Whole count transferred
+setall: lda     count           ; Whole count transferred
         sta     COUNT
-        lda     ptr2+1
+        lda     count+1
         sta     COUNT+1
 ok:     jsr     restore
         lda     #$00
@@ -337,42 +346,42 @@ ok:     jsr     restore
 restore:
         pha
         lda     saveptr4
-        sta     ptr4
+        sta     ctlblock
         lda     saveptr4+1
-        sta     ptr4+1
+        sta     ctlblock+1
         pla
         rts
 
-; whole: set up fm_rangeio for the whole request (ptr1, ptr2).
+; whole: set up fm_rangeio for the whole request (buffer, count).
 
-whole:  lda     ptr1
+whole:  lda     buffer
         sta     fm_rio_addr
-        lda     ptr1+1
+        lda     buffer+1
         sta     fm_rio_addr+1
-        lda     ptr2
+        lda     count
         sta     fm_rio_count
-        lda     ptr2+1
+        lda     count+1
         sta     fm_rio_count+1
         rts
 
-; putbyte: store A at ptr1, then fall into nextbyte.
+; putbyte: store A at buffer, then fall into nextbyte.
 ; nextbyte: advance ptr1 and COUNT. Returns Z set when COUNT = ptr2.
 
 putbyte:
         ldy     #$00
-        sta     (ptr1),y
+        sta     (buffer),y
 nextbyte:
-        inc     ptr1
+        inc     buffer
         bne     :+
-        inc     ptr1+1
+        inc     buffer+1
 :       inc     COUNT
         bne     :+
         inc     COUNT+1
 :       lda     COUNT
-        cmp     ptr2
+        cmp     count
         bne     :+
         lda     COUNT+1
-        cmp     ptr2+1
+        cmp     count+1
 :       rts
 
 ; swapnl: exchange $0A and $0D (DESIGN.md 5.1, newlines).

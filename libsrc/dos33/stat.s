@@ -35,6 +35,13 @@
         .include        "fm.inc"
         .include        "dir.inc"
 
+; Shared storage
+statbuf         = ptr1          ; struct stat*: the caller's
+entry           = ptr2          ; struct dirent*: a catalog entry
+size_low        = tmp1          ; unsigned: the size, from lseek
+size_high       = tmp2
+name_char       = tmp1          ; char: one of d_name's characters (cmpname)
+
         .code
 
 _stat:
@@ -42,11 +49,11 @@ _stat:
         stx     stbuf+1
 
         ; Clear statbuf
-        sta     ptr1
-        stx     ptr1+1
+        sta     statbuf
+        stx     statbuf+1
         lda     #$00
         ldy     #.sizeof(stat) - 1
-:       sta     (ptr1),y
+:       sta     (statbuf),y
         dey
         bpl     :-
 
@@ -68,9 +75,9 @@ _stat:
         tay
         jsr     fm_fdfcb
         lda     stbuf
-        sta     ptr1
+        sta     statbuf
         lda     stbuf+1
-        sta     ptr1+1
+        sta     statbuf+1
 
         ; st_dev
         lda     fm_drive
@@ -81,36 +88,36 @@ _stat:
         asl
         ora     fm_slot
         ldy     #stat::st_dev
-        sta     (ptr1),y
+        sta     (statbuf),y
 
         ; st_mode
         lda     #S_IFREG
         ldy     #stat::st_mode
-        sta     (ptr1),y
+        sta     (statbuf),y
 
         ; st_access: the lock bit
         ldy     #FCB::TYPE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         sta     type
         and     #FMT_LOCKED
         ldy     #stat::st_access
-        sta     (ptr1),y
+        sta     (statbuf),y
 
         ; st_type: OPEN's type, as the catalog has it
         lda     type
         and     #FMT_TYPE_MASK
         ldy     #stat::st_type
-        sta     (ptr1),y
+        sta     (statbuf),y
 
         ; st_auxtype: B files only (ADDR is 0 otherwise)
         ldy     #FCB::ADDR
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ldy     #stat::st_auxtype
-        sta     (ptr1),y
+        sta     (statbuf),y
         ldy     #FCB::ADDR+1
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ldy     #stat::st_auxtype+1
-        sta     (ptr1),y
+        sta     (statbuf),y
 
         ; st_size = lseek (fd, 0L, SEEK_END)
         lda     fd
@@ -122,20 +129,20 @@ _stat:
         lda     #1              ; SEEK_END
         ldx     #$00
         jsr     _lseek
-        sta     tmp1
-        stx     tmp2
+        sta     size_low
+        stx     size_high
         lda     sreg            ; -1 has sreg = $FFFF; sizes are below $10000
         jne     fail
-        lda     stbuf           ; lseek changed ptr1
-        sta     ptr1
+        lda     stbuf           ; lseek changed statbuf (ptr1)
+        sta     statbuf
         lda     stbuf+1
-        sta     ptr1+1
+        sta     statbuf+1
         ldy     #stat::st_size
-        lda     tmp1
-        sta     (ptr1),y
+        lda     size_low
+        sta     (statbuf),y
         iny
-        lda     tmp2
-        sta     (ptr1),y
+        lda     size_high
+        sta     (statbuf),y
 
         ; close (fd)
         lda     fd
@@ -164,9 +171,9 @@ _stat:
 find:   lda     dirp
         ldx     dirp+1
         jsr     __readdir_a2lib
-        sta     ptr2
-        stx     ptr2+1
-        ora     ptr2+1
+        sta     entry
+        stx     entry+1
+        ora     entry+1
         beq     notfound
 
         ; Compare d_name (NUL-terminated) with the 30-byte name buffer
@@ -174,15 +181,15 @@ find:   lda     dirp
         ldx     #$00            ; Name buffer index
         ldy     #$00            ; d_name index; stays on the NUL
 cmpname:
-        lda     (ptr2),y
+        lda     (entry),y
         beq     blank
         iny
         bne     :+              ; Branch always
 blank:  lda     #' '            ; Past the end of d_name: blanks
-:       sta     tmp1
+:       sta     name_char
         lda     fm_namebuf,x
         and     #HIBIT_OFF
-        cmp     tmp1
+        cmp     name_char
         jne     find
         inx
         cpx     #NAME_LEN
@@ -190,17 +197,17 @@ blank:  lda     #' '            ; Past the end of d_name: blanks
 
         ; Found: st_blocks = d_blocks
         lda     stbuf
-        sta     ptr1
+        sta     statbuf
         lda     stbuf+1
-        sta     ptr1+1
+        sta     statbuf+1
         ldy     #DIRENT::BLOCKS
-        lda     (ptr2),y
+        lda     (entry),y
         ldy     #stat::st_blocks
-        sta     (ptr1),y
+        sta     (statbuf),y
         ldy     #DIRENT::BLOCKS+1
-        lda     (ptr2),y
+        lda     (entry),y
         ldy     #stat::st_blocks+1
-        sta     (ptr1),y
+        sta     (statbuf),y
 
         ; Close the catalog; return 0, or -1 if reading it failed
 notfound:

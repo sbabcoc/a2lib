@@ -3,7 +3,7 @@
 ;
 ; Replaces libsrc/apple2/rwcommon.s from cc65 and exports the same symbols,
 ; for the stock read.s and for write.s:
-;   rwprolog  pop fd and buf, save count (ptr2) and buf (ptr1), getfd
+;   rwprolog  pop fd and buf, save count (count) and buf (ptr1), getfd
 ;   rwcommon  transfer to or from a file: a JMP to rwfile (rwfile.s), set
 ;             by its constructor when a program opens files; a program
 ;             that doesn't has no file to pass here
@@ -18,12 +18,15 @@
         .include        "errno.inc"
         .include        "filedes.inc"
 
+; Shared storage
+count           = ptr2          ; unsigned: the bytes asked for
+
         .code
 
 rwprolog:
         ; Save count
-        sta     ptr2
-        stx     ptr2+1
+        sta     count
+        stx     count+1
 
         ; Get and save buf
         jsr     popptr1

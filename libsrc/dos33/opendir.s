@@ -38,29 +38,29 @@ dir_at:
         lda     #<.sizeof(DIR)
         ldx     #>.sizeof(DIR)
         jsr     _malloc
-        sta     ptr1
-        stx     ptr1+1
-        ora     ptr1+1
+        sta     dirptr
+        stx     dirptr+1
+        ora     dirptr+1
         bne     :+
         lda     #ENOMEM
         jmp     nulldirect
 
 :       ldy     #DIR::SLOT
         lda     fm_slot
-        sta     (ptr1),y
+        sta     (dirptr),y
         .assert DIR::DRIVE = DIR::SLOT + 1, error
         .assert DIR::VOLUME = DIR::DRIVE + 1, error
         iny
         lda     fm_drive
-        sta     (ptr1),y
+        sta     (dirptr),y
         iny
         lda     fm_volume
-        sta     (ptr1),y
+        sta     (dirptr),y
 
         ; Read the VTOC
         lda     #VTOC_TRACK
         ldx     #$00
-        jsr     read_dir_sector_ptr1
+        jsr     read_dir_sector
         bcc     :+
         jsr     rwts_maperr
         jmp     freemapped
@@ -68,37 +68,37 @@ dir_at:
         ; Check that it is a DOS 3.3 VTOC: 16 sectors per track, 122 T/S
         ; pairs per list sector, and a first catalog sector on the disk
 :       ldy     #DIR::BUF + VTOC_SECTORS
-        lda     (ptr1),y
+        lda     (dirptr),y
         cmp     #DOS_SECTORS
         bne     notdos
         ldy     #DIR::BUF + VTOC_TSPAIRS
-        lda     (ptr1),y
+        lda     (dirptr),y
         cmp     #DOS_TSPAIRS
         bne     notdos
         ldy     #DIR::BUF + VTOC_CATTRACK
-        lda     (ptr1),y
+        lda     (dirptr),y
         beq     notdos
         cmp     #DOS_TRACKS
         bcs     notdos
         ldy     #DIR::FIRSTT
-        sta     (ptr1),y
+        sta     (dirptr),y
         ldy     #DIR::BUF + VTOC_CATTRACK + 1
-        lda     (ptr1),y
+        lda     (dirptr),y
         cmp     #DOS_SECTORS
         bcs     notdos
         ldy     #DIR::FIRSTS
-        sta     (ptr1),y
+        sta     (dirptr),y
 
-        jsr     rewinddir_ptr1
-        lda     ptr1
-        ldx     ptr1+1
+        jsr     rewind_dir
+        lda     dirptr
+        ldx     dirptr+1
         rts
 
 notdos: lda     #LIBERR_NOTDOS  ; -> ENODEV
 freemapped:
         pha
-        lda     ptr1
-        ldx     ptr1+1
+        lda     dirptr
+        ldx     dirptr+1
         jsr     _free
         pla
 nullmapped:
@@ -109,26 +109,26 @@ nulldirect:
         jmp     return0
 
 ; ------------------------------------------------------------------------
-; read_dir_sector_ptr1: read track A, sector X of the disk of the DIR at
-; ptr1 into its BUF. Returns as rwts_read.
+; read_dir_sector: read track A, sector X of the disk of the DIR at
+; dirptr into its BUF. Returns as rwts_read.
 
-read_dir_sector_ptr1:
+read_dir_sector:
         sta     rwts_track
         stx     rwts_sector
         ldy     #DIR::SLOT
-        lda     (ptr1),y
+        lda     (dirptr),y
         sta     rwts_slot
         iny
-        lda     (ptr1),y
+        lda     (dirptr),y
         sta     rwts_drive
         iny
-        lda     (ptr1),y
+        lda     (dirptr),y
         sta     rwts_volume
         clc
-        lda     ptr1
+        lda     dirptr
         adc     #<DIR::BUF
         sta     rwts_buf
-        lda     ptr1+1
+        lda     dirptr+1
         adc     #>DIR::BUF
         sta     rwts_buf+1
         jmp     rwts_read

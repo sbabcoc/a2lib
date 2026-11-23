@@ -28,6 +28,10 @@
         .include        "filedes.inc"
         .include        "fm.inc"
 
+; Shared storage
+offset_low      = ptr1          ; unsigned: the offset's low word
+offset_high     = ptr2          ; unsigned: the offset's high word
+
         .code
 
 _lseek:
@@ -35,11 +39,12 @@ _lseek:
         sta     whence
         stx     whence+1
 
-        ; Get and save offset: low word in ptr1, high word in ptr2
+        ; Get and save offset: low word in offset_low, high word in
+        ; offset_high
         jsr     popptr1
         jsr     popax
-        sta     ptr2
-        stx     ptr2+1
+        sta     offset_high
+        stx     offset_high+1
 
         ; Get and process fd
         jsr     popax
@@ -70,22 +75,22 @@ _lseek:
         cpx     #1
         beq     end
         ldy     #FCB::POS       ; SEEK_CUR: POS
-        lda     (ptr4),y
+        lda     (ctlblock),y
         sta     base
         iny
-        lda     (ptr4),y
+        lda     (ctlblock),y
         sta     base+1
         jmp     add
 
         ; SEEK_END
 end:    ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         beq     scan
         ldy     #FCB::LEN       ; Header files: LEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         sta     base
         iny
-        lda     (ptr4),y
+        lda     (ctlblock),y
         sta     base+1
         jmp     add
 
@@ -99,7 +104,7 @@ sloop:  jsr     fm_readbyte
         ldy     #FCB::KIND      ; T files end at the first $00
         tax
         bne     :+
-        lda     (ptr4),y
+        lda     (ctlblock),y
         bmi     add
 :       inc     base
         bne     sloop
@@ -112,34 +117,34 @@ send:   cmp     #DOSERR_ENDDATA
         ; New position = base + offset; must be 0..$FFFF
 add:    clc
         lda     base
-        adc     ptr1
+        adc     offset_low
         sta     newpos
         lda     base+1
-        adc     ptr1+1
+        adc     offset_low+1
         sta     newpos+1
         lda     #$00
-        adc     ptr2
+        adc     offset_high
         bne     einval          ; Negative, or beyond 16 bits
         lda     #$00
-        adc     ptr2+1
+        adc     offset_high+1
         bne     einval
 
         ; Header files: not past LEN; the File Manager offset is
         ; HDRLEN + newpos, which must also fit 16 bits
         ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         beq     set
         ldy     #FCB::LEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         cmp     newpos
         iny
-        lda     (ptr4),y
+        lda     (ctlblock),y
         sbc     newpos+1
         bcs     :+
         lda     #LIBERR_POSITION ; -> ESPIPE
         jmp     oserr
 :       ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         clc
         adc     newpos
         sta     fmpos
@@ -161,14 +166,14 @@ pos:    lda     fmpos
         bcs     fmerr
         ldy     #FCB::POS
         lda     newpos
-        sta     (ptr4),y
+        sta     (ctlblock),y
         iny
         lda     newpos+1
-        sta     (ptr4),y
+        sta     (ctlblock),y
         ldy     #FCB::STATE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         and     #<~FCBS_EOF
-        sta     (ptr4),y
+        sta     (ctlblock),y
 
         ; Return the position in sreg:X:A
         lda     #$00

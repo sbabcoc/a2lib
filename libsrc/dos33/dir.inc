@@ -47,9 +47,14 @@ ENT_LENGTH      = $21           ; Length in sectors (2)
         BUF     .res 256        ; VTOC, then the current catalog sector
 .endstruct
 
-; dir_at: open the catalog at fm_slot, fm_drive and fm_volume, for opendir
-; and stat (opendir.s). read_dir_sector_ptr1: read track A, sector X of
-; ptr1's DIR's disk into its BUF (opendir.s). rewinddir_ptr1: start
-; ptr1's DIR again at the first catalog sector (rewinddir.s).
+; The cell that the directory modules keep the DIR in (a text macro, as
+; fm.inc's names are)
 
-        .global         dir_at, read_dir_sector_ptr1, rewinddir_ptr1
+.define dirptr          ptr1    ; DIR*: the directory
+
+; dir_at: open the catalog at fm_slot, fm_drive and fm_volume, for opendir
+; and stat (opendir.s). read_dir_sector: read track A, sector X of
+; dirptr's disk into its BUF (opendir.s). rewind_dir: start dirptr's
+; directory again at the first catalog sector (rewinddir.s).
+
+        .global         dir_at, read_dir_sector, rewind_dir

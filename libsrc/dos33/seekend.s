@@ -27,10 +27,10 @@ seekend:
         jsr     fm_fdbegin
 
         ldy     #FCB::KIND
-        lda     (ptr4),y
+        lda     (ctlblock),y
         bmi     text
         ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         bne     header
         lda     #LIBERR_NOEND   ; -> EINVAL
         sec
@@ -38,21 +38,21 @@ seekend:
 
         ; POS = LEN; POSITION to HDRLEN + LEN
 header: ldy     #FCB::LEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ldy     #FCB::POS
-        sta     (ptr4),y
+        sta     (ctlblock),y
         ldy     #FCB::LEN+1
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ldy     #FCB::POS+1
-        sta     (ptr4),y
+        sta     (ctlblock),y
         ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         clc
         ldy     #FCB::LEN
-        adc     (ptr4),y
+        adc     (ctlblock),y
         pha
         ldy     #FCB::LEN+1
-        lda     (ptr4),y
+        lda     (ctlblock),y
         adc     #$00
         tax
         pla
@@ -73,9 +73,9 @@ text:   jsr     topos
 
         ; Position on the terminator, so the next write replaces it
 found:  ldy     #FCB::STATE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         and     #<~FCBS_EOF
-        sta     (ptr4),y
+        sta     (ctlblock),y
         jsr     topos
 
 check:  bcc     out
@@ -87,10 +87,10 @@ out:    ldy     sslot
 ; topos: POSITION to the logical position POS (T files have no header).
 
 topos:  ldy     #FCB::POS+1
-        lda     (ptr4),y
+        lda     (ctlblock),y
         tax
         dey
-        lda     (ptr4),y
+        lda     (ctlblock),y
         jmp     fm_position
 
         .bss

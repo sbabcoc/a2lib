@@ -8,6 +8,14 @@
         .include        "machine.inc"
 
 ; ------------------------------------------------------------------------
+; Names for the cc65 zero-page cells that every file module uses for the
+; same thing. Text macros, so that a module that doesn't use one doesn't
+; import its cell.
+
+.define fm_parmlist     ptr3    ; byte*: the File Manager parameter list
+.define ctlblock        ptr4    ; FCB*: the file's control block
+
+; ------------------------------------------------------------------------
 ; Page 3 vectors
 
 FM_LOCATE       := $03DC        ; Returns parameter list address in Y (lo), A (hi)

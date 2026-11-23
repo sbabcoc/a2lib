@@ -10,7 +10,7 @@
 ;
 ; Uses DOS's own IOB (from $3E3), so the device characteristics table
 ; and last-access fields that DOS maintains stay valid ("Beneath Apple
-; DOS" ch. 6). Uses ptr3.
+; DOS" ch. 6). Uses iob.
 ;
 ; rwts_maperr: translate an RWTS return code (A) into the DOS 3.3 error
 ; number DOS itself reports for it, as fm_maperr does for the File Manager.
@@ -19,54 +19,57 @@
         .include        "zeropage.inc"
         .include        "fm.inc"
 
+; Shared storage
+iob             = ptr3          ; byte*: DOS's IOB
+
         .code
 
 rwts_read:
         jsr     RWTS_LOCATE     ; Y = low, A = high
-        sty     ptr3
-        sta     ptr3+1
+        sty     iob
+        sta     iob+1
 
         ldy     #IOB_TYPE
         lda     #IOB_TABLE
-        sta     (ptr3),y
+        sta     (iob),y
         iny                     ; IOB_SLOT
         lda     rwts_slot
         asl
         asl
         asl
         asl
-        sta     (ptr3),y
+        sta     (iob),y
         .assert IOB_DRIVE = IOB_SLOT + 1, error
         .assert IOB_VOLUME = IOB_DRIVE + 1, error
         .assert IOB_TRACK = IOB_VOLUME + 1, error
         .assert IOB_SECTOR = IOB_TRACK + 1, error
         iny
         lda     rwts_drive
-        sta     (ptr3),y
+        sta     (iob),y
         iny
         lda     rwts_volume
-        sta     (ptr3),y
+        sta     (iob),y
         iny
         lda     rwts_track
-        sta     (ptr3),y
+        sta     (iob),y
         iny
         lda     rwts_sector
-        sta     (ptr3),y
+        sta     (iob),y
         ldy     #IOB_BUF
         lda     rwts_buf
-        sta     (ptr3),y
+        sta     (iob),y
         iny
         lda     rwts_buf+1
-        sta     (ptr3),y
+        sta     (iob),y
         ldy     #IOB_COUNT
         lda     #$00            ; 256 bytes
-        sta     (ptr3),y
+        sta     (iob),y
         ldy     #IOB_CMD
         lda     #IOB_READ
-        sta     (ptr3),y
+        sta     (iob),y
 
-        ldy     ptr3
-        lda     ptr3+1
+        ldy     iob
+        lda     iob+1
         jmp     call
 
 ; cc65 leaves Language Card bank 2 enabled for reading; switch ROM in
@@ -78,7 +81,7 @@ call:   bit     LC_ROM_RO
         jsr     RWTS_ENTRY
         bit     LC_BANK2_RO
         ldy     #IOB_RC
-        lda     (ptr3),y
+        lda     (iob),y
         cmp     #$01            ; C = (return code <> 0)
         rts
 

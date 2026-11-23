@@ -21,7 +21,7 @@
 ; padded with HI_SPACE, as DOS's command parser stores names.
 ;
 ; fm_name:     parse the path in AX into the File Manager parameter list
-;              (ptr3, from fm_begin): the name buffer and its address, and
+;              (fm_parmlist, from fm_begin): the name buffer and its address, and
 ;              the volume, drive and slot fields.
 ; fm_location: parse a directory, for opendir() and chdir(): "", ".",
 ;              "2", "/6/2", each optionally ending in "/". Sets fm_slot,
@@ -29,18 +29,21 @@
 ;              doesn't need fm_begin.
 ;
 ; Both return carry clear, or carry set with A = DOSERR_SYNTAX (EINVAL).
-; Uses ptr1.
+; Uses path.
 ;
 
         .include        "zeropage.inc"
         .include        "fm.inc"
+
+; Shared storage
+path            = ptr1          ; char*: the path being parsed
 
         .code
 
 fm_location:
         jsr     location
         bcs     bad
-        lda     (ptr1),y        ; Nothing may follow
+        lda     (path),y        ; Nothing may follow
         bne     bad
         clc
         rts
@@ -57,7 +60,7 @@ fm_name:
         bpl     :-
 
         ; The name must start with a letter
-        lda     (ptr1),y
+        lda     (path),y
         jsr     upcase
         cmp     #'A'
         bcc     bad
@@ -66,7 +69,7 @@ fm_name:
 
         ; Copy it to the end of the string; no "/" in it
         ldx     #$00
-@copy:  lda     (ptr1),y
+@copy:  lda     (path),y
         beq     store
         cmp     #'/'
         beq     bad
@@ -86,22 +89,22 @@ bad:    lda     #DOSERR_SYNTAX  ; -> EINVAL
         ; Set the parameter list fields
 store:  ldy     #FM_NAME
         lda     #<fm_namebuf
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     #>fm_namebuf
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
 
         .assert FM_DRIVE = FM_VOLUME + 1, error
         .assert FM_SLOT = FM_DRIVE + 1, error
         ldy     #FM_VOLUME
         lda     fm_volume
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     fm_drive
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     fm_slot
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         clc
         rts
 
@@ -114,8 +117,8 @@ store:  ldy     #FM_NAME
 ;   "/S/D"  "/S/D/..."  "D"  "D/..."  "."  "./..."  anything else: Y = 0
 
 location:
-        sta     ptr1
-        stx     ptr1+1
+        sta     path
+        stx     path+1
         lda     #$00
         sta     fm_volume
         lda     DOS_DRIVE
@@ -124,7 +127,7 @@ location:
         sta     fm_slot
 
         ldy     #$00
-        lda     (ptr1),y
+        lda     (path),y
         cmp     #'/'
         beq     @absolute
         cmp     #'.'
@@ -146,7 +149,7 @@ location:
         ; "/S/D" or "/S/D/"
 @absolute:
         iny
-        lda     (ptr1),y
+        lda     (path),y
         sec
         sbc     #'1'
         cmp     #NSLOTS         ; Slots 1-7
@@ -154,7 +157,7 @@ location:
         adc     #1
         sta     fm_slot
         iny
-        lda     (ptr1),y
+        lda     (path),y
         cmp     #'/'
         bne     @bad
         iny
@@ -169,7 +172,7 @@ location:
 ; followed by more (skipped). Returns as location.
 
 endpart:
-        lda     (ptr1),y
+        lda     (path),y
         beq     @done
         cmp     #'/'
         bne     @bad
@@ -179,18 +182,18 @@ endpart:
 @bad:   sec
         rts
 
-; drive: the drive digit at (ptr1),y ('1' or '2'), followed by the end of
+; drive: the drive digit at (path),y ('1' or '2'), followed by the end of
 ; the string or "/", into fm_drive. Carry set (and fm_drive unchanged) if
 ; it isn't one.
 
-drive:  lda     (ptr1),y
+drive:  lda     (path),y
         sec
         sbc     #'1'
         cmp     #NDRIVES        ; Drives 1-2
         bcs     @no
         pha
         iny
-        lda     (ptr1),y        ; What follows the digit
+        lda     (path),y        ; What follows the digit
         beq     @yes            ; End of the string
         cmp     #'/'
         beq     @yes

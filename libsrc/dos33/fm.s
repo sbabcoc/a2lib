@@ -3,51 +3,55 @@
 ;
 ; DOS 3.3 File Manager glue for the cc65 apple2 target
 ;
-; On entry to the routines below, ptr4 points to the open file's control
-; block (FCB). fm_begin sets ptr3 to the File Manager parameter list.
+; On entry to the routines below, ctlblock points to the open file's
+; control block (FCB). fm_begin sets fm_parmlist to the File Manager
+; parameter list.
 ;
 
         .include        "zeropage.inc"
         .include        "filedes.inc"
         .include        "fm.inc"
 
+; Shared storage
+call_type       = tmp1          ; byte: FMC_READ or FMC_WRITE (fm_rangeio)
+
         .code
 
 ; ------------------------------------------------------------------------
-; fm_fdfcb: ptr4 = the control block of fdtab slot Y. Preserves X and Y;
+; fm_fdfcb: ctlblock = the control block of fdtab slot Y. Preserves X and Y;
 ; returns Z set if the slot has none (the console).
 ; fm_fdbegin: the same, then fm_begin (falls into it).
 
 fm_fdfcb:
         lda     fdtab + FD::BUFFER,y
-        sta     ptr4
+        sta     ctlblock
         lda     fdtab + FD::BUFFER+1,y
-        sta     ptr4+1
+        sta     ctlblock+1
         rts
 
 fm_fdbegin:
         jsr     fm_fdfcb        ; Falls into fm_begin
 
-; fm_begin: locate the parameter list (ptr3) and point its buffer fields at
-; the control block in ptr4: its work area, and the T/S list and data
+; fm_begin: locate the parameter list (fm_parmlist) and point its buffer
+; fields at the control block in ctlblock: its work area, and the T/S list and data
 ; buffers below it. Must precede every series of File Manager calls,
 ; because DOS owns the parameter list between calls.
 
 fm_begin:
         jsr     FM_LOCATE       ; Y = low, A = high
-        sty     ptr3
-        sta     ptr3+1
+        sty     fm_parmlist
+        sta     fm_parmlist+1
 
         .assert FM_TSL = FM_WORK + 2, error
         .assert FM_DATA = FM_TSL + 2, error
         .assert FCB_TSL = $100 && FCB_DATA = $200, error
-        ldx     ptr4+1
+        ldx     ctlblock+1
         ldy     #FM_WORK
-:       lda     ptr4            ; Each buffer a page below the last
-        sta     (ptr3),y
+:       lda     ctlblock        ; Each buffer a page below the last
+        sta     (fm_parmlist),y
         iny
         txa
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         dex
         cpy     #FM_DATA + 2
@@ -62,7 +66,7 @@ fm_begin:
 fm_simple:
         ldx     #$01
 fm_op:  ldy     #FM_CALL
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         jmp     fm_call         ; fm_call is in another segment
 
 ; ------------------------------------------------------------------------
@@ -71,12 +75,12 @@ fm_op:  ldy     #FM_CALL
 
 fm_open:
         ldy     #FM_TYPE
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         lda     #$00
         ldy     #FM_RECORD
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         lda     #FMC_OPEN
         bne     fm_op           ; Branch always
 
@@ -95,7 +99,7 @@ fm_call:
         jsr     FM_ENTRY
         bit     LC_BANK2_RO
         ldy     #FM_RC
-        lda     (ptr3),y
+        lda     (fm_parmlist),y
         cmp     #$01            ; C = (return code <> 0)
         rts
 
@@ -107,15 +111,15 @@ fm_call:
 
 fm_position:
         ldy     #FM_OFFSET
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         txa
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         lda     #$00
         ldy     #FM_RECORD
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         lda     #FMC_POSITION
         bne     fm_simple       ; Branch always
 
@@ -126,15 +130,15 @@ fm_position:
 fm_readbyte:
         ldy     #FM_CALL
         lda     #FMC_READ
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     #FMS_ONE
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         ldx     #$01
         jsr     fm_call
         bcs     :+
         ldy     #FM_BYTE
-        lda     (ptr3),y
+        lda     (fm_parmlist),y
         clc
 :       rts
 
@@ -143,33 +147,33 @@ fm_readbyte:
 
 fm_writebyte:
         ldy     #FM_BYTE
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         ldy     #FM_CALL
         lda     #FMC_WRITE
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     #FMS_ONE
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         ldx     #$01
         jmp     fm_call
 
 ; ------------------------------------------------------------------------
 ; fm_rangeio: READ or WRITE (call type in A) fm_rio_count bytes at
 ; fm_rio_addr. The count must not be zero. Returns as fm_call.
-; Uses tmp1.
+; Uses call_type.
 
 fm_rangeio:
-        sta     tmp1
+        sta     call_type
         ldy     #FM_CALL
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     #FMS_RANGE
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
 
         ; Range length; a WRITE takes the count minus FM_WRITE_ADJUST
         lda     fm_rio_count
         ldx     fm_rio_count+1
-        ldy     tmp1
+        ldy     call_type
         cpy     #FMC_WRITE
         bne     :+
         sec
@@ -177,18 +181,18 @@ fm_rangeio:
         bcs     :+
         dex
 :       ldy     #FM_RANGE
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         txa
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
 
         ; Range address
         ldy     #FM_ADDR
         lda     fm_rio_addr
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     fm_rio_addr+1
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
 
         ldx     #$01
         jmp     fm_call
@@ -198,14 +202,14 @@ fm_rangeio:
 
 fm_incpos:
         ldy     #FCB::POS
-        lda     (ptr4),y
+        lda     (ctlblock),y
         clc
         adc     #$01
-        sta     (ptr4),y
+        sta     (ctlblock),y
         iny
-        lda     (ptr4),y
+        lda     (ctlblock),y
         adc     #$00
-        sta     (ptr4),y
+        sta     (ctlblock),y
         rts
 
 ; ------------------------------------------------------------------------

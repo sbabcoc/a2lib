@@ -6,25 +6,28 @@
 ; HIMEM and DOS, chained from DOS_BUFS. A buffer is in use while the first
 ; byte of its name field is nonzero, as DOS's own commands mark it.
 ;
-; fm_getfcb:  reserve a free one into ptr4, with the library's fields
+; fm_getfcb:  reserve a free one into ctlblock, with the library's fields
 ;             cleared. Returns carry clear, or carry set with A =
 ;             DOSERR_NOBUFS (DOS's NO BUFFERS AVAILABLE, ENOMEM) if every
 ;             buffer is in use.
-; fm_freefcb: release the one in ptr4. Preserves A.
+; fm_freefcb: release the one in ctlblock. Preserves A.
 ; fm_isopen:  whether the file named in the parameter list (by fm_name) is
 ;             open, before DELETE and RENAME (DESIGN.md
-;             5.5a). OPENs it in the control block in ptr4 without
+;             5.5a). OPENs it in the control block in ctlblock without
 ;             allocating it, CLOSEs it, and compares the work area's first
 ;             T/S list, slot and drive with each open file's. Returns carry
 ;             clear if it isn't open, or carry set with A = an __oserror value:
 ;             LIBERR_OPEN if it is open (EINVAL), or the OPEN's error.
 ;             Set up the parameter list again before the next call
-;             (fm_begin, fm_name). Uses ptr2.
+;             (fm_begin, fm_name). Uses open_ctlblock.
 ;
 
         .include        "zeropage.inc"
         .include        "fm.inc"
         .include        "filedes.inc"
+
+; Shared storage
+open_ctlblock   = ptr2          ; FCB*: an open file's (fm_isopen)
 
 ; File Manager work area ("Beneath Apple DOS", ch. 6): the bytes that
 ; identify a file. The first T/S list's track and sector are unique on a
@@ -40,31 +43,31 @@ WA_DRIVE        = $27           ; Drive
 fm_getfcb:
         lda     DOS_BUFS
         ldx     DOS_BUFS+1
-@buf:   sta     ptr4            ; A buffer's name field
-        stx     ptr4+1
-        ora     ptr4+1
+@buf:   sta     ctlblock        ; A buffer's name field
+        stx     ctlblock+1
+        ora     ctlblock+1
         beq     @none           ; End of the chain
         ldy     #$00
-        lda     (ptr4),y
+        lda     (ctlblock),y
         beq     @free
         ldy     #FCB::NEXT - FCB::INUSE + 1
-        lda     (ptr4),y        ; The next one's
+        lda     (ctlblock),y    ; The next one's
         tax
         dey
-        lda     (ptr4),y
+        lda     (ctlblock),y
         jmp     @buf
 
 @free:  lda     #FCB_INUSE
-        sta     (ptr4),y
+        sta     (ctlblock),y
         sec                     ; Address the work area
-        lda     ptr4
+        lda     ctlblock
         sbc     #FCB::INUSE
-        sta     ptr4
+        sta     ctlblock
         bcs     :+
-        dec     ptr4+1
+        dec     ctlblock+1
 :       lda     #$00            ; Clear the library's fields
         ldy     #FCB::ADDR + 1
-@clear: sta     (ptr4),y
+@clear: sta     (ctlblock),y
         dey
         cpy     #FCB::INUSE
         bne     @clear
@@ -79,7 +82,7 @@ fm_freefcb:
         pha
         lda     #$00
         ldy     #FCB::INUSE
-        sta     (ptr4),y
+        sta     (ctlblock),y
         pla
         rts
 
@@ -100,9 +103,9 @@ file:   lda     fdtab + FD::REF_NUM,x
         cmp     #$40
         bne     next
         lda     fdtab + FD::BUFFER,x
-        sta     ptr2
+        sta     open_ctlblock
         lda     fdtab + FD::BUFFER+1,x
-        sta     ptr2+1
+        sta     open_ctlblock+1
         ldy     #FCB::WORK + WA_TSL
         jsr     same
         bne     next
@@ -128,11 +131,11 @@ next:   inx
         clc
         rts
 
-; same: Z set if byte Y of the open file's control block (ptr2) equals the
-; same byte of this one (ptr4).
+; same: Z set if byte Y of the open file's control block (open_ctlblock)
+; equals the same byte of this one (ctlblock).
 
-same:   lda     (ptr2),y
-        cmp     (ptr4),y
+same:   lda     (open_ctlblock),y
+        cmp     (ctlblock),y
         rts
 
         .assert WA_DRIVE = WA_SLOT + 1, error

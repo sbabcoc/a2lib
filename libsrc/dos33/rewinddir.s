@@ -15,26 +15,26 @@
         .code
 
 __rewinddir_a2lib:
-        sta     ptr1
-        stx     ptr1+1
+        sta     dirptr
+        stx     dirptr+1
         ; Fall through
 
-; rewinddir_ptr1: start the DIR at ptr1 again at the first catalog sector
+; rewind_dir: start the DIR at dirptr again at the first catalog sector
 ; (read on the next readdir). Used by opendir too.
 
-rewinddir_ptr1:
+rewind_dir:
         ldy     #DIR::FIRSTT
-        lda     (ptr1),y
+        lda     (dirptr),y
         ldy     #DIR::NEXTT
-        sta     (ptr1),y
+        sta     (dirptr),y
         ldy     #DIR::FIRSTS
-        lda     (ptr1),y
+        lda     (dirptr),y
         ldy     #DIR::NEXTS
-        sta     (ptr1),y
+        sta     (dirptr),y
         lda     #CAT_PERSECTOR
         ldy     #DIR::INDEX
-        sta     (ptr1),y
+        sta     (dirptr),y
         lda     #$00
         ldy     #DIR::DONE
-        sta     (ptr1),y
+        sta     (dirptr),y
         rts

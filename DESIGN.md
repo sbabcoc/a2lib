@@ -80,6 +80,18 @@ follows them, so the code stays as readable as they left it.
   the module. One name per value: no second name for the same thing.
   cc65's own names (`apple2.inc`: `DOSWARM`, `CURLIN`, `PROMPT`, ...) come
   first where they exist.
+- **Shared storage gets a name for what it holds (10.39).** cc65's
+  zero-page cells (`ptr1`-`ptr4`, `tmp1`-`tmp4`, `sreg`) are named in a
+  "Shared storage" block after the module's includes (`buffer = ptr1`),
+  as stock modules such as `vfscanf.s` and `lzsa1.s` do. A cell with two
+  jobs in one module gets a name for each, used where it does that job.
+  Names that several modules share are defined once: `fm.inc` has
+  `fm_parmlist` (`ptr3`) and `ctlblock` (`ptr4`), `dir.inc` has `dirptr`
+  (`ptr1`). Those are text macros (`.define`), because a `=` alias
+  imports its cell even in a module that never uses it, which
+  `samebytes.sh` reports; a `.define` name must be unique across the
+  sources, as it replaces the word wherever it appears. Vendored modules
+  keep stock's names, so they stay easy to compare.
 - **Labels.** An anonymous label is only for a jump to the nearest one
   (`:+`, `:-`). A jump past another label (`:++`, `:--`), including the
   outer loop of a nested pair, gets a named label (`@row`, `@col`).
@@ -3281,6 +3293,21 @@ finds `fm_getfcb`, `DOS_BUFS`, `fdtab`, `popax`), a second `make` does
 nothing, touching a source rebuilds it, and with `CTAGS=` `make` skips it
 while `make tags` says why and fails. `tools/samebytes.sh`: identical, as
 nothing that's built changed.
+
+### 10.39 Names for shared storage: the file layer
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/fm.inc` | `fm_parmlist` and `ctlblock`, text macros for `ptr3` and `ptr4` |
+| `libsrc/dos33/dir.inc` | `dirptr` for `ptr1`; `read_dir_sector_ptr1` and `rewinddir_ptr1` renamed `read_dir_sector` and `rewind_dir`, as their input now has a name |
+| `libsrc/dos33/fm.s`, `fmbuf.s`, `fmname.s`, `open.s`, `seekend.s`, `sysrename.s`, `lseek.s`, `rwts.s`, `rwfile.s`, `rwcommon.s`, `exec.s`, `opendir.s`, `rewinddir.s`, `readdir.s`, `stat.s` | The cells named for what they hold (code and comments) |
+
+The vendored `write.s` and `mainargs.s` keep stock's names.
+
+Verified: `tools/samebytes.sh` against `f85d189` reports only the
+symbol tables of `opendir.s`, `readdir.s` and `rewinddir.s`, for the two
+renamed routines; with those two names put back, it reports the tree
+IDENTICAL, every module and program.
 
 ## 11. Sources
 

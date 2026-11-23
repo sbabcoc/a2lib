@@ -72,9 +72,9 @@ found:  sty     slot
         jmp     ___mappederrno  ; A = DOSERR_NOBUFS -> ENOMEM
 
 :       ldy     slot
-        lda     ptr4
+        lda     ctlblock
         sta     fdtab + FD::BUFFER,y
-        lda     ptr4+1
+        lda     ctlblock+1
         sta     fdtab + FD::BUFFER+1,y
         lda     #$00
         sta     created
@@ -133,9 +133,9 @@ exists: lda     flags
 
         ; Set up the control block from the type of the file opened
 opened: ldy     #FM_TYPE
-        lda     (ptr3),y
+        lda     (fm_parmlist),y
         ldy     #FCB::TYPE      ; Keep the lock bit for stat
-        sta     (ptr4),y
+        sta     (ctlblock),y
         and     #FMT_TYPE_MASK
         sta     type
         jsr     classify
@@ -167,14 +167,14 @@ oldfile:
         sta     hdrbuf+1
         ldy     #FCB::STATE
         lda     #FCBS_DIRTY
-        sta     (ptr4),y
+        sta     (ctlblock),y
         bne     done            ; Branch always (LEN stays 0)
 :       ldy     #FCB::LEN
         lda     hdrbuf+2
-        sta     (ptr4),y
+        sta     (ctlblock),y
         iny
         lda     hdrbuf+3
-        sta     (ptr4),y
+        sta     (ctlblock),y
         jmp     done
 
         ; New (or truncated) file: write the hidden header, if any
@@ -197,15 +197,15 @@ newfile:
 
         ; B files: keep the load address for stat
 done:   ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         cmp     #4
         bne     :+
         ldy     #FCB::ADDR
         lda     hdrbuf
-        sta     (ptr4),y
+        sta     (ctlblock),y
         iny
         lda     hdrbuf+1
-        sta     (ptr4),y
+        sta     (ctlblock),y
 
         ; Fill in the fdtab slot and return the handle
 :       ldy     slot
@@ -325,7 +325,7 @@ setname:
 
 hdrsize:
         ldy     #FCB::HDRLEN
-        lda     (ptr4),y
+        lda     (ctlblock),y
         beq     :+
         sta     fm_rio_count
         lda     #$00
@@ -362,14 +362,14 @@ classify:
         rts                     ; Raw: fields are already zero
 hdr:    tya
         ldy     #FCB::LENOFS
-        sta     (ptr4),y
+        sta     (ctlblock),y
         txa
         ldy     #FCB::HDRLEN
-        sta     (ptr4),y
+        sta     (ctlblock),y
         rts
 text:   lda     #FCB_TEXT
         ldy     #FCB::KIND
-        sta     (ptr4),y
+        sta     (ctlblock),y
         rts
 
 ; ------------------------------------------------------------------------
@@ -384,19 +384,19 @@ closedirect:
         sta     cerr
 
         ldy     #FCB::STATE
-        lda     (ptr4),y
+        lda     (ctlblock),y
         and     #FCBS_DIRTY
         beq     cclose
         ldy     #FCB::LENOFS
-        lda     (ptr4),y
+        lda     (ctlblock),y
         ldx     #$00
         jsr     fm_position
         bcs     cfail
         clc
-        lda     ptr4
+        lda     ctlblock
         adc     #<FCB::LEN
         sta     fm_rio_addr
-        lda     ptr4+1
+        lda     ctlblock+1
         adc     #>FCB::LEN
         sta     fm_rio_addr+1
         lda     #2

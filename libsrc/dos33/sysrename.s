@@ -112,10 +112,10 @@ __sysrename:
         jsr     setname
         ldy     #FM_NEWNAME
         lda     #<newbuf
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         lda     #>newbuf
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         lda     #FMC_RENAME
         jsr     fm_simple
         bcs     fmerr           ; Locked, write protected, I/O error, ...
@@ -132,10 +132,10 @@ done:   ldx     #$00
 
 setname:
         ldy     #FM_NAME
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         iny
         txa
-        sta     (ptr3),y
+        sta     (fm_parmlist),y
         rts
 
         .bss
