@@ -28,9 +28,10 @@
 ;                                       free DOS buffer, DOSERR_SYNTAX
 ;                                       (EINVAL) for a bad path, or another
 ;                                       DOS 3.3 error
-;               X             byte      0
-; Changes:      Y; ptr1 (fm_name), ptr2 (fm_isopen), fm_parmlist and ctlblock.
-;               Takes a DOS buffer for the call and releases it.
+; Changes:      X and Y; ptr1 (fm_name), ptr2 (fm_isopen), fm_parmlist and
+;               ctlblock. Takes a DOS buffer for the call and releases it.
+; Note:         X isn't set: the only caller, cc65's common/remove.s,
+;               ends in ___mappederrno, which sets it.
 
 __sysremove:
         sta     name
@@ -55,8 +56,7 @@ __sysremove:
         bcc     free            ; A = 0
         jsr     fm_maperr
 free:   jsr     fm_freefcb      ; Preserves A
-done:   ldx     #$00
-        rts
+done:   rts
 
         .bss
 

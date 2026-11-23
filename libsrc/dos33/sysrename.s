@@ -46,9 +46,11 @@
 ;                                       (ENOMEM) with no free DOS buffer, or
 ;                                       RENAME's own error, such as
 ;                                       DOSERR_LOCKED (EACCES)
-;               X             byte      0
-; Changes:      Y; ptr1 (fm_name), ptr2 (fm_isopen), fm_parmlist and ctlblock.
-;               Pops oldname. Takes a DOS buffer for the call and releases it.
+; Changes:      X and Y; ptr1 (fm_name), ptr2 (fm_isopen), fm_parmlist and
+;               ctlblock. Pops oldname. Takes a DOS buffer for the call and
+;               releases it.
+; Note:         X isn't set: the only caller, cc65's common/rename.s,
+;               ends in ___mappederrno, which sets it.
 
 __sysrename:
         sta     newname
@@ -145,8 +147,7 @@ elsewhere:
         bne     free            ; Branch always
 fmerr:  jsr     fm_maperr
 free:   jsr     fm_freefcb      ; Preserves A
-done:   ldx     #$00
-        rts
+done:   rts
 
 ;-----------------------------------------------------------------------------
 ; setname: Point the parameter list's FM_NAME at a name buffer.

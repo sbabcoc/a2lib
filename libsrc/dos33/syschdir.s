@@ -29,10 +29,10 @@
 ;                                       optionally ending in "/"
 ; Output:       A             byte      0, or DOSERR_SYNTAX (EINVAL) for any
 ;                                       other path
-;               X             byte      unchanged (name's high byte), not 0:
-;                                       cc65's chdir reads only A
 ; Changes:      Y and ptr1 (fm_location). On success: DOS_SLOT and DOS_DRIVE,
 ;               which outlast the program, and __cwd (initcwd).
+; Note:         X isn't set: the only caller, cc65's common/chdir.s,
+;               ends in ___mappederrno, which sets it.
 
 __syschdir:
         jsr     fm_location     ; From AX

@@ -3334,6 +3334,17 @@ Each module's storage is commented with its type. Comments only.
 Verified: `tools/samebytes.sh` against `674ba13` reports the tree
 IDENTICAL, every module and program.
 
+### 10.41 remove() and rename(): no X for ___mappederrno
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/sysremove.s`, `sysrename.s` | The `ldx #$00` before `rts` removed: the only callers, cc65's `common/remove.s` and `common/rename.s`, end in `___mappederrno`, which sets X from A. Stock apple2's modules don't set X either. 2 bytes each |
+| `libsrc/dos33/syschdir.s` | Header: the same note on X |
+
+Verified: `tools/samebytes.sh` against `c664afa` reports only
+`sysremove.s`, `sysrename.s` and the programs that link them
+(`filetest`, `wptest`); `make emutest` passes.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,
