@@ -18,17 +18,20 @@
         .include        "zeropage.inc"
         .include        "timer.inc"
 
+; Shared storage
+tp              = ptr1          ; struct timespec*: the caller's time
+
 _clock_settime:
 
         ; Cleanup stack
         jsr     incsp1          ; Preserves A
 
         ; clk_offset = tv_sec - t_sec; remember when
-        sta     ptr1
-        stx     ptr1+1
+        sta     tp
+        stx     tp+1
         ldy     #$00            ; The loop test leaves C alone
         sec
-:       lda     (ptr1),y
+:       lda     (tp),y
         sbc     t_sec,y
         sta     clk_offset,y
         lda     t_sec,y

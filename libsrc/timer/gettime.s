@@ -17,9 +17,12 @@
         .include        "zeropage.inc"
         .include        "timer.inc"
 
+; Shared storage
+tp              = ptr1          ; struct timespec*: the caller's time
+
 _clock_gettime:
-        sta     ptr1
-        stx     ptr1+1
+        sta     tp
+        stx     tp+1
         jsr     incsp1          ; Drop clk_id
 
         ; tv_sec = t_sec + clk_offset (the loop test leaves C alone)
@@ -28,7 +31,7 @@ _clock_gettime:
         clc
 :       lda     t_sec,y
         adc     clk_offset,y
-        sta     (ptr1),y
+        sta     (tp),y
         iny
         tya
         eor     #4
@@ -74,7 +77,7 @@ noadd:  asl     addend
         ldy     #timespec::tv_nsec
         ldx     #$00
 :       lda     nsec,x
-        sta     (ptr1),y
+        sta     (tp),y
         iny
         inx
         cpx     #4

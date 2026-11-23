@@ -85,6 +85,8 @@ follows them, so the code stays as readable as they left it.
   "Shared storage" block after the module's includes (`buffer = ptr1`),
   as stock modules such as `vfscanf.s` and `lzsa1.s` do. A cell with two
   jobs in one module gets a name for each, used where it does that job.
+  `sreg` keeps its name where it holds a `long` result's high word, as
+  the calling convention names it.
   Names that several modules share are defined once: `fm.inc` has
   `fm_parmlist` (`ptr3`) and `ctlblock` (`ptr4`), `dir.inc` has `dirptr`
   (`ptr1`). Those are text macros (`.define`), because a `=` alias
@@ -3344,6 +3346,21 @@ IDENTICAL, every module and program.
 Verified: `tools/samebytes.sh` against `c664afa` reports only
 `sysremove.s`, `sysrename.s` and the programs that link them
 (`filetest`, `wptest`); `make emutest` passes.
+
+### 10.42 Names for shared storage: the runtime
+
+| File | Change |
+|---|---|
+| `libsrc/timer/gettime.s`, `settime.s` | `tp` for `ptr1`, the `struct timespec*` argument |
+
+The other runtime modules use no cc65 zero-page cell except as stock
+does: `timer.s` saves and restores the whole block from `sreg` around
+callbacks, and `sreg` carries `a2_millis()`'s and `a2_clock_age()`'s
+high word. The vendored `crt0.s`, `mainargs.s`, `cgetc.s` and `kbhit.s`
+keep stock's names.
+
+Verified: `tools/samebytes.sh` against `92a7d3d` reports the tree
+IDENTICAL, every module and program.
 
 ## 11. Sources
 
