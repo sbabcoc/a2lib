@@ -3377,6 +3377,21 @@ Each module's storage is commented with its type. Comments only.
 Verified: `tools/samebytes.sh` against `e60ca38` reports the tree
 IDENTICAL, every module and program.
 
+### 10.44 Names for shared storage: the display libraries
+
+| File | Change |
+|---|---|
+| `libsrc/s70/s70.s` | `source` and `dest` for `ptr1` and `ptr2`, s70_font's font set and its place in the font table |
+
+No other display module uses a cc65 zero-page cell except as stock
+does: the vendored `vt/cgetc.s` and `vt/cputc.s` keep the character
+under the caret in `tmp3`, cc65's convention between the two, under
+stock's name. Soft-80 and Soft-70 use the monitor's `BASL` and
+`BAS2L` as their pointers, under the monitor's names.
+
+Verified: `tools/samebytes.sh` against `042175d` reports the tree
+IDENTICAL, every module and program.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

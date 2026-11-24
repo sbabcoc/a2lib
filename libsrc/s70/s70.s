@@ -34,7 +34,8 @@
 ;
 ; Uses BASL and BAS2L ($28-$2B) as pointers, set on every use, and no
 ; other zero page, except s70_font, a C function, which uses ptr1 and
-; ptr2. Self-modifying: the drawing loops' operands are set per cell.
+; ptr2 (source and dest). Self-modifying: the drawing loops' operands are
+; set per cell.
 ;
 
         .export         _s70_font
@@ -50,6 +51,10 @@
         .include        "display.inc"
         .include        "vt.inc"
         .include        "timer.inc"
+
+; Shared storage
+source          = ptr1          ; const byte*: s70_font's font set
+dest            = ptr2          ; byte*: s70_font's place in font
 
         .assert __MAIN_START__ >= $4000, lderror, "Soft-70: link with --start-addr 0x4000 (DESIGN.md 3.8)"
         .assert __LOW_LAST__ <= $2000, lderror, "Soft-70: LOWBSS overlaps the hi-res page"
@@ -495,16 +500,16 @@ curdraw:
 _s70_font:
         sta     nibble          ; Nonzero: the high nibble
         jsr     popax
-        sta     ptr1
-        stx     ptr1+1
+        sta     source
+        stx     source+1
         lda     #<font
-        sta     ptr2
+        sta     dest
         lda     #>font
-        sta     ptr2+1
+        sta     dest+1
         lda     #3              ; 768 bytes
         sta     pages
         ldy     #$00
-@byte:  lda     (ptr1),y
+@byte:  lda     (source),y
         ldx     nibble
         beq     @low
         lsr
@@ -512,11 +517,11 @@ _s70_font:
         lsr
         lsr
 @low:   and     #$0F
-        sta     (ptr2),y
+        sta     (dest),y
         iny
         bne     @byte
-        inc     ptr1+1
-        inc     ptr2+1
+        inc     source+1
+        inc     dest+1
         dec     pages
         bne     @byte
         lda     #$00            ; Blank cells are skipped, not drawn
