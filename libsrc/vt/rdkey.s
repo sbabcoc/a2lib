@@ -12,6 +12,7 @@
         .export         RDKEY
 
         .include        "apple2.inc"
+        .include        "machine.inc"
         .include        "vt.inc"
 
         .segment        "LOWCODE"
@@ -32,11 +33,11 @@ RDKEY:
         lda     #R10_BLINK      ; Show the card's cursor while waiting
         jsr     vt_r10
 :       ; Switch in ROM and call RDKEY
-        bit     $C082
-        jsr     $FD0C           ; Display prompt and read key from user input routine
+        bit     LC_ROM_RO
+        jsr     MON_RDKEY           ; Display prompt and read key from user input routine
 
         ; Switch in LC bank 2 for R/O and return
-        bit     $C080
+        bit     LC_BANK2_RO
         bit     vt_active
         bpl     :+
         pha

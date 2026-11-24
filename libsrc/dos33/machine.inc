@@ -15,7 +15,14 @@ LC_BANK2_RO     := $C080        ; Read bank 2 RAM; write-protected
 
 ; Monitor and DOS entry points
 MON_COUT        := $FDED        ; COUT: through CSW, so through DOS's intercept
+MON_RDKEY       := $FD0C        ; RDKEY: through KSW, so through DOS's intercept
 DOS_CONNECT     := $03EA        ; Reconnect DOS's I/O intercepts (page 3 vector)
+
+; Applesoft's pointers for BLTU2, the block move crt0 copies the LC
+; segment with
+HIGHDS          := $94          ; One past the destination's last byte
+HIGHTR          := $96          ; One past the source's last byte
+LOWTR           := $9B          ; The source's first byte
 
 ; Pages exec() uses after the C library has shut down
 STACK_PAGE      := $0100        ; Hardware stack page: exec()'s saved cmdline

@@ -94,6 +94,11 @@ follows them, so the code stays as readable as they left it.
   `samebytes.sh` reports; a `.define` name must be unique across the
   sources, as it replaces the word wherever it appears. Vendored modules
   keep stock's names, so they stay easy to compare.
+- **Addresses by name.** Code names every soft switch, ROM entry point
+  and fixed location: cc65's `apple2.inc` where it has a name (`ROMIN`,
+  `LCBANK2`, `KBD`), else `libsrc/dos33/machine.inc` (`LC_ROM_RO`,
+  `LC_BANK2_RO`, `MON_COUT`, `MON_RDKEY`), vendored modules included. The
+  exception is `$0103,x` after `tsx`, an offset into the stack frame.
 - **Routine headers (10.40).** Every exported routine, and each
   internal one worth a name, has a header after a 78-column rule: the
   name and what it does, then `Prepare:` (routines that must come
@@ -3409,6 +3414,18 @@ has. Each module's storage is commented with its type. Comments only.
 
 Verified: `tools/samebytes.sh` against `810c917` reports the tree
 IDENTICAL, every module and program.
+
+### 10.46 Addresses by name
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/machine.inc` | New: `MON_RDKEY` ($FD0C), and Applesoft's `HIGHDS`, `HIGHTR` and `LOWTR` ($94, $96, $9B), BLTU2's pointers |
+| `libsrc/dos33/crt0.s`, `irq.s` | The language card switches by name (`ROMIN`, `LCBANK2`, `LC_ROM_RO`, `LC_BANK2_RO`), and BLTU2's pointers |
+| `libsrc/vt/cout.s`, `rdkey.s`, `libsrc/s70/rdkey.s`, `libsrc/reflow/cout.s` | The switches, `MON_COUT` and `MON_RDKEY` by name; they include `machine.inc` |
+| `Makefile` | The VideoTerm, Soft-70 and sim objects depend on `libsrc/dos33/*.inc`, which they include |
+
+Verified: `tools/samebytes.sh` against `1c70002` reports the tree
+IDENTICAL, every module and program; `make simtest` passes.
 
 ## 11. Sources
 

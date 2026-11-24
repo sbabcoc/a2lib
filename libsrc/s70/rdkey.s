@@ -17,6 +17,7 @@
         .import         VTABZ, s70_curshow, s70_curhide
 
         .include        "apple2.inc"
+        .include        "machine.inc"
         .include        "s80.inc"
         .include        "vt.inc"
 
@@ -74,9 +75,9 @@ s70:    jsr     s70_curshow
 ; Changes:      What RDKEY and the input hook change.
 
 rom:    ; Switch in ROM and call RDKEY
-        bit     $C082
-        jsr     $FD0C           ; Display prompt and read key from user input routine
+        bit     LC_ROM_RO
+        jsr     MON_RDKEY           ; Display prompt and read key from user input routine
 
         ; Switch in LC bank 2 for R/O and return
-        bit     $C080
+        bit     LC_BANK2_RO
         rts

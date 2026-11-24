@@ -36,6 +36,7 @@
         .import         callirq
 
         .include        "apple2.inc"
+        .include        "machine.inc"
 
 IRQLOC  := $03FE                ; Monitor's maskable-interrupt vector
 SAVEA   := $45                  ; Where the ROM IRQ handler saves A
@@ -67,8 +68,8 @@ initirq:
         lda     #>romirq
         sta     IRQLOC+1
 
-        bit     $C083           ; LC bank 2 read and write
-        bit     $C083
+        bit     LCBANK2           ; LC bank 2 read and write
+        bit     LCBANK2
         lda     ROM_IRQ
         sta     lcnext+1
         lda     ROM_IRQ+1
@@ -77,7 +78,7 @@ initirq:
         sta     ROM_IRQ
         lda     #>lcirq
         sta     ROM_IRQ+1
-        bit     $C080           ; LC bank 2 read only, as crt0 leaves it
+        bit     LC_BANK2_RO           ; LC bank 2 read only, as crt0 leaves it
 
         inc     installed
         cli
@@ -105,13 +106,13 @@ doneirq:
         sta     IRQLOC
         lda     romnext+2
         sta     IRQLOC+1
-        bit     $C083
-        bit     $C083
+        bit     LCBANK2
+        bit     LCBANK2
         lda     lcnext+1
         sta     ROM_IRQ
         lda     lcnext+2
         sta     ROM_IRQ+1
-        bit     $C080
+        bit     LC_BANK2_RO
         cli
         rts
 

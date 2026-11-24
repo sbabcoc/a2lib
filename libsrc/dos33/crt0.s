@@ -22,6 +22,7 @@
 
         .include        "zeropage.inc"
         .include        "apple2.inc"
+        .include        "machine.inc"
 
 ; ------------------------------------------------------------------------
 
@@ -57,7 +58,7 @@
 ;               zpsave        byte[]    the zero page from c_sp, as at entry
 ;               rvsave        byte[3]   the RESET vector, as at entry
 ; Changes:      A, X and Y; SOFTEV and PWREDUP; LC RAM's ROM_RST and ROM_IRQ,
-;               and the LC segment; $94-$97 and $9B-$9C (bltu2); what the
+;               and the LC segment; HIGHDS, HIGHTR and LOWTR (bltu2); what the
 ;               constructors change. Leaves LC bank 2 read-only.
 ; Note:         The vectors are patched before the constructors run, so
 ;               irq.s's initirq replaces this IRQ vector and chains to
@@ -89,8 +90,8 @@ init:   ldx     #zpspace-1
         jsr     reset           ; Setup RESET vector
 
         ; Switch in LC bank 2 for W/O.
-        bit     $C081
-        bit     $C081
+        bit     ROMIN
+        bit     ROMIN
 
         lda     #<reset_6502
         ldx     #>reset_6502
@@ -103,43 +104,43 @@ init:   ldx     #zpspace-1
         stx     ROM_IRQ+1
 
         ; Back to ROM for reading, LC write-protected, as at entry
-        bit     $C082
+        bit     LC_ROM_RO
 
         ; Call the module constructors.
         jsr     initlib
 
         ; Copy the LC segment to its destination
         ; Switch in LC bank 2 for W/O.
-        bit     $C081
-        bit     $C081
+        bit     ROMIN
+        bit     ROMIN
 
         ; Set the source start address.
         ; Aka __LC_LOAD__ iff segment LC exists.
         lda     #<(__ONCE_LOAD__ + __ONCE_SIZE__)
         ldy     #>(__ONCE_LOAD__ + __ONCE_SIZE__)
-        sta     $9B
-        sty     $9C
+        sta     LOWTR
+        sty     LOWTR+1
 
         ; Set the source last address.
         ; Aka __LC_LOAD__ + __LC_SIZE__ iff segment LC exists.
         lda     #<((__ONCE_LOAD__ + __ONCE_SIZE__) + (__LC_LAST__ - __LC_START__))
         ldy     #>((__ONCE_LOAD__ + __ONCE_SIZE__) + (__LC_LAST__ - __LC_START__))
-        sta     $96
-        sty     $97
+        sta     HIGHTR
+        sty     HIGHTR+1
 
         ; Set the destination last address.
         ; Aka __LC_RUN__ + __LC_SIZE__ iff segment LC exists.
         lda     #<__LC_LAST__
         ldy     #>__LC_LAST__
-        sta     $94
-        sty     $95
+        sta     HIGHDS
+        sty     HIGHDS+1
 
         ; Call into Applesoft Block Transfer Up -- which handles zero-
         ; sized blocks well -- to move the content of the LC memory area.
         jsr     bltu2
 
         ; Switch in LC bank 2 for R/O and return.
-        bit     $C080
+        bit     LC_BANK2_RO
         rts
 
 ; ------------------------------------------------------------------------
@@ -172,7 +173,7 @@ return: rts
 ; Changes:      Banks in ROM.
 
 reset_6502:
-        bit     $C082           ; Switch in ROM
+        bit     LC_ROM_RO           ; Switch in ROM
         jmp     (ROM_RST)       ; Jump to ROM's RESET vector
 
 ;-----------------------------------------------------------------------------
@@ -185,7 +186,7 @@ reset_6502:
 ; Changes:      Banks in ROM, and leaves it in.
 
 irq_6502:
-        bit     $C082           ; Switch in ROM
+        bit     LC_ROM_RO           ; Switch in ROM
         jmp     (ROM_IRQ)       ; Jump to ROM's IRQ/BRK vector
 
 ; ------------------------------------------------------------------------

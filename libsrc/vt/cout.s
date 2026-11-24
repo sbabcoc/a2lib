@@ -13,6 +13,7 @@
         .export         COUT, a2_rawcout, a2_coutvec
 
         .include        "apple2.inc"
+        .include        "machine.inc"
         .include        "vt.inc"
 
 ; COUT is a JMP in DATA that reflow.s's reflow_on points at its filter
@@ -41,9 +42,9 @@ a2_rawcout:
         jmp     vt_write        ; Same as COUT through the hook, minus banking
 
 :       ; Switch in ROM and call COUT
-        bit     $C082
-        jsr     $FDED           ; Vector to user output routine
+        bit     LC_ROM_RO
+        jsr     MON_COUT           ; Vector to user output routine
 
         ; Switch in LC bank 2 for R/O and return
-        bit     $C080
+        bit     LC_BANK2_RO
         rts

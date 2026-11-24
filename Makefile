@@ -171,7 +171,7 @@ $(REFLOW_LIB): $(REFLOW_OBJ) lib/a2lib-reflow.o $(STOCKCOPY)
 
 # VideoTerm backend: VideoTerm-aware conio modules, and the timer's tick
 # hook and kbhit (their cgetc ticks too)
-build/vt/%.o: libsrc/vt/%.s $(VT_INC) $(TIMER_INC)
+build/vt/%.o: libsrc/vt/%.s $(VT_INC) $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) -I libsrc/vt -I libsrc/timer -I libsrc/dos33 -o $@ $<
 
@@ -192,11 +192,11 @@ $(IP65_OBJ): libsrc/ip65/a2timer.s $(TIMER_INC)
 # linked with --start-addr 0x4000.
 S70_FLAGS := -I libsrc/s70 -I libsrc/s80 -I libsrc/vt -I libsrc/timer -I libsrc/dos33
 
-build/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
+build/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) $(S70_FLAGS) -o $@ $<
 
-build/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
+build/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t $(TARGET) $(S70_FLAGS) -o $@ $<
 
@@ -291,11 +291,11 @@ SIM_REFLOW := $(SIM_DIR)/reflow.o
 SIM_OBJ  := $(patsubst %,$(SIM_DIR)/%.o,$(SIM_MODS))
 SIM65    ?= sim65
 
-$(SIM_DIR)/%.o: libsrc/timer/%.s $(TIMER_INC)
+$(SIM_DIR)/%.o: libsrc/timer/%.s $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 -I libsrc/timer -I libsrc/dos33 -o $@ $<
 
-$(SIM_DIR)/%.o: libsrc/reflow/%.s
+$(SIM_DIR)/%.o: libsrc/reflow/%.s $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 -I libsrc/dos33 -o $@ $<
 
@@ -305,11 +305,11 @@ $(SIM_DIR)/timersim: test/sim/timersim.c test/sim/shim.s test/timerzp.s $(SIM_OB
 S70_SIM_MODS := s80 cputc cpeekc gotoxy gotoy wherex wherey clrscr s70 font
 S70_SIM_OBJ  := $(patsubst %,$(SIM_DIR)/s70/%.o,$(S70_SIM_MODS))
 
-$(SIM_DIR)/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
+$(SIM_DIR)/s70/%.o: libsrc/s70/%.s $(S70_INC) $(VT_INC) $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 $(S70_FLAGS) -o $@ $<
 
-$(SIM_DIR)/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC)
+$(SIM_DIR)/s70/%.o: libsrc/s80/%.s $(S70_INC) $(VT_INC) $(TIMER_INC) $(DOS33_INC)
 	@mkdir -p $(@D)
 	$(CA65) -t sim6502 $(S70_FLAGS) -o $@ $<
 
