@@ -14,6 +14,15 @@
         .include        "s80.inc"
         .include        "display.inc"
 
+;-----------------------------------------------------------------------------
+; screensize: The screen's size, for cc65's screensize(): 80 x 24, on the
+; VideoTerm and in the model alike.
+;
+; Input:        none
+; Output:       X             byte      80
+;               Y             byte      24
+; Changes:      Flags. A is unchanged.
+
 screensize:
         ldx     #S80_COLS
         ldy     #S80_ROWS

@@ -27,6 +27,15 @@ a2_coutvec      = COUT + 1      ; The JMP's target
 
         .segment        "LOWCODE"
 
+;-----------------------------------------------------------------------------
+; a2_rawcout: Write a character, as the monitor's COUT: through vt_write on
+; the VideoTerm, otherwise into the model (s80_cout). Called through COUT, the
+; JMP that reflow_on can point at its filter.
+;
+; Input:        A             char      the character, with the high bit set
+; Output:       none
+; Changes:      Flags; the screen. A, X and Y are unchanged.
+
 a2_rawcout:
         bit     vt_active
         bpl     :+

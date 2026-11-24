@@ -14,6 +14,15 @@
 
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _clrscr: Clear the screen and home the cursor: void clrscr (void). On the
+; card, with the firmware's $0C; otherwise with the monitor's HOME.
+;
+; Input:        none
+; Output:       none
+; Changes:      The screen and the cursor. On the card: A and flags.
+;               Otherwise: A and Y, and the monitor's cursor cells.
+
 _clrscr:
         bit     vt_active
         bmi     :+

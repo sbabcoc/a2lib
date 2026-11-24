@@ -23,6 +23,16 @@ a2_coutvec      = COUT + 1      ; The JMP's target
 
         .segment        "LOWCODE"
 
+;-----------------------------------------------------------------------------
+; a2_rawcout: Write a character through COUT ($FDED) with ROM banked in, as
+; stock cout.s: the output routine itself, which COUT's JMP reaches unless
+; reflow_on has pointed it at its filter.
+;
+; Input:        A             char      the character, with the high bit set
+; Output:       none
+; Changes:      What COUT and the output hook change. Ends with LC bank 2
+;               read-only.
+
 a2_rawcout:
         ; Switch in ROM and call COUT
         bit     $C082

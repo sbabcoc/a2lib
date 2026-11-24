@@ -18,6 +18,15 @@
         .include        "apple2.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _wherex: The cursor's column: unsigned char wherex (void). On the card, 79
+; while a wrap is pending at column 80.
+;
+; Input:        none
+; Output:       AX            unsigned char
+;                                       the column
+; Changes:      Flags. Y is unchanged.
+
 _wherex:
         bit     vt_active
         bmi     vt

@@ -22,6 +22,19 @@
 
         .segment        "LOWCODE"
 
+;-----------------------------------------------------------------------------
+; RDKEY: Read a key through the monitor's RDKEY ($FD0C) with ROM banked in, so
+; the input hook (KSW) gets it, as stdio input does. On the VideoTerm, shows
+; the card's cursor while waiting. With Soft-70, shows the blinking cursor at
+; the model's, and puts the monitor's own cursor at row 0, column 0 of the
+; hidden text screen. The echo goes through COUT into the model.
+;
+; Input:        none
+; Output:       A             char      the key, with the high bit set
+; Changes:      X, Y and flags; what RDKEY and the input hook change. With
+;               Soft-70: CH, CV and BASL/BASH (VTABZ), and what s70_curshow
+;               and s70_curhide change. Ends with LC bank 2 read-only.
+
 RDKEY:
         bit     vt_active
         bpl     s70
@@ -34,6 +47,13 @@ RDKEY:
         pla
         rts
 
+;-----------------------------------------------------------------------------
+; s70: RDKEY with Soft-70.
+;
+; Input:        none
+; Output:       A             char      the key
+; Changes:      As RDKEY.
+
 s70:    jsr     s70_curshow
         lda     #$00
         sta     CH
@@ -44,6 +64,14 @@ s70:    jsr     s70_curshow
         jsr     s70_curhide
         pla
         rts
+
+;-----------------------------------------------------------------------------
+; rom: Call the monitor's RDKEY with ROM banked in, then LC bank 2 read-only
+; again.
+;
+; Input:        none
+; Output:       A             char      the key
+; Changes:      What RDKEY and the input hook change.
 
 rom:    ; Switch in ROM and call RDKEY
         bit     $C082

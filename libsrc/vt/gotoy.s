@@ -15,6 +15,16 @@
 
         .include        "apple2.inc"
 
+;-----------------------------------------------------------------------------
+; _gotoy: Move the cursor to a row, keeping its column: void __fastcall__
+; gotoy (unsigned char y). On the card, column 79 if a wrap is pending.
+;
+; Input:        A             unsigned char
+;                                       y: the row, from the top of the window
+; Output:       none
+; Changes:      A and flags; the cursor. On the card: X. Otherwise: CV and
+;               BASL/BASH (VTABZ).
+
 _gotoy:
         bit     vt_active
         bmi     vty

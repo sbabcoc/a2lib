@@ -25,6 +25,16 @@ a2_coutvec      = COUT + 1      ; The JMP's target
 
         .segment        "LOWCODE"
 
+;-----------------------------------------------------------------------------
+; a2_rawcout: Write a character, as the monitor's COUT: through vt_write on
+; the card, otherwise through COUT ($FDED) with ROM banked in. Called through
+; COUT, the JMP that reflow_on can point at its filter.
+;
+; Input:        A             char      the character, with the high bit set
+; Output:       none
+; Changes:      On the card: flags only. Otherwise: what COUT and the output
+;               hook change. Ends with LC bank 2 read-only.
+
 a2_rawcout:
         bit     vt_active
         bpl     :+

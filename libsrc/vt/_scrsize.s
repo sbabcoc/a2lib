@@ -13,6 +13,15 @@
         .include        "apple2.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; screensize: The screen's size, for cc65's screensize(): 80 x 24 on the card,
+; else the window's.
+;
+; Input:        none
+; Output:       X             byte      the width in columns
+;               Y             byte      the height in rows
+; Changes:      A and flags.
+
 screensize:
         bit     vt_active
         bmi     vt

@@ -17,6 +17,16 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _cpeekc: The character at the cursor: char cpeekc (void). From the model's
+; buffer, through S80_PEEK; on the VideoTerm, from VRAM as a2lib-vt.lib's
+; cpeekc. A pending wrap reads column 79.
+;
+; Input:        none
+; Output:       AX            char      the character
+; Changes:      Y and flags; BAS2L. On the VideoTerm: the card's VRAM page and
+;               $C800 space.
+
 _cpeekc:
         bit     vt_active
         bmi     vt
@@ -31,6 +41,14 @@ _cpeekc:
         S80_PEEK                ; Character
         ldx     #>$0000
         rts
+
+;-----------------------------------------------------------------------------
+; vt: cpeekc on the VideoTerm, as a2lib-vt.lib's cpeekc.s: the cursor line's
+; VRAM address plus the column, modulo 2048, through the $CC00-$CDFF window.
+;
+; Input:        none
+; Output:       AX            char      the character, bit 7 clear
+; Changes:      Y and flags; the card's VRAM page and $C800 space.
 
 vt:     ldy     VT_CHORZ
         cpy     #VT_COLS

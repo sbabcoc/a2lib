@@ -15,6 +15,15 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _clrscr: Clear the screen and home the cursor: void clrscr (void). On the
+; VideoTerm, with the firmware's $0C; otherwise s80_clear.
+;
+; Input:        none
+; Output:       none
+; Changes:      A and flags; the screen and the cursor. In the model: X, Y,
+;               BAS2L and the buffer, and the display's redraw.
+
 _clrscr:
         bit     vt_active
         bmi     :+

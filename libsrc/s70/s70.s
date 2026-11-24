@@ -67,6 +67,17 @@ BLINK_TICKS     = MS_TICKS(250)
 
         .segment        "ONCE"
 
+;-----------------------------------------------------------------------------
+; disp_init: Start the display, from s80init before it clears the buffer: copy
+; the default font, allow lowercase, clear hi-res page 1, and show it
+; full-screen.
+;
+; Input:        none
+; Output:       font          byte[768] the default font (s70_deffont)
+;               uppercasemask byte      $FF
+; Changes:      A, X, Y and flags; hi-res page 1; sext and baron; the display
+;               switches.
+
 disp_init:
         ldx     #$00
 :       lda     s70_deffont,x
@@ -88,12 +99,30 @@ disp_init:
 
         .code
 
+;-----------------------------------------------------------------------------
+; disp_done: Stop the display, from s80done: the text screen again, cleared
+; and homed.
+;
+; Input:        none
+; Output:       none
+; Changes:      A, Y and flags; the text screen; the monitor's cursor (HOME).
+
 disp_done:
         bit     TXTSET
         jmp     HOME
 
-; ------------------------------------------------------------------------
-; disp_cell: show screen code A at screen column X, row Y.
+;-----------------------------------------------------------------------------
+; disp_cell: Draw a screen code's glyph in a cell: one byte per scanline for a
+; cell at bit 0-3, two for one at bit 4-6, through lotab and hitab. On row 23
+; with the gauge shown, the bar is put back in the cell.
+;
+; Input:        A             byte      the screen code: bit 7 clear for
+;                                       inverse
+;               X             byte      the screen column, 0-69
+;               Y             byte      the row, 0-23
+; Output:       sext          byte[24]  the row's extent, widened to the cell
+; Changes:      A, X, Y and flags; the cell; BAS2L; the drawing loops'
+;               operands, crow, cbyte, csh and fidx. BASL is unchanged.
 
 disp_cell:
         sty     crow
@@ -250,8 +279,15 @@ bar:    bit     baron
         sta     BARLINE,y
 :       rts
 
-; ------------------------------------------------------------------------
-; disp_redraw: clear the page and draw the window's nonblank cells.
+;-----------------------------------------------------------------------------
+; disp_redraw: Clear the page and draw the window's nonblank cells, columns
+; s80_left to s80_left + 69.
+;
+; Input:        s80_left      byte      the leftmost visible column
+;               s80_buf       byte[]    the model's screen
+; Output:       none
+; Changes:      A, X, Y and flags; the page; BASL and BAS2L; rrow and rcol;
+;               what disp_cell changes. The gauge goes with the clear.
 
 disp_redraw:
         jsr     hclear
@@ -285,7 +321,14 @@ row:    lda     rrow
         bne     row
         rts
 
-; disp_clear / hclear: clear the page; the gauge goes with it.
+;-----------------------------------------------------------------------------
+; disp_clear: Clear the page, after s80_clear: the gauge goes with it. hclear
+; is the same.
+;
+; Input:        none
+; Output:       sext          byte[24]  0
+;               baron         byte      0
+; Changes:      A, X, Y and flags; hi-res page 1.
 
 disp_clear:
 hclear: lda     #$00
@@ -302,9 +345,16 @@ hclear: lda     #$00
         sta     baron
         rts
 
-; ------------------------------------------------------------------------
-; disp_scroll: move screen rows 1-23 up and clear row 23. Each row copies
-; the bytes that can hold text in it or in the row moving into it.
+;-----------------------------------------------------------------------------
+; disp_scroll: Move screen rows 1-23 up a row and clear row 23, after the
+; model has scrolled. Each row copies only the bytes that can hold text in it
+; or in the row moving into it, with an unrolled loop per scanline. The
+; gauge's bar is taken off row 23 first and put back after.
+;
+; Input:        sext          byte[24]  each row's extent
+; Output:       sext          byte[24]  moved up a row; row 23's 0
+; Changes:      A, X, Y and flags; the page; the copy loop's operands and
+;               savex.
 
 disp_scroll:
         bit     baron           ; Take the bar off row 23 first
@@ -380,8 +430,16 @@ snext:  lda     sext+1,x
 ; ------------------------------------------------------------------------
 ; Position gauge
 
-; disp_gauge_draw: the thumb covers 35 of the 40 bytes (70 of 80 columns),
-; from byte s80_left / 2.
+;-----------------------------------------------------------------------------
+; disp_gauge_draw: Show the position gauge for s80_left on the bottom
+; scanline: a dotted track across the width, and a solid thumb over 35 of its
+; 40 bytes (70 of 80 columns) from byte s80_left / 2. Replaces the bar shown,
+; if any.
+;
+; Input:        s80_left      byte      the leftmost visible column
+; Output:       barpat        byte[40]  the bar
+;               baron         byte      $80
+; Changes:      A, X, Y and flags; the bottom scanline; tstart and tend.
 
 disp_gauge_draw:
         bit     baron           ; Remove the bar shown, if any
@@ -412,6 +470,13 @@ gbyte:  cpy     tstart
         sta     baron
         rts
 
+;-----------------------------------------------------------------------------
+; disp_gauge_erase: Remove the gauge, if shown: a timer callback.
+;
+; Input:        none
+; Output:       baron         byte      0
+; Changes:      A, Y and flags; the bottom scanline.
+
 disp_gauge_erase:
         bit     baron
         bpl     :+
@@ -419,6 +484,13 @@ disp_gauge_erase:
         lda     #$00
         sta     baron
 :       rts
+
+;-----------------------------------------------------------------------------
+; barxor: EOR the bar onto the bottom scanline: draws it, or removes it again.
+;
+; Input:        barpat        byte[40]  the bar
+; Output:       none
+; Changes:      A, Y and flags; the bottom scanline. X is unchanged.
 
 barxor: ldy     #39
 :       lda     BARLINE,y
@@ -431,8 +503,17 @@ barxor: ldy     #39
 ; ------------------------------------------------------------------------
 ; Cursor
 
-; s70_curshow: show the cursor, panning to it if following; carry set if
-; it isn't visible. s70_curhide: remove it.
+;-----------------------------------------------------------------------------
+; s70_curshow: Show the cursor, panning to it if following: its cell inverted,
+; blinking with a periodic timer, or steady if no timer slot is free.
+;
+; Input:        none
+; Output:       C             flag      clear: shown; set: its column isn't
+;                                       visible
+;               cshown        byte      $80 if shown
+;               cslot         byte      the blink timer's slot, or $FF
+; Changes:      A, X, Y and flags; ccol and ccrow; the cell; what s80_show and
+;               disp_cell change.
 
 s70_curshow:
         jsr     s80_show
@@ -459,6 +540,14 @@ s70_curshow:
         clc
 :       rts
 
+;-----------------------------------------------------------------------------
+; s70_curhide: Remove the cursor, if shown, and stop its blink timer.
+;
+; Input:        cshown        byte      bit 7: the cursor is shown
+;               cslot         byte      its timer's slot, or $FF
+; Output:       cshown        byte      0
+; Changes:      A, X, Y and flags; the cell; what disp_cell changes.
+
 s70_curhide:
         bit     cshown
         bpl     :+
@@ -469,13 +558,28 @@ s70_curhide:
         jsr     curdraw
 :       rts
 
+;-----------------------------------------------------------------------------
+; blink: The blink timer's callback: switch the cursor's phase and redraw its
+; cell. Falls into curdraw.
+;
+; Input:        cshown        byte      $80 inverted, $C0 normal
+; Output:       none
+; Changes:      As curdraw; cshown.
+
 blink:  lda     cshown
         eor     #$40
         sta     cshown
         ; Fall through
 
-; curdraw: draw the cursor's cell from the buffer, inverted while cshown
-; is $80 (shown, in its inverse phase).
+;-----------------------------------------------------------------------------
+; curdraw: Draw the cursor's cell from the buffer, inverted while cshown is
+; $80 (shown, in its inverse phase).
+;
+; Input:        ccol          byte      the cursor's screen column
+;               ccrow         byte      its row
+;               cshown        byte      $80: inverted
+; Output:       none
+; Changes:      A, X, Y and flags; the cell; BAS2L; what disp_cell changes.
 
 curdraw:
         lda     ccrow
@@ -495,7 +599,22 @@ curdraw:
         jmp     disp_cell
 
 ; ------------------------------------------------------------------------
-; void __fastcall__ s70_font (const void* set, unsigned char nibble);
+; C interface
+
+;-----------------------------------------------------------------------------
+; _s70_font: Replace the font: void __fastcall__ s70_font (const void* set,
+; unsigned char nibble). Takes one 4-bit nibble of each byte of a 768-byte
+; set, so one set can hold two fonts, and keeps the space blank. Redraws
+; unless the VideoTerm is in use.
+;
+; Input:        C stack       const void*
+;                                       set: 96 glyphs x 8 scanlines, bit 0
+;                                       leftmost
+;               A             unsigned char
+;                                       nibble: 0 for bits 0-3, else bits 4-7
+; Output:       font          byte[768] the new font
+; Changes:      A, X, Y and flags; source and dest; nibble and pages; the
+;               display (disp_redraw). Pops set.
 
 _s70_font:
         sta     nibble          ; Nonzero: the high nibble
@@ -592,26 +711,27 @@ track:  .byte   $55, $2A        ; Even pixels lit, in even and odd bytes
 
 baron:          .byte   $00     ; Bit 7: the gauge's bar is on the screen
 cshown:         .byte   $00     ; $80 cursor inverted, $C0 normal phase
-cslot:          .byte   $FF
+cslot:          .byte   $FF     ; The blink timer's slot; $FF: none
 
         .bss
 
-crow:           .res    1
-cbyte:          .res    1
-csh:            .res    1
-fidx:           .res    1
-rrow:           .res    1
-rcol:           .res    1
-savex:          .res    1
-tstart:         .res    1
-tend:           .res    1
-pages:          .res    1
-nibble:         .res    1
-ccol:           .res    1
-ccrow:          .res    1
+crow:           .res    1       ; disp_cell: the row
+cbyte:          .res    1       ; disp_cell: the cell's first byte
+csh:            .res    1       ; disp_cell: its bit offset, 0-6
+fidx:           .res    1       ; disp_cell: the glyph's offset in its page
+rrow:           .res    1       ; disp_redraw: the row
+rcol:           .res    1       ; disp_redraw: the column
+savex:          .res    1       ; disp_scroll: the row
+tstart:         .res    1       ; disp_gauge_draw: the thumb's first byte
+tend:           .res    1       ; disp_gauge_draw: one past its last
+pages:          .res    1       ; s70_font: pages left to copy
+nibble:         .res    1       ; s70_font: nonzero for the high nibble
+ccol:           .res    1       ; The cursor's screen column
+ccrow:          .res    1       ; The cursor's row
 
         .segment        "LOWBSS"
 
-font:           .res    96 * 8
-sext:           .res    S80_ROWS
-barpat:         .res    40
+font:           .res    96 * 8  ; byte[768]: the font, bits 0-3 used
+sext:           .res    S80_ROWS ; byte[24]: one past each row's last
+                                ; byte written since it was cleared
+barpat:         .res    40      ; byte[40]: the gauge's bar

@@ -19,8 +19,31 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; gotoxy: gotoxy for other library modules, such as cputcxy: both coordinates
+; on the C stack.
+;
+; Input:        C stack       unsigned char
+;                                       x
+;               C stack       unsigned char
+;                                       y, pushed last
+; Output:       none
+; Changes:      As _gotoxy. Pops y.
+
 gotoxy:
         jsr     popa            ; Get Y
+
+;-----------------------------------------------------------------------------
+; _gotoxy: Move the cursor: void __fastcall__ gotoxy (unsigned char x,
+; unsigned char y). An out-of-range column or row is ignored. Moving the
+; cursor doesn't pan; writing or showing it does.
+;
+; Input:        C stack       unsigned char
+;                                       x: the column, 0-79
+;               A             unsigned char
+;                                       y: the row, 0-23
+; Output:       none
+; Changes:      A, X, Y and flags; the cursor. Pops x.
 
 _gotoxy:
         pha                     ; Row
@@ -31,6 +54,15 @@ _gotoxy:
         bpl     :+
         jmp     vt_goto
 :       jmp     s80_goto
+
+;-----------------------------------------------------------------------------
+; _gotox: Move the cursor to a column of its row: void __fastcall__ gotox
+; (unsigned char x).
+;
+; Input:        A             unsigned char
+;                                       x: the column, 0-79
+; Output:       none
+; Changes:      A, X and flags; the cursor.
 
 _gotox:
         tax                     ; Column; same row

@@ -16,6 +16,16 @@
 
         .segment        "LOWCODE"
 
+;-----------------------------------------------------------------------------
+; RDKEY: Read a key through the monitor's RDKEY ($FD0C) with ROM banked in, so
+; the input hook (KSW) gets it. On the card, shows the card's cursor while
+; waiting.
+;
+; Input:        none
+; Output:       A             char      the key, with the high bit set
+; Changes:      What RDKEY and the input hook change. On the card: X (vt_r10).
+;               Ends with LC bank 2 read-only.
+
 RDKEY:
         bit     vt_active
         bpl     :+

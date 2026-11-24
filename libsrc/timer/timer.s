@@ -270,7 +270,8 @@ done:   rts
 ; slot.
 ;
 ; Input:        s_flag        byte[4]   TF_DUE marks a due timer
-;               s_fnlo, s_fnhi byte[4] each slot's callback
+;               s_fnlo        byte[4]   each slot's callback, low byte (high
+;                                       byte in s_fnhi)
 ; Output:       anydue        byte      0
 ; Changes:      A, X and Y; s_flag, dvec and dslot; what the callbacks change.
 ;               CH, CV, BASL, BASH and INVFLG, and the C zero page from sreg

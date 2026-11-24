@@ -14,6 +14,15 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _gotoy: Move the cursor to a row, keeping its column (79 while a wrap is
+; pending): void __fastcall__ gotoy (unsigned char y).
+;
+; Input:        A             unsigned char
+;                                       y: the row, 0-23
+; Output:       none
+; Changes:      X and flags; the cursor. On the VideoTerm: A.
+
 _gotoy:
         bit     vt_active
         bpl     model

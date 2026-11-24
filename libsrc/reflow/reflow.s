@@ -45,6 +45,21 @@ REFLOW_MAX      = 81            ; Widest width; the word buffer holds 80
 
         .code
 
+;-----------------------------------------------------------------------------
+; _reflow_on: Word-wrap stdio console output: void __fastcall__ reflow_on
+; (unsigned char width). Points COUT at filter, starting at the cursor's
+; column. After moving the cursor with conio, call it again.
+;
+; Input:        A             unsigned char
+;                                       width: the screen width to wrap for,
+;                                       2-81 (others are clamped); 0 for the
+;                                       visible width (a2_viewport)
+; Output:       maxlen        byte      width - 1, the longest line
+;               col           byte      the cursor's column (wherex), at most
+;                                       maxlen
+;               a2_coutvec    word      filter
+; Changes:      A, X, Y and flags; wlen and wrapped.
+
 _reflow_on:
         cmp     #$00
         bne     :+
@@ -74,6 +89,14 @@ _reflow_on:
         sta     a2_coutvec+1
         rts
 
+;-----------------------------------------------------------------------------
+; _reflow_off: Stop word-wrapping: void reflow_off (void). Points COUT back at
+; a2_rawcout.
+;
+; Input:        none
+; Output:       a2_coutvec    word      a2_rawcout
+; Changes:      A and flags. X and Y are unchanged.
+
 _reflow_off:
         lda     #<a2_rawcout
         sta     a2_coutvec
@@ -81,8 +104,18 @@ _reflow_off:
         sta     a2_coutvec+1
         rts
 
-; ------------------------------------------------------------------------
-; filter: COUT through the filter. The character is in A, bit 7 set.
+;-----------------------------------------------------------------------------
+; filter: COUT while reflow is on, word-wrapping as described above.
+;
+; Input:        A             char      the character, bit 7 set
+;               col           byte      the column of the next character
+;               wlen          byte      the current word's length
+;               wrapped       byte      bit 7: the filter began this line
+; Output:       col           byte      updated
+;               wlen          byte      updated
+;               wrapped       byte      updated
+; Changes:      Flags; wbuf; the screen. A, X and Y are unchanged, and no zero
+;               page is used (see above).
 
 filter: sta     savea
         stx     savex
@@ -197,7 +230,7 @@ maxlen:         .res    1       ; Longest line: width - 1
 col:            .res    1       ; Column of the next character
 wlen:           .res    1       ; Length of the current word
 wrapped:        .res    1       ; Bit 7: the filter began this line
-wbuf:           .res    REFLOW_MAX - 1
-savea:          .res    1
+wbuf:           .res    REFLOW_MAX - 1  ; char[80]: the current word
+savea:          .res    1       ; filter's A, X and Y, given back
 savex:          .res    1
 savey:          .res    1

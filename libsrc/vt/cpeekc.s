@@ -18,6 +18,16 @@
         .include        "apple2.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _cpeekc: The character at the cursor: char cpeekc (void). On the card, read
+; from VRAM where the firmware's $CA59 finds it, using the last column while a
+; wrap is pending.
+;
+; Input:        none
+; Output:       AX            char      the character
+; Changes:      Y and flags. On the card: the card's VRAM page and $C800
+;               space.
+
 _cpeekc:
         bit     vt_active
         bmi     vt
@@ -49,9 +59,18 @@ peek:   lda     (BASL),Y        ; Get character
         ldx     #>$0000
         rts
 
-; VRAM address = line base (VT_BASEH/VT_BASEL, kept by the firmware for the
-; cursor's row) + column, modulo 2048. Bits 1-2 of the high byte select one
-; of four 512-byte pages, bit 0 the half of the $CC00-$CDFF window.
+;-----------------------------------------------------------------------------
+; vt: cpeekc on the card. The VRAM address is the cursor line's base
+; (VT_BASEH/VT_BASEL, kept by the firmware) plus the column, modulo 2048: bits
+; 1-2 of its high byte select one of four 512-byte pages, and bit 0 the half
+; of the $CC00-$CDFF window.
+;
+; Input:        VT_CHORZ      byte      the cursor's column (80: wrap pending)
+;               VT_BASEL      word      the cursor line's VRAM address (high
+;                                       byte in VT_BASEH)
+; Output:       AX            char      the character, bit 7 clear (bit 7 is
+;                                       the character set)
+; Changes:      Y and flags; the card's VRAM page and $C800 space.
 
 vt:     ldy     VT_CHORZ
         cpy     #VT_COLS

@@ -25,10 +25,32 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _cputcxy: Move the cursor, then write a character: void __fastcall__ cputcxy
+; (unsigned char x, unsigned char y, char c).
+;
+; Input:        C stack       unsigned char
+;                                       x
+;               C stack       unsigned char
+;                                       y
+;               A             char      c
+; Output:       none
+; Changes:      As gotoxy and _cputc. Pops x and y.
+
 _cputcxy:
         pha                     ; Save C
         jsr     gotoxy          ; Call this one, will pop params
         pla                     ; Restore C and run into _cputc
+
+;-----------------------------------------------------------------------------
+; _cputc: Write a character at the cursor and advance: void __fastcall__ cputc
+; (char c). '\r' goes to column 0 and '\n' down a line, in the same column;
+; other controls show as their letters.
+;
+; Input:        A             char      c
+; Output:       none
+; Changes:      A, X, Y and flags; the screen and the cursor; in the model,
+;               BASL and BAS2L. Not ptr1, tmp1 or tmp2.
 
 _cputc:
         bit     vt_active
@@ -43,22 +65,55 @@ _cputc:
         bcc     cputdirect
         and     uppercasemask
 
+;-----------------------------------------------------------------------------
+; cputdirect: Write a screen code at the cursor and advance, as INVFLG shows
+; it.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      As _cputc. chline keeps counters in tmp1 and tmp2 across it.
+
 cputdirect:
         bit     vt_active
         bmi     vtdirect
         S80_ATTR                ; Normal or inverse
         jmp     s80_put
 
+;-----------------------------------------------------------------------------
+; newline: Move the cursor down a line, in the same column, scrolling at the
+; bottom.
+;
+; Input:        none
+; Output:       none
+; Changes:      A and flags; the cursor. In the model, on a scroll: X, Y,
+;               BASL, BAS2L, the buffer and the display.
+
 newline:
         bit     vt_active
         bmi     vtnewline
         jmp     s80_lf
+
+;-----------------------------------------------------------------------------
+; putchar: Store a screen code at the cursor, without advancing, as INVFLG
+; shows it.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      As putchardirect.
 
 putchar:
         bit     vt_active
         bmi     vtput
         S80_ATTR
         jmp     s80_putnoadv
+
+;-----------------------------------------------------------------------------
+; putchardirect: Store a screen code at the cursor, without advancing. On the
+; VideoTerm: write it, then backspace.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      A, X, Y and flags; the screen; in the model, BASL and BAS2L.
 
 putchardirect:
         bit     vt_active
@@ -67,6 +122,14 @@ putchardirect:
 
 ; ------------------------------------------------------------------------
 ; VideoTerm, as in a2lib-vt.lib's cputc.s
+
+
+;-----------------------------------------------------------------------------
+; vtcputc: _cputc on the VideoTerm.
+;
+; Input:        A             char      c
+; Output:       none
+; Changes:      A and flags; the screen and the cursor.
 
 vtcputc:
         cmp     #$0D            ; CR only
@@ -79,13 +142,34 @@ vtcputc:
         ora     #$40            ; Controls show as their letters
 vtw:    jmp     vt_write
 
+;-----------------------------------------------------------------------------
+; vtdirect: cputdirect on the VideoTerm.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      A and flags; the screen and the cursor.
+
 vtdirect:
         jsr     vt_screen
         jmp     vt_write
 
+;-----------------------------------------------------------------------------
+; vtnewline: newline on the VideoTerm: a line feed.
+;
+; Input:        none
+; Output:       none
+; Changes:      A and flags; the cursor.
+
 vtnewline:
         lda     #$8A            ; Line feed
         jmp     vt_write
+
+;-----------------------------------------------------------------------------
+; vtput: putchar and putchardirect on the VideoTerm.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      A and flags; the screen.
 
 vtput:  jsr     vt_screen
         jsr     vt_write

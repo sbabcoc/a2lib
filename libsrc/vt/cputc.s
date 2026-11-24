@@ -40,6 +40,14 @@
 
         .segment        "ONCE"
 
+;-----------------------------------------------------------------------------
+; initconio: The module constructor, as stock's: on a IIe or later, the
+; alternate character set, and SET80COL-HISCR limited to text.
+;
+; Input:        none
+; Output:       none
+; Changes:      A and flags; the soft switches.
+
 initconio:
         .ifndef __APPLE2ENH__
         bit     machinetype
@@ -53,12 +61,34 @@ initconio:
 
         .code
 
-; Plot a character - also used as internal function
+;-----------------------------------------------------------------------------
+; _cputcxy: Move the cursor, then write a character: void __fastcall__ cputcxy
+; (unsigned char x, unsigned char y, char c).
+;
+; Input:        C stack       unsigned char
+;                                       x
+;               C stack       unsigned char
+;                                       y
+;               A             char      c
+; Output:       none
+; Changes:      As gotoxy and _cputc. Pops x and y.
 
 _cputcxy:
         pha                     ; Save C
         jsr     gotoxy          ; Call this one, will pop params
         pla                     ; Restore C and run into _cputc
+
+;-----------------------------------------------------------------------------
+; _cputc: Write a character at the cursor and advance: void __fastcall__ cputc
+; (char c). '\r' goes to column 0 and '\n' down a line, in the same column. On
+; the card, other controls show as their letters, as screen codes $80-$9F do,
+; and INVFLG (revers) has no effect.
+;
+; Input:        A             char      c
+; Output:       none
+; Changes:      A, X, Y and flags; the screen and the cursor. On the 40-column
+;               screen: tmp3, and BASL/BASH at a new line (VTABZ). Not ptr1,
+;               which cputs keeps a pointer in.
 
 _cputc:
         bit     vt_active
@@ -73,6 +103,13 @@ _cputc:
         bcc     cputdirect
         and     uppercasemask
         .endif
+
+;-----------------------------------------------------------------------------
+; cputdirect: Write a screen code at the cursor and advance.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      As _cputc.
 
 cputdirect:
         bit     vt_active
@@ -121,6 +158,15 @@ left:
 
 done:   rts
 
+;-----------------------------------------------------------------------------
+; newline: Move the cursor down a line, in the same column. On the 40-column
+; screen, the bottom line wraps to the window's top.
+;
+; Input:        none
+; Output:       none
+; Changes:      A and flags; the cursor. On the 40-column screen: CV and
+;               BASL/BASH (VTABZ).
+
 newline:
         bit     vt_active
         jmi     vtnewline
@@ -131,6 +177,14 @@ newline:
         lda     WNDTOP          ; Goto top of screen
         sta     CV
 :       jmp     VTABZ
+
+;-----------------------------------------------------------------------------
+; putchar: Store a character at the cursor, without advancing, as INVFLG shows
+; it. On the card, INVFLG has no effect.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      As putchardirect.
 
 putchar:
         bit     vt_active
@@ -143,6 +197,15 @@ putchar:
         bpl     putchardirect   ; Mask normally for ][/+ ; done
         .endif
         ora     #$40            ; Restore lowercase bit for //e and up
+
+;-----------------------------------------------------------------------------
+; putchardirect: Store a screen code at the cursor, without advancing. On the
+; card: write it, then backspace.
+;
+; Input:        A             byte      the screen code
+; Output:       tmp3          byte      on the 40-column screen: the character
+;                                       it replaced, for cgetc
+; Changes:      A, X, Y and flags; the screen.
 
 putchardirect:
         bit     vt_active
@@ -180,6 +243,13 @@ put:    lda     (BASL),Y        ; Get current character
 ; ------------------------------------------------------------------------
 ; VideoTerm
 
+;-----------------------------------------------------------------------------
+; vtcputc: _cputc on the card.
+;
+; Input:        A             char      c
+; Output:       none
+; Changes:      A and flags; the screen and the cursor.
+
 vtcputc:
         cmp     #$0D            ; CR only
         beq     vtw
@@ -191,13 +261,34 @@ vtcputc:
         ora     #$40            ; Controls show as their letters
 vtw:    jmp     vt_write
 
+;-----------------------------------------------------------------------------
+; vtdirect: cputdirect on the card.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      A and flags; the screen and the cursor.
+
 vtdirect:
         jsr     vt_screen
         jmp     vt_write
 
+;-----------------------------------------------------------------------------
+; vtnewline: newline on the card: a line feed.
+;
+; Input:        none
+; Output:       none
+; Changes:      A and flags; the cursor.
+
 vtnewline:
         lda     #$8A            ; Line feed
         jmp     vt_write
+
+;-----------------------------------------------------------------------------
+; vtput: putchar and putchardirect on the card.
+;
+; Input:        A             byte      the screen code
+; Output:       none
+; Changes:      A and flags; the screen.
 
 vtput:  jsr     vt_screen
         jsr     vt_write

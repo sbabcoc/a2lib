@@ -14,6 +14,14 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _wherey: The cursor's row: unsigned char wherey (void).
+;
+; Input:        none
+; Output:       AX            unsigned char
+;                                       the row
+; Changes:      Flags. Y is unchanged.
+
 _wherey:
         lda     s80_y
         bit     vt_active

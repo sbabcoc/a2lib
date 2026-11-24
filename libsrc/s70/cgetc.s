@@ -18,6 +18,17 @@
         .include        "vt.inc"
         .include        "timer.inc"
 
+;-----------------------------------------------------------------------------
+; _cgetc: Wait for a key and return it: char cgetc (void). If the cursor is
+; on, shows the VideoTerm's cursor, or Soft-70's blinking cursor at the
+; model's, panning to it if following. Ticks the timer while waiting.
+;
+; Input:        cursor        byte      nonzero: show the cursor
+; Output:       AX            char      the key, high bit clear (no Open Apple
+;                                       on a II+)
+; Changes:      Y and flags; RNDL and RNDH; KBDSTRB, cleared; what a2_tick,
+;               s70_curshow and s70_curhide change.
+
 _cgetc:
         lda     cursor
         beq     wait

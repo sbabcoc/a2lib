@@ -13,6 +13,15 @@
         .include        "apple2.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _wherey: The cursor's row, from the top of the window: unsigned char wherey
+; (void).
+;
+; Input:        none
+; Output:       AX            unsigned char
+;                                       the row
+; Changes:      Flags. Y is unchanged.
+
 _wherey:
         bit     vt_active
         bmi     vt

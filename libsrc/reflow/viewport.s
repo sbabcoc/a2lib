@@ -11,6 +11,14 @@
 
         .include        "apple2.inc"
 
+;-----------------------------------------------------------------------------
+; a2_viewport: The visible width of the stock 40-column screen, for reflow_on:
+; the monitor's window width.
+;
+; Input:        none
+; Output:       A             byte      WNDWDTH
+; Changes:      Flags. X and Y are unchanged.
+
 a2_viewport:
         lda     WNDWDTH
         rts

@@ -13,6 +13,14 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; a2_viewport: The visible width of the text screen, for reflow.s (DESIGN.md
+; 3.7): 80 on the VideoTerm, else S80_VIEW.
+;
+; Input:        none
+; Output:       A             byte      the width in columns
+; Changes:      Flags. X and Y are unchanged.
+
 a2_viewport:
         lda     #VT_COLS
         bit     vt_active

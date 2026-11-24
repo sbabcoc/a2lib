@@ -15,6 +15,15 @@
         .include        "display.inc"
         .include        "vt.inc"
 
+;-----------------------------------------------------------------------------
+; _wherex: The cursor's column, 0-79 (79 while a wrap is pending): unsigned
+; char wherex (void).
+;
+; Input:        none
+; Output:       AX            unsigned char
+;                                       the column
+; Changes:      Flags. Y is unchanged.
+
 _wherex:
         lda     s80_x
         bit     vt_active

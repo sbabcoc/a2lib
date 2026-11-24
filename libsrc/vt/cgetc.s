@@ -24,6 +24,17 @@
         .include        "vt.inc"
         .include        "timer.inc"
 
+;-----------------------------------------------------------------------------
+; _cgetc: Wait for a key and return it: char cgetc (void). If the cursor is
+; on, shows the card's cursor while waiting, or on the 40-column screen a
+; caret. Ticks the timer while waiting.
+;
+; Input:        cursor        byte      nonzero: show the cursor
+; Output:       AX            char      the key, with the high bit set if Open
+;                                       Apple is down on a IIe or later
+; Changes:      Y; RNDL and RNDH; KBDSTRB, cleared; what a2_tick changes. On
+;               the 40-column screen: tmp3 (putchardirect).
+
 _cgetc:
         bit     vt_active
         bmi     vt
