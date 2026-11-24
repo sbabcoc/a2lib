@@ -3427,6 +3427,15 @@ IDENTICAL, every module and program.
 Verified: `tools/samebytes.sh` against `1c70002` reports the tree
 IDENTICAL, every module and program; `make simtest` passes.
 
+### 10.47 Comments realigned after 10.46
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/crt0.s`, `irq.s`, `libsrc/vt/cout.s`, `rdkey.s`, `libsrc/s70/rdkey.s`, `libsrc/reflow/cout.s` | The comments after the renamed operands back at column 33, where 10.46's longer names had pushed them |
+
+Verified: `tools/samebytes.sh` against `12d4d65` reports the tree
+IDENTICAL, every module and program.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

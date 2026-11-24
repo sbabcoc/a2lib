@@ -43,7 +43,7 @@ a2_rawcout:
 
 :       ; Switch in ROM and call COUT
         bit     LC_ROM_RO
-        jsr     MON_COUT           ; Vector to user output routine
+        jsr     MON_COUT        ; Vector to user output routine
 
         ; Switch in LC bank 2 for R/O and return
         bit     LC_BANK2_RO

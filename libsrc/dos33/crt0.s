@@ -173,7 +173,7 @@ return: rts
 ; Changes:      Banks in ROM.
 
 reset_6502:
-        bit     LC_ROM_RO           ; Switch in ROM
+        bit     LC_ROM_RO       ; Switch in ROM
         jmp     (ROM_RST)       ; Jump to ROM's RESET vector
 
 ;-----------------------------------------------------------------------------
@@ -186,7 +186,7 @@ reset_6502:
 ; Changes:      Banks in ROM, and leaves it in.
 
 irq_6502:
-        bit     LC_ROM_RO           ; Switch in ROM
+        bit     LC_ROM_RO       ; Switch in ROM
         jmp     (ROM_IRQ)       ; Jump to ROM's IRQ/BRK vector
 
 ; ------------------------------------------------------------------------

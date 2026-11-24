@@ -68,7 +68,7 @@ initirq:
         lda     #>romirq
         sta     IRQLOC+1
 
-        bit     LCBANK2           ; LC bank 2 read and write
+        bit     LCBANK2         ; LC bank 2 read and write
         bit     LCBANK2
         lda     ROM_IRQ
         sta     lcnext+1
@@ -78,7 +78,7 @@ initirq:
         sta     ROM_IRQ
         lda     #>lcirq
         sta     ROM_IRQ+1
-        bit     LC_BANK2_RO           ; LC bank 2 read only, as crt0 leaves it
+        bit     LC_BANK2_RO     ; LC bank 2 read only, as crt0 leaves it
 
         inc     installed
         cli

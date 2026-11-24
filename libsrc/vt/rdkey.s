@@ -34,7 +34,7 @@ RDKEY:
         jsr     vt_r10
 :       ; Switch in ROM and call RDKEY
         bit     LC_ROM_RO
-        jsr     MON_RDKEY           ; Display prompt and read key from user input routine
+        jsr     MON_RDKEY       ; Display prompt and read key from user input routine
 
         ; Switch in LC bank 2 for R/O and return
         bit     LC_BANK2_RO
