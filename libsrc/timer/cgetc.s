@@ -23,6 +23,16 @@
         .include        "apple2.inc"
         .include        "timer.inc"
 
+;-----------------------------------------------------------------------------
+; _cgetc: Wait for a key and return it: char cgetc (void). Shows a caret while
+; waiting if the cursor is on; ticks the timer while waiting.
+;
+; Input:        cursor        byte      nonzero: show the caret
+; Output:       AX            char      the key, with the high bit set if Open
+;                                       Apple is down on a IIe or later
+; Changes:      Y; tmp3 (putchardirect); RNDL and RNDH; KBDSTRB, cleared; what
+;               a2_tick changes.
+
 _cgetc:
         ; Cursor on ?
         lda     cursor

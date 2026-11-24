@@ -14,12 +14,28 @@
 
         .data
 
+;-----------------------------------------------------------------------------
+; a2_tickhook: The tick hook: the wait loops of cgetc, kbhit and the display
+; libraries' cgetc JSR here each time they increment RNDH. Returns at once
+; until timer.s's constructor points it at a2_tick.
+;
+; Input:        none
+; Output:       none
+; Changes:      Nothing, until timer.s is linked; then what a2_tick changes.
+
 a2_tickhook:
         jmp     tickrts         ; Target set by timer.s's constructor
 a2_tickon:
         .byte   $00             ; Bit 7: the timer is in use
 
         .code
+
+;-----------------------------------------------------------------------------
+; tickrts: a2_tickhook's target while the timer isn't in use.
+;
+; Input:        none
+; Output:       none
+; Changes:      Nothing.
 
 tickrts:
         rts

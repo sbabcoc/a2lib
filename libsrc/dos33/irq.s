@@ -42,6 +42,19 @@ SAVEA   := $45                  ; Where the ROM IRQ handler saves A
 
         .segment        "ONCE"
 
+;-----------------------------------------------------------------------------
+; initirq: Install romirq at $3FE and lcirq at LC RAM's $FFFE, keeping the old
+; vectors. Called by the constructor of cc65's runtime/callirq.s, in programs
+; with an interruptor.
+;
+; Input:        IRQLOC        word      the previous $3FE handler
+;               ROM_IRQ       word      LC RAM's vector: crt0's irq_6502
+; Output:       romnext       JMP       to the previous $3FE handler
+;               lcnext        JMP       to the previous LC RAM vector
+;               installed     byte      nonzero
+; Changes:      A and flags; IRQLOC and LC RAM's ROM_IRQ. Leaves LC bank 2
+;               read-only, as crt0 does, and interrupts enabled.
+
 initirq:
         ; Install both entry points, keeping the old vectors
         sei
@@ -72,6 +85,17 @@ initirq:
 
         .code
 
+;-----------------------------------------------------------------------------
+; doneirq: Put back the vectors initirq replaced. Called by the destructor of
+; cc65's runtime/callirq.s.
+;
+; Input:        installed     byte      nonzero if initirq ran
+;               romnext       JMP       the previous $3FE handler
+;               lcnext        JMP       the previous LC RAM vector
+; Output:       none
+; Changes:      A and flags; IRQLOC and LC RAM's ROM_IRQ, if initirq ran.
+;               Leaves LC bank 2 read-only and interrupts enabled.
+
 doneirq:
         ; Restore the vectors, if initirq installed them
         lda     installed
@@ -95,8 +119,16 @@ doneirq:
 
         .segment        "LOWCODE"
 
-; ROM enabled: entered from the ROM IRQ handler through $3FE,
-; with A saved in $45 and X and Y intact.
+;-----------------------------------------------------------------------------
+; romirq: The interrupt handler while ROM is enabled. Entered from the
+; Autostart ROM's IRQ handler through $3FE: runs the interruptors and returns
+; from the interrupt if one handled it, else goes on to the previous handler.
+;
+; Input:        SAVEA         byte      the interrupted A, saved by ROM
+;               X, Y          byte      as interrupted
+; Output:       none
+; Changes:      None for the interrupted code. The interruptors may change
+;               what they handle.
 
 romirq: cld
         txa
@@ -113,8 +145,18 @@ romirq: cld
         rti
 :       jmp     romnext         ; Not ours: previous handler, same state
 
-; LC RAM enabled: entered from the vector at $FFFE in LC RAM,
-; with A, X and Y as interrupted.
+;-----------------------------------------------------------------------------
+; lcirq: The interrupt handler while LC RAM is enabled. Entered from LC RAM's
+; $FFFE: runs the interruptors and returns from the interrupt if one handled
+; it. A BRK, or an interrupt none handles, goes on to the previous vector
+; (crt0's irq_6502).
+;
+; Input:        A, X, Y       byte      as interrupted
+;               stack         byte      P and the return address, pushed by
+;                                       the interrupt
+; Output:       none
+; Changes:      None for the interrupted code. The interruptors may change
+;               what they handle.
 
 lcirq:  pha
         txa

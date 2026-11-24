@@ -21,6 +21,19 @@
 ; Shared storage
 tp              = ptr1          ; struct timespec*: the caller's time
 
+;-----------------------------------------------------------------------------
+; _clock_settime: Set the software clock: int __fastcall__ clock_settime
+; (clockid_t clk_id, const struct timespec* tp). tv_nsec is ignored.
+;
+; Input:        C stack       clockid_t clk_id: ignored
+;               AX            struct timespec*
+;                                       tp: the time
+; Output:       clk_offset    long      tv_sec - t_sec
+;               clk_setat     long      t_sec, now
+;               clk_isset     byte      $80
+;               AX            int       0
+; Changes:      Y; tp. Pops clk_id.
+
 _clock_settime:
 
         ; Cleanup stack
@@ -43,6 +56,16 @@ _clock_settime:
         lda     #$80
         sta     clk_isset
         jmp     return0
+
+;-----------------------------------------------------------------------------
+; _a2_clock_age: The seconds since clock_settime: unsigned long a2_clock_age
+; (void).
+;
+; Input:        clk_isset     byte      bit 7: the clock was set
+;               clk_setat     long      t_sec when it was
+; Output:       AX, sreg      long      t_sec - clk_setat, or A2_CLOCK_UNSET
+;                                       ($FFFFFFFF) if the clock was never set
+; Changes:      Flags. Y is unchanged.
 
 _a2_clock_age:
         bit     clk_isset

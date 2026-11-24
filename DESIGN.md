@@ -104,7 +104,9 @@ follows them, so the code stays as readable as they left it.
   `unsigned`), else `byte`, `word`, `flag` or `T*`. A module's storage
   is given by its name; another module's cells as `ptr1 (fm_name)`. The
   stack is mentioned only where its use is out of the ordinary, such as
-  exec()'s reset.
+  exec()'s reset. Vendored modules get headers too, as comments that
+  leave stock's code as it is. The guards and selectors define no
+  routine, so their file headers are all they have.
 - **Labels.** An anonymous label is only for a jump to the nearest one
   (`:+`, `:-`). A jump past another label (`:++`, `:--`), including the
   outer loop of a nested pair, gets a named label (`@row`, `@col`).
@@ -3360,6 +3362,19 @@ high word. The vendored `crt0.s`, `mainargs.s`, `cgetc.s` and `kbhit.s`
 keep stock's names.
 
 Verified: `tools/samebytes.sh` against `92a7d3d` reports the tree
+IDENTICAL, every module and program.
+
+### 10.43 Routine headers: the runtime
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/crt0.s`, `irq.s`, `mainargs.s` | Headers for start-up, the vectors, the interrupt handlers and the argument constructor |
+| `libsrc/timer/timer.s`, `tick.s`, `cgetc.s`, `kbhit.s`, `gettime.s`, `settime.s` | Headers for the cooperative timer, its hook, its wait loops and the software clock |
+| `libsrc/ip65/a2timer.s` | Headers for IP65's timer interface |
+
+Each module's storage is commented with its type. Comments only.
+
+Verified: `tools/samebytes.sh` against `e60ca38` reports the tree
 IDENTICAL, every module and program.
 
 ## 11. Sources

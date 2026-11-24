@@ -29,12 +29,28 @@
 
         .code
 
+;-----------------------------------------------------------------------------
+; timer_init: Start IP65's millisecond counter from 0.
+;
+; Input:        t_ms          long      the timer's milliseconds since startup
+; Output:       base          word      t_ms's low word
+; Changes:      A. X and Y are unchanged.
+
 timer_init:
         lda     t_ms
         sta     base
         lda     t_ms+1
         sta     base+1
         rts
+
+;-----------------------------------------------------------------------------
+; timer_read: Wait one tick, then return the milliseconds since timer_init.
+;
+; Input:        base          word      t_ms's low word at timer_init
+; Output:       AX            word      the milliseconds since timer_init,
+;                                       modulo 65536
+; Changes:      Y; what a2_idle changes, including the callbacks of due
+;               timers.
 
 timer_read:
         jsr     _a2_idle
@@ -47,6 +63,14 @@ timer_read:
         tax
         tya
         rts
+
+;-----------------------------------------------------------------------------
+; timer_seconds: The seconds of the current minute, as IP65's time-of-day
+; drivers return them.
+;
+; Input:        t_sec60       byte      the seconds since startup, modulo 60
+; Output:       A             byte      t_sec60 in BCD, $00-$59
+; Changes:      X and flags; units. Y is unchanged.
 
 timer_seconds:
         lda     t_sec60         ; Binary 0-59 to BCD
@@ -67,5 +91,5 @@ timer_seconds:
 
         .bss
 
-base:   .res    2
-units:  .res    1
+base:   .res    2               ; word: t_ms's low word at timer_init
+units:  .res    1               ; byte: timer_seconds' units digit

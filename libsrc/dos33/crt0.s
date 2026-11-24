@@ -44,6 +44,25 @@
 
         .segment        "ONCE"
 
+;-----------------------------------------------------------------------------
+; init: Start-up work done once, in the ONCE segment: save the zero page and
+; the RESET vector, set up the C stack below HIMEM, point RESET at exit(),
+; patch the RESET and IRQ vectors in LC RAM, run the module constructors, and
+; copy the LC segment into LC RAM.
+;
+; Input:        HIMEM         word      BASIC's top of memory: the C stack's
+;                                       top
+;               SOFTEV        byte[3]   the RESET vector and its check byte
+; Output:       c_sp          word      HIMEM
+;               zpsave        byte[]    the zero page from c_sp, as at entry
+;               rvsave        byte[3]   the RESET vector, as at entry
+; Changes:      A, X and Y; SOFTEV and PWREDUP; LC RAM's ROM_RST and ROM_IRQ,
+;               and the LC segment; $94-$97 and $9B-$9C (bltu2); what the
+;               constructors change. Leaves LC bank 2 read-only.
+; Note:         The vectors are patched before the constructors run, so
+;               irq.s's initirq replaces this IRQ vector and chains to
+;               irq_6502. Stock crt0 patches them afterward.
+
         ; Save the zero-page locations that we need.
 init:   ldx     #zpspace-1
 :       lda     c_sp,x
@@ -127,16 +146,43 @@ init:   ldx     #zpspace-1
 
         .code
 
-        ; Set up the RESET vector.
+;-----------------------------------------------------------------------------
+; reset: Point the RESET vector at a routine, and set its check byte.
+;
+; Input:        X             byte      the routine's address, low byte
+;               A             byte      the routine's address, high byte
+; Output:       SOFTEV        word      the routine
+;               PWREDUP       byte      A EOR $A5
+; Changes:      A and flags. X and Y are unchanged.
+; Note:         Also called by cc65's callmain.s, at exit. The rts is return,
+;               which rebootafterexit() puts in done.
+
 reset:  stx     SOFTEV
         sta     SOFTEV+1
         eor     #$A5
         sta     PWREDUP
 return: rts
 
+;-----------------------------------------------------------------------------
+; reset_6502: LC RAM's RESET vector: switch to ROM and take ROM's RESET
+; vector.
+;
+; Input:        none
+; Output:       none
+; Changes:      Banks in ROM.
+
 reset_6502:
         bit     $C082           ; Switch in ROM
         jmp     (ROM_RST)       ; Jump to ROM's RESET vector
+
+;-----------------------------------------------------------------------------
+; irq_6502: LC RAM's IRQ/BRK vector, as crt0 leaves it: switch to ROM and take
+; ROM's IRQ/BRK vector. irq.s's lcirq chains here for a BRK, or an interrupt
+; no interruptor handles.
+;
+; Input:        none
+; Output:       none
+; Changes:      Banks in ROM, and leaves it in.
 
 irq_6502:
         bit     $C082           ; Switch in ROM
@@ -146,12 +192,13 @@ irq_6502:
 
         .data
 
-        ; Final jump when we're done
-done:   jmp     DOSWARM         ; Patched by exec()
+        ; Final jump when we're done: callmain ends here after the
+        ; destructors. Patched by exec() and rebootafterexit()
+done:   jmp     DOSWARM
 
 ; ------------------------------------------------------------------------
 
         .segment        "INIT"
 
-zpsave: .res    zpspace
-rvsave: .res    3
+zpsave: .res    zpspace         ; byte[]: the zero page cc65 uses, at entry
+rvsave: .res    3               ; byte[3]: the RESET vector, at entry

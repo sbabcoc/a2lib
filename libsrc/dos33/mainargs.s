@@ -57,6 +57,19 @@ REM       = $B2                 ; BASIC token-code
 
         .segment        "ONCE"
 
+;-----------------------------------------------------------------------------
+; initmainargs: Set argc and argv for main(): a module constructor, run by
+; crt0 before main().
+;
+; Input:        BASIC_BUF     char[]    the line that ran the program, or
+;                                       exec()'s command and tail
+; Output:       __argc        int       1 plus the arguments found, at most
+;                                       MAXARGS
+;               __argv        char**    argv: argv[0] is "", and argv[argc] is
+;                                       NULL
+;               buffer        char[]    the arguments, each ended by $00
+; Changes:      A, X and Y; tmp1. Clears exec()'s marker in BASIC_BUF.
+
 initmainargs:
 
         inc     __argc          ; argc always is equal to, at least, 1
@@ -157,9 +170,17 @@ done:   lda     #<argv
         stx     __argv+1
         rts
 
-; execargs: exec()'s arguments in BASIC_BUF? If so, clear the marker and
-; return carry clear with X indexing the first byte after the REM.
-; Otherwise carry set.
+;-----------------------------------------------------------------------------
+; execargs: Find the arguments exec() left in BASIC_BUF, after its command.
+;
+; Input:        BASIC_BUF     char[]    $84, the command, $8D, then $00, REM
+;                                       and the arguments if exec() left them
+; Output:       C             flag      clear: found; set: not exec()'s
+;                                       command
+;               X             byte      if C clear: the arguments' offset in
+;                                       BASIC_BUF
+; Changes:      A. If found, the $00 marker becomes a space, so a later
+;               program doesn't take the same arguments.
 
 execargs:
         lda     BASIC_BUF       ; The command begins with Ctrl-D
@@ -199,4 +220,5 @@ argv:   .addr   empty
 
         .segment        "INIT"
 
-buffer: .res    BUF_LEN
+buffer: .res    BUF_LEN         ; char[]: the arguments, copied out of
+                                ; BASIC_BUF

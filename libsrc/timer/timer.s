@@ -47,6 +47,21 @@ ZPLEN = 18                      ; sreg, regsave, ptr1-ptr4, tmp1-tmp4
 
         .segment        "ONCE"
 
+;-----------------------------------------------------------------------------
+; timerinit: The module constructor: point a2_tickhook at a2_tick, set
+; a2_tickon, and install keyin as the input routine: as DOS's true input
+; routine when DOS's intercept is in KSW, else in KSW itself.
+;
+; Input:        KSWL          word      the input hook
+;               DOS_KSW       word      DOS's saved true input hook
+; Output:       a2_tickhook   JMP       to a2_tick
+;               a2_tickon     byte      $80
+;               savek         word      KSW, as at entry
+;               savedos       word      DOS_KSW, as at entry
+;               viados        byte      $80 if keyin became DOS's true input
+;                                       routine
+; Changes:      A; KSWL or DOS_KSW.
+
 timerinit:
         lda     #<a2_tick
         sta     a2_tickhook+1
@@ -95,6 +110,18 @@ direct: lda     #<keyin
 
         .code
 
+;-----------------------------------------------------------------------------
+; timerdone: The module destructor: put back the input hooks timerinit
+; replaced, including a DOS_KSW that DOS's reconnect routine copied keyin
+; into.
+;
+; Input:        viados        byte      bit 7: keyin is DOS's true input
+;                                       routine
+;               savek         word      KSW, as at entry
+;               savedos       word      DOS_KSW, as at entry
+; Output:       none
+; Changes:      A and flags; KSWL and DOS_KSW.
+
 timerdone:
         bit     viados          ; Installed as DOS's true input routine?
         bpl     :+
@@ -123,10 +150,21 @@ timerdone:
         sta     DOS_KSW+1
 :       rts
 
-; ------------------------------------------------------------------------
-; a2_tick: one tick. Called with LC bank 2 enabled for reading (cc65's
-; normal state). Changes A, X and Y; the zero page only when dispatching,
-; and then restores it.
+;-----------------------------------------------------------------------------
+; a2_tick: One tick: advance the clocks, count down the active timers, and run
+; the due timers' callbacks unless a callback is already running. Called
+; through a2_tickhook from the wait loops, with LC bank 2 enabled for reading.
+;
+; Input:        t_err         byte      the Bresenham error term
+;               s_flag        byte[4]   each slot's TF_* flags
+; Output:       t_ms          long      milliseconds since startup
+;               t_rem         word      milliseconds into the current second
+;               t_sec         long      seconds since startup
+;               t_sec60       byte      t_sec modulo 60
+; Changes:      A, X and Y; the slots' counts and flags, nact and anydue. CH,
+;               CV, BASL, BASH and INVFLG, and the C zero page from sreg to
+;               tmp4, are saved before callbacks and restored after
+;               (dispatch).
 
 a2_tick:
         ; Milliseconds this tick: TICK_MS, plus 1 when the error term
@@ -227,8 +265,17 @@ check:  lda     anydue
         bpl     dispatch
 done:   rts
 
-; ------------------------------------------------------------------------
-; dispatch: run the callbacks of the due timers.
+;-----------------------------------------------------------------------------
+; dispatch: Run the callbacks of the due timers, freeing each due one-shot's
+; slot.
+;
+; Input:        s_flag        byte[4]   TF_DUE marks a due timer
+;               s_fnlo, s_fnhi byte[4] each slot's callback
+; Output:       anydue        byte      0
+; Changes:      A, X and Y; s_flag, dvec and dslot; what the callbacks change.
+;               CH, CV, BASL, BASH and INVFLG, and the C zero page from sreg
+;               to tmp4, are saved before callbacks and restored after. busy
+;               is $80 while they run.
 
 dispatch:
         lda     #$80
@@ -294,8 +341,12 @@ dn:     inx
         sta     busy
         rts
 
-; ------------------------------------------------------------------------
-; C interface
+;-----------------------------------------------------------------------------
+; _a2_millis: The milliseconds since startup: unsigned long a2_millis (void).
+;
+; Input:        t_ms          long      milliseconds since startup
+; Output:       AX, sreg      long      t_ms
+; Changes:      Flags. Y is unchanged.
 
 _a2_millis:
         lda     t_ms+3
@@ -306,8 +357,15 @@ _a2_millis:
         lda     t_ms
         rts
 
-; One tick, with the same 15-cycle loop as cgetc's (the BIT keeps the
-; timing); keys are left alone.
+;-----------------------------------------------------------------------------
+; _a2_idle: Wait one tick, with the same 15-cycle loop as cgetc, leaving keys
+; alone: void a2_idle (void).
+;
+; Input:        none
+; Output:       none
+; Changes:      A, X and Y; RNDL and RNDH; what a2_tick changes.
+; Note:         The BIT KBD, whose result is unused, keeps the loop at cgetc's
+;               timing.
 
 _a2_idle:
 @wait:  inc     RNDL
@@ -316,6 +374,23 @@ _a2_idle:
         jmp     a2_tick
 @key:   bit     KBD
         jmp     @wait
+
+;-----------------------------------------------------------------------------
+; _a2_timer_start: Start a timer: unsigned char __fastcall__ a2_timer_start
+; (unsigned ms, void (*fn) (void), unsigned char periodic). Converts ms to
+; ticks, rounded and at least one, and falls into a2_timer_arm.
+;
+; Input:        C stack       unsigned  ms: the interval in milliseconds
+;               C stack       void (*)()
+;                                       fn: the callback
+;               A             unsigned char
+;                                       periodic: nonzero to restart it each
+;                                       time it expires
+; Output:       AX            unsigned char
+;                                       the handle (the slot), or
+;                                       A2_TIMER_NONE ($FF) if no slot is free
+; Changes:      Y; tmr_ticks, tmr_fn, tmr_per, ms, prod, mult and rem. Pops ms
+;               and fn.
 
 _a2_timer_start:
         sta     tmr_per
@@ -395,6 +470,19 @@ dv:     asl     prod
         inc     tmr_ticks
         ; Fall through
 
+;-----------------------------------------------------------------------------
+; a2_timer_arm: Start a timer, for s80.s, which must leave the C zero page
+; alone: find a free slot and fill it.
+;
+; Input:        tmr_ticks     word      the interval in ticks, at least 1
+;               tmr_fn        void (*)()
+;                                       the callback
+;               tmr_per       byte      nonzero: periodic
+; Output:       A             byte      the handle (the slot), or $FF if no
+;                                       slot is free
+;               X             byte      0
+; Changes:      Flags; the slot and nact. Leaves the zero page alone.
+
 a2_timer_arm:
         ldx     #$00
 :       lda     s_flag,x
@@ -425,6 +513,14 @@ found:  lda     tmr_ticks
         ldx     #$00
         rts
 
+;-----------------------------------------------------------------------------
+; a2_timer_restart: Restart a timer from its full interval, for s80.s.
+;
+; Input:        X             byte      the handle (the slot)
+; Output:       none
+; Changes:      A and flags; the slot, and nact if it wasn't counting. X and Y
+;               are unchanged.
+
 a2_timer_restart:
         lda     s_ivlo,x
         sta     s_remlo,x
@@ -440,6 +536,16 @@ a2_timer_restart:
         sta     s_flag,x
         rts
 
+;-----------------------------------------------------------------------------
+; _a2_timer_stop: Stop a timer and free its slot: void __fastcall__
+; a2_timer_stop (unsigned char handle). A handle that isn't a slot, such as
+; A2_TIMER_NONE, is ignored.
+;
+; Input:        A             unsigned char
+;                                       handle
+; Output:       none
+; Changes:      A, X and flags; the slot, and nact if it was counting.
+
 _a2_timer_stop:
         cmp     #NSLOT
         bcs     @done
@@ -453,12 +559,21 @@ _a2_timer_stop:
 @done:  rts
 
 ; ------------------------------------------------------------------------
-; keyin: the KSW input routine, mirroring the Autostart ROM's KEYIN
-; ($FD1B): entered from RDKEY with A = the character under the cursor and
-; Y = CH; restores that character when a key arrives and returns the key
-; in A, with X and Y unchanged. Runs with ROM enabled, so it is in LOWCODE.
 
-        .segment        "LOWCODE"
+        .segment        "LOWCODE"       ; keyin runs with ROM enabled
+
+;-----------------------------------------------------------------------------
+; keyin: The input routine, as the Autostart ROM's KEYIN ($FD1B) but ticking
+; while it waits. Entered from RDKEY, or from DOS's intercept, with ROM
+; enabled.
+;
+; Input:        A             char      the character under the cursor
+;               Y             byte      CH
+;               BASL          byte*     the cursor's line
+; Output:       A             char      the key, with the high bit set
+; Changes:      Flags; RNDL and RNDH; the cursor's character, put back;
+;               KBDSTRB, cleared; what a2_tick changes, but X and Y are
+;               unchanged (kswtick).
 
 keyin:
 @wait:  inc     RNDL
@@ -472,8 +587,13 @@ keyin:
         bit     KBDSTRB
         rts
 
-; kswtick: a2_tick in cc65's banking (LC bank 2 for reading, so callbacks
-; run as the program does), then ROM again. Preserves A, X and Y.
+;-----------------------------------------------------------------------------
+; kswtick: Run a2_tick from keyin with cc65's banking, LC bank 2 for reading,
+; so callbacks run as the program does; then ROM again.
+;
+; Input:        none
+; Output:       none
+; Changes:      What a2_tick changes, but A, X and Y are unchanged.
 
 kswtick:
         pha
@@ -513,9 +633,9 @@ s_ivhi:         .res    NSLOT, 0
 s_fnlo:         .res    NSLOT, 0
 s_fnhi:         .res    NSLOT, 0
 
-tmr_ticks:      .word   0       ; a2_timer_arm's arguments
-tmr_fn:         .word   0
-tmr_per:        .byte   0
+tmr_ticks:      .word   0       ; a2_timer_arm's arguments: ticks,
+tmr_fn:         .word   0       ; the callback,
+tmr_per:        .byte   0       ; and nonzero for periodic
 
 dvec:           jmp     $0000   ; Callback, stored by dispatch (an indirect
                                 ; JMP could hit the NMOS JMP ($xxFF) bug)

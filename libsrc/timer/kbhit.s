@@ -17,6 +17,16 @@
         .include "apple2.inc"
         .include "timer.inc"
 
+;-----------------------------------------------------------------------------
+; _kbhit: Is a key waiting? unsigned char kbhit (void). While the timer is in
+; use and none is, waits for a key or one tick first.
+;
+; Input:        a2_tickon     byte      bit 7: the timer is in use
+; Output:       AX            unsigned char
+;                                       1 if a key is waiting, else 0
+; Changes:      Flags. When the timer is in use: Y, RNDL and RNDH, and what
+;               a2_tick changes.
+
 _kbhit:
         bit     KBD
         bmi     done            ; Key pending

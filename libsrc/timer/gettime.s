@@ -20,6 +20,20 @@
 ; Shared storage
 tp              = ptr1          ; struct timespec*: the caller's time
 
+;-----------------------------------------------------------------------------
+; _clock_gettime: Read the software clock: int __fastcall__ clock_gettime
+; (clockid_t clk_id, struct timespec* tp). Before clock_settime, the time is
+; the up-time.
+;
+; Input:        C stack       clockid_t clk_id: ignored
+;               AX            struct timespec*
+;                                       tp: where to store the time
+; Output:       *tp           struct timespec
+;                                       tv_sec: t_sec + clk_offset; tv_nsec:
+;                                       t_rem * 1000000
+;               AX            int       0
+; Changes:      Y; tp, mul, addend and nsec. Pops clk_id.
+
 _clock_gettime:
         sta     tp
         stx     tp+1
@@ -86,6 +100,6 @@ noadd:  asl     addend
 
         .bss
 
-mul:    .res    2
-addend: .res    4
-nsec:   .res    4
+mul:    .res    2               ; word: t_rem, shifted out bit by bit
+addend: .res    4               ; long: 1000000, doubled each bit
+nsec:   .res    4               ; long: the product, tv_nsec
