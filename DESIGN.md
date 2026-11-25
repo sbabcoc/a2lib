@@ -95,10 +95,14 @@ follows them, so the code stays as readable as they left it.
   sources, as it replaces the word wherever it appears. Vendored modules
   keep stock's names, so they stay easy to compare.
 - **Addresses by name.** Code names every soft switch, ROM entry point
-  and fixed location: cc65's `apple2.inc` where it has a name (`ROMIN`,
-  `LCBANK2`, `KBD`), else `libsrc/dos33/machine.inc` (`LC_ROM_RO`,
-  `LC_BANK2_RO`, `MON_COUT`, `MON_RDKEY`), vendored modules included. The
-  exception is `$0103,x` after `tsx`, an offset into the stack frame.
+  and fixed location: cc65's `apple2.inc` where it has a name that says
+  what the location does (`KBD`, `CH`), else `libsrc/dos33/machine.inc`
+  (`MON_COUT`, `MON_RDKEY`), vendored modules included. The language card
+  switches are all a2lib's, named for what each does to reads and writes
+  (`LC_BANK2_RO`, `LC_ROM_WRAM`, `LC_ROM_RO`, `LC_BANK2_RW`): cc65 names
+  only two, and its `ROMIN` and `LCBANK2` don't say that both write-enable
+  RAM. The exception is `$0103,x` after `tsx`, an offset into the stack
+  frame.
 - **File headers.** Each file opens with its authors, then a summary of
   what it holds, in sentences, ending with a pointer to the design: "For
   details, see section 5.9 of DESIGN." File headers name no other source
@@ -3500,6 +3504,17 @@ IDENTICAL, every module and program.
 Comments only.
 
 Verified: `tools/samebytes.sh` against `cab6e0a` reports the tree
+IDENTICAL, every module and program.
+
+### 10.51 The language card switches by a2lib's names
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/machine.inc` | `LC_ROM_WRAM` ($C081) and `LC_BANK2_RW` ($C083), beside `LC_BANK2_RO` and `LC_ROM_RO`, in address order |
+| `libsrc/dos33/crt0.s`, `irq.s` | `LC_ROM_WRAM` and `LC_BANK2_RW` in place of cc65's `ROMIN` and `LCBANK2` |
+| `DESIGN.md` | The convention: cc65's names only where they say what the location does |
+
+Verified: `tools/samebytes.sh` against `002c52e` reports the tree
 IDENTICAL, every module and program.
 
 ## 11. Sources

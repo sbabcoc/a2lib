@@ -65,8 +65,8 @@ initirq:
         lda     #>romirq
         sta     IRQLOC+1
 
-        bit     LCBANK2         ; LC bank 2 read and write
-        bit     LCBANK2
+        bit     LC_BANK2_RW     ; LC bank 2 read and write
+        bit     LC_BANK2_RW
         lda     ROM_IRQ
         sta     lcnext+1
         lda     ROM_IRQ+1
@@ -102,8 +102,8 @@ doneirq:
         sta     IRQLOC
         lda     romnext+2
         sta     IRQLOC+1
-        bit     LCBANK2
-        bit     LCBANK2
+        bit     LC_BANK2_RW
+        bit     LC_BANK2_RW
         lda     lcnext+1
         sta     ROM_IRQ
         lda     lcnext+2

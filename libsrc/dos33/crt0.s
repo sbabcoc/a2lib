@@ -88,8 +88,8 @@ init:   ldx     #zpspace-1
         jsr     reset           ; Setup RESET vector
 
         ; Switch in LC bank 2 for W/O.
-        bit     ROMIN
-        bit     ROMIN
+        bit     LC_ROM_WRAM
+        bit     LC_ROM_WRAM
 
         lda     #<reset_6502
         ldx     #>reset_6502
@@ -109,8 +109,8 @@ init:   ldx     #zpspace-1
 
         ; Copy the LC segment to its destination
         ; Switch in LC bank 2 for W/O.
-        bit     ROMIN
-        bit     ROMIN
+        bit     LC_ROM_WRAM
+        bit     LC_ROM_WRAM
 
         ; Set the source start address.
         ; Aka __LC_LOAD__ iff segment LC exists.

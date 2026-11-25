@@ -7,11 +7,16 @@
 .ifndef MACHINE_INC
 MACHINE_INC = 1
 
-; Language card soft switches ("Apple II Reference Manual"). cc65 runs with
-; bank 2 enabled for reading; the File Manager, RWTS and the monitor need
-; ROM. apple2.inc names $C081 (ROMIN) and $C083 (LCBANK2), not these.
+; Language card soft switches ("Apple II Reference Manual"), each named for
+; what it does to reads and to writes. cc65 runs with bank 2 enabled for
+; reading; the File Manager, RWTS and the monitor need ROM. A switch that
+; write-enables RAM must be read twice. These take the place of
+; apple2.inc's ROMIN and LCBANK2, whose names don't say that both
+; write-enable RAM.
+LC_BANK2_RO     := $C080        ; Read bank 2 RAM; RAM write-protected
+LC_ROM_WRAM     := $C081        ; Read ROM; write bank 2 RAM (read twice)
 LC_ROM_RO       := $C082        ; Read ROM; RAM write-protected
-LC_BANK2_RO     := $C080        ; Read bank 2 RAM; write-protected
+LC_BANK2_RW     := $C083        ; Read and write bank 2 RAM (read twice)
 
 ; Monitor and DOS entry points
 MON_COUT        := $FDED        ; COUT: through CSW, so through DOS's intercept
