@@ -12,7 +12,7 @@
 ; After each pan, a position gauge shows which columns are visible, and a
 ; one-shot timer removes it after a second, if a timer slot is free.
 ;
-; The buffer holds screen codes XOR $A0, so that zeroed memory is a blank
+; The buffer holds screen codes XOR #$A0, so that zeroed memory is a blank
 ; screen. The startup code clears BSS after the constructors run, so all the
 ; state the constructor sets is in DATA. The model uses BASL and BAS2L as
 ; pointers, set on every use, and no other zero page: it runs inside cputc(),

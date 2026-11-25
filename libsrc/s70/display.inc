@@ -27,6 +27,6 @@ normal:
         and     #$7F
 .endmacro
 
-; Encoding of the buffer for the text marker: bytes XOR $A0 give these
+; Encoding of the buffer for the text marker: bytes XOR #$A0 give these
 ; screen codes. For details, see section 3.9 of DESIGN.
 S80_TEXTENC     = 1

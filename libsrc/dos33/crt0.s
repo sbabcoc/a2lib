@@ -146,14 +146,19 @@ init:   ldx     #zpspace-1
         .code
 
 ;-----------------------------------------------------------------------------
-; Point the RESET vector at a routine, and set its check byte.
+; Point the RESET vector at a routine. On RESET, the Autostart ROM jumps
+; through the vector only if PWREDUP holds the MSB of the vector EOR #$A5;
+; otherwise it takes RESET as a power-up, and reboots.
 ;
 ; Input:        A:X           word      the routine's address
-; Output:       SOFTEV        word      the routine
-;               PWREDUP       byte      A EOR $A5
+; Output:       SOFTEV        word      the routine's address
+;               PWREDUP       byte      MSB of the routine's address EOR #$A5
 ; Changes:      A and flags. X and Y are unchanged.
-; Note:         Also called by cc65's callmain, at exit. The rts is return,
-;               which rebootafterexit() puts in done.
+; Note:         cc65's exit code calls this too, so that a RESET during the
+;               destructors still restores the vector and zero page. The rts
+;               (return) is also the whole of cc65's rebootafterexit(); its
+;               constructor points the JMP that ends the program (done) at
+;               the Autostart ROM's PWRUP routine ($FAA6), which reboots.
 
 reset:  stx     SOFTEV
         sta     SOFTEV+1

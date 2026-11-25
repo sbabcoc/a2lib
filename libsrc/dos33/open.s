@@ -5,7 +5,7 @@
 ; the symbols cc65's own read(), close() and descriptor table expect, so those
 ; work unchanged. A file's fdtab slot holds:
 ;
-;   REF_NUM  the slot's offset ORed with $40: nonzero and below $80, so
+;   REF_NUM  the slot's offset ORed with #$40: nonzero and below $80, so
 ;            read(), write() and close() treat it as a file, and the slot
 ;            can be found again from it
 ;   BUFFER   the file's control block, a DOS buffer; 0 for the console
