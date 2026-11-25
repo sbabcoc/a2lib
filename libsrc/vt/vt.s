@@ -134,6 +134,7 @@ a2_savehooks:
 ; out ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a routine
 ; stored in CSW directly (DESIGN.md 3.5, 3.6).
 ;
+; Prepare:      a2_savehooks
 ; Input:        AX            void (*)()
 ;                                       the routine
 ; Output:       hooked        word      the routine
@@ -166,6 +167,7 @@ direct: sta     CSWL
 ; a2_hookout installed the routine there; otherwise CSW, and DOS's saved hook
 ; too if DOS's reconnect routine ($A851) moved the routine into it.
 ;
+; Prepare:      a2_savehooks, then a2_hookout
 ; Input:        viados        byte      bit 7: installed as DOS's true output
 ;                                       routine
 ;               savecsw       word      CSW, as kept

@@ -14,7 +14,8 @@
 ; __closedir_a2lib: Close a directory: int __fastcall__ _closedir_a2lib (DIR*
 ; dir), which dirent.h names closedir().
 ;
-; Input:        AX            DIR*      dir: from opendir()
+; Prepare:      opendir()
+; Input:        AX            DIR*      dir: the directory
 ; Output:       AX            int       0
 ; Changes:      Y and what free changes. dir is freed.
 

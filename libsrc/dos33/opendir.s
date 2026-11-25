@@ -135,6 +135,7 @@ nulldirect:
 ;-----------------------------------------------------------------------------
 ; read_dir_sector: Read a sector of the directory's disk into its BUF.
 ;
+; Prepare:      dir_at
 ; Input:        A             byte      the track
 ;               X             byte      the sector
 ;               dirptr        DIR*      the directory

@@ -99,13 +99,18 @@ follows them, so the code stays as readable as they left it.
   `LCBANK2`, `KBD`), else `libsrc/dos33/machine.inc` (`LC_ROM_RO`,
   `LC_BANK2_RO`, `MON_COUT`, `MON_RDKEY`), vendored modules included. The
   exception is `$0103,x` after `tsx`, an offset into the stack frame.
-- **Routine headers (10.40).** Every exported routine, and each
-  internal one worth a name, has a header after a 78-column rule: the
-  name and what it does, then `Prepare:` (routines that must come
-  first), `Input:` and `Output:` (one line per value: where it is, its
-  type, what it means), `Changes:` (registers, flags and storage changed
-  besides the outputs, and other effects) and `Note:`, each only where
-  it applies. Types are C's where C sees the value (`int`, `char*`,
+- **Routine headers (10.40).** Every exported routine, and each internal
+  one worth a name, has a header after a 78-column rule: the name and
+  what it does, then `Prepare:`, `Input:` and `Output:` (one line per
+  value: where it is, its type, what it means), `Changes:` (registers,
+  flags and storage changed besides the outputs, and other effects) and
+  `Note:`, each only where it applies. `Prepare:` names what the caller
+  must have called first for the inputs to be valid: C functions with
+  `()` (`open()`, `opendir()`, `a2_timer_start()`), routines without
+  (`fm_begin`), in order. It names no helper's own caller, which sets up
+  the helper's inputs as part of its work, and nothing that runs by
+  itself, such as a constructor. Inputs then describe values, not where
+  they came from. Types are C's where C sees the value (`int`, `char*`,
   `unsigned`), else `byte`, `word`, `flag` or `T*`. A module's storage
   is given by its name; another module's cells as `ptr1 (fm_name)`. The
   stack is mentioned only where its use is out of the ordinary, such as
@@ -3434,6 +3439,19 @@ IDENTICAL, every module and program; `make simtest` passes.
 | `libsrc/dos33/crt0.s`, `irq.s`, `libsrc/vt/cout.s`, `rdkey.s`, `libsrc/s70/rdkey.s`, `libsrc/reflow/cout.s` | The comments after the renamed operands back at column 33, where 10.46's longer names had pushed them |
 
 Verified: `tools/samebytes.sh` against `12d4d65` reports the tree
+IDENTICAL, every module and program.
+
+### 10.48 Prerequisites in `Prepare:`, throughout
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/write.s`, `lseek.s`, `rwcommon.s`, `readdir.s`, `rewinddir.s`, `closedir.s`, `libsrc/timer/timer.s` | `Prepare:` for the public functions that take what another returns: `open()`, `opendir()`, `a2_timer_start()` |
+| `libsrc/dos33/fm.s`, `fmbuf.s`, `open.s`, `opendir.s`, `rewinddir.s`, `seekend.s`, `sysrename.s`, `rwcommon.s`, `libsrc/vt/vt.s`, `libsrc/ip65/a2timer.s` | `Prepare:` for the internal routines that lacked it; prerequisites that were written into Input lines moved there; `fm_call`'s and `truncate`'s naming routines only |
+| `DESIGN.md` | The header convention says what `Prepare:` names |
+
+Comments only.
+
+Verified: `tools/samebytes.sh` against `961733c` reports the tree
 IDENTICAL, every module and program.
 
 ## 11. Sources

@@ -22,6 +22,8 @@ count           = ptr2          ; unsigned: the bytes asked for
 ; rwprolog: Take read()'s or write()'s arguments: int __fastcall__ read (int
 ; fd, void* buf, unsigned count), and write's.
 ;
+; Prepare:      open(), for a file; the console's descriptors (0-2) are open
+;               from the start
 ; Input:        C stack       int       fd
 ;               C stack       void*     buf
 ;               AX            unsigned  count
@@ -48,6 +50,7 @@ rwprolog:
 ;-----------------------------------------------------------------------------
 ; rwepilog: Return the number of bytes transferred, from read() or write().
 ;
+; Prepare:      rwprolog, then the transfer (rwfile), which sets rw_count
 ; Input:        A             byte      the __oserror value (0)
 ;               rw_count      unsigned  the bytes transferred
 ; Output:       AX            int       rw_count

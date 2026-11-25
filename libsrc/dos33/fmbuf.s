@@ -82,7 +82,8 @@ fm_getfcb:
 ;-----------------------------------------------------------------------------
 ; fm_freefcb: Release a control block's DOS file buffer.
 ;
-; Input:        ctlblock      FCB*      the control block (from fm_getfcb)
+; Prepare:      fm_getfcb
+; Input:        ctlblock      FCB*      the control block
 ; Output:       A             byte      unchanged
 ; Changes:      Y; N and Z set from A. X and C are unchanged. The buffer is
 ;               free in DOS's chain (FCB::INUSE = 0).

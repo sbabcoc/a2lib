@@ -46,6 +46,7 @@ timer_init:
 ;-----------------------------------------------------------------------------
 ; timer_read: Wait one tick, then return the milliseconds since timer_init.
 ;
+; Prepare:      timer_init
 ; Input:        base          word      t_ms's low word at timer_init
 ; Output:       AX            word      the milliseconds since timer_init,
 ;                                       modulo 65536

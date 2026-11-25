@@ -31,7 +31,8 @@ sectors_high    = tmp2          ; sectors, then in blocks
 ; __readdir_a2lib: Read the next file's entry: struct dirent* __fastcall__
 ; _readdir_a2lib (DIR* dir), which dirent.h names readdir().
 ;
-; Input:        AX            DIR*      dir: from opendir()
+; Prepare:      opendir()
+; Input:        AX            DIR*      dir: the directory
 ; Output:       AX            struct dirent*
 ;                                       the entry, inside dir and valid until
 ;                                       the next call; NULL at the end, with

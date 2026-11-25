@@ -23,6 +23,7 @@
 ;-----------------------------------------------------------------------------
 ; seekend: Move an open file to its end, before a write with O_APPEND.
 ;
+; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset, of an open
 ;                                       file
 ; Output:       C             flag      clear: at the end; set: an error

@@ -19,7 +19,8 @@
 ; __fastcall__ _rewinddir_a2lib (DIR* dir), which dirent.h names rewinddir().
 ; Falls into rewind_dir.
 ;
-; Input:        AX            DIR*      dir: from opendir()
+; Prepare:      opendir()
+; Input:        AX            DIR*      dir: the directory
 ; Output:       none
 ; Changes:      A, Y and dirptr. X is unchanged.
 
@@ -31,6 +32,7 @@ __rewinddir_a2lib:
 ; rewind_dir: Start the directory again at its first catalog sector, which the
 ; next readdir reads. Used by opendir too.
 ;
+; Prepare:      dir_at
 ; Input:        dirptr        DIR*      the directory, FIRSTT and FIRSTS set
 ; Output:       none
 ; Changes:      A and Y. X is unchanged.

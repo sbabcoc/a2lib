@@ -280,7 +280,7 @@ errfreedirect:                  ; A = errno code, file not open
 ; truncate: Replace the open file with an empty one of the same type, as the
 ; File Manager can't shorten a file. A B file keeps its load address.
 ;
-; Prepare:      fm_begin, and the file open
+; Prepare:      fm_begin, fmopen
 ; Input:        ctlblock      FCB*      the file's control block
 ;               name          char*     the path
 ;               type          byte      the file's type
@@ -384,8 +384,9 @@ setname:
 ; hdrsize: Point fm_rangeio at the hidden header: the last HDRLEN bytes of
 ; hdrbuf.
 ;
+; Prepare:      classify
 ; Input:        ctlblock      FCB*      the file's control block, with HDRLEN
-;                                       set (classify)
+;                                       set
 ; Output:       Z             flag      set: the file has no hidden header
 ;               fm_rio_addr   byte*     if Z clear: the header's place in
 ;                                       hdrbuf
@@ -415,9 +416,9 @@ hdrsize:
 ; length), the length at offset 2. I and A: a 2-byte header (length) at offset
 ; 0. Others: raw, no header.
 ;
+; Prepare:      fm_getfcb
 ; Input:        A             byte      the type (FMT_*, without the lock bit)
 ;               ctlblock      FCB*      the control block, its fields 0
-;                                       (fm_getfcb)
 ; Output:       ctlblock      FCB*      KIND, HDRLEN and LENOFS set
 ; Changes:      A, X and Y.
 
@@ -452,6 +453,7 @@ text:   lda     #FCB_TEXT
 ; Rewrites the hidden header's length first if it changed, and closes the file
 ; even if that fails.
 ;
+; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset, of an open
 ;                                       file
 ;               A             byte      REF_NUM (unused)
@@ -508,6 +510,7 @@ cclose: lda     #FMC_CLOSE
 ; freebuffer: Release the control block of an fdtab slot, if it has one (the
 ; console has none), for close() and at exit.
 ;
+; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset
 ; Output:       none
 ; Changes:      A, Y and ctlblock. X is unchanged.

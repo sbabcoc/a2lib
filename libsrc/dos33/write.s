@@ -30,6 +30,8 @@
 ; const void* buf, unsigned count). The console gets each byte through COUT,
 ; '\n' as CR, uppercase on a II+ as stock's does (uppercasemask).
 ;
+; Prepare:      open(), for a file; the console's descriptors (0-2) are open
+;               from the start
 ; Input:        C stack       int       fd: open for writing
 ;               C stack       void*     buf: the bytes
 ;               AX            unsigned  count: how many

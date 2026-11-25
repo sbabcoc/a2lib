@@ -38,6 +38,7 @@ offset_high     = ptr2          ; unsigned: the offset's high word
 ; _lseek: Move an open file's position: off_t __fastcall__ lseek (int fd,
 ; off_t offset, int whence).
 ;
+; Prepare:      open()
 ; Input:        C stack       int       fd: an open file, not the console
 ;               C stack       long      offset: from the position whence names
 ;               AX            int       whence: SEEK_CUR (0), SEEK_END (1) or

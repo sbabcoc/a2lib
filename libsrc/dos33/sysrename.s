@@ -152,6 +152,7 @@ done:   rts
 ;-----------------------------------------------------------------------------
 ; setname: Point the parameter list's FM_NAME at a name buffer.
 ;
+; Prepare:      fm_begin
 ; Input:        AX            byte*     the name buffer (NAME_LEN bytes, as
 ;                                       fm_name stores names)
 ;               fm_parmlist   byte*     the parameter list

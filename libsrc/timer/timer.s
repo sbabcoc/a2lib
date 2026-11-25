@@ -517,6 +517,7 @@ found:  lda     tmr_ticks
 ;-----------------------------------------------------------------------------
 ; a2_timer_restart: Restart a timer from its full interval, for s80.s.
 ;
+; Prepare:      a2_timer_arm
 ; Input:        X             byte      the handle (the slot)
 ; Output:       none
 ; Changes:      A and flags; the slot, and nact if it wasn't counting. X and Y
@@ -542,6 +543,7 @@ a2_timer_restart:
 ; a2_timer_stop (unsigned char handle). A handle that isn't a slot, such as
 ; A2_TIMER_NONE, is ignored.
 ;
+; Prepare:      a2_timer_start()
 ; Input:        A             unsigned char
 ;                                       handle
 ; Output:       none

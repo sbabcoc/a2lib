@@ -20,6 +20,7 @@ call_type       = tmp1          ; byte: FMC_READ or FMC_WRITE (fm_rangeio)
 ;-----------------------------------------------------------------------------
 ; fm_fdfcb: Find the control block of an fdtab slot.
 ;
+; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset (fd *
 ;                                       .sizeof(FD))
 ; Output:       ctlblock      FCB*      the slot's control block; 0 for the
@@ -40,6 +41,7 @@ fm_fdfcb:
 ; fm_fdbegin: Find the control block of an fdtab slot and begin File Manager
 ; calls on it: fm_fdfcb, then fm_begin (falls into it).
 ;
+; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset, of an open
 ;                                       file
 ; Output:       ctlblock      FCB*      the slot's control block
@@ -55,6 +57,7 @@ fm_fdbegin:
 ; list and data buffers below it. Needed before each series, because DOS owns
 ; the parameter list between calls.
 ;
+; Prepare:      fm_getfcb or fm_fdfcb
 ; Input:        ctlblock      FCB*      the control block
 ; Output:       fm_parmlist   byte*     the parameter list, with FM_WORK,
 ;                                       FM_TSL and FM_DATA set
@@ -146,10 +149,11 @@ fm_open:
 ; reading, so ROM is switched in around the call, as rdkey.s does around the
 ; monitor's RDKEY.
 ;
-; Prepare:      fm_begin, and the call's parameters
+; Prepare:      fm_begin
 ; Input:        X             byte      OPEN only: 0 creates the file if it
 ;                                       isn't found; else it doesn't
-;               fm_parmlist   byte*     the parameter list
+;               fm_parmlist   byte*     the parameter list, with the call's
+;                                       fields set
 ; Output:       C             flag      clear: the call succeeded; set: it
 ;                                       failed
 ;               A             byte      the File Manager's return code: 0, or
@@ -293,6 +297,7 @@ fm_rangeio:
 ;-----------------------------------------------------------------------------
 ; fm_incpos: Add 1 to the control block's logical position.
 ;
+; Prepare:      fm_begin
 ; Input:        ctlblock      FCB*      the control block
 ; Output:       ctlblock      FCB*      FCB::POS one higher, modulo 65536
 ; Changes:      A and Y; C set if POS wrapped to 0. X is unchanged.
