@@ -88,22 +88,22 @@ dir_at:
 
         ; Check that it is a DOS 3.3 VTOC: 16 sectors per track, 122 T/S
         ; pairs per list sector, and a first catalog sector on the disk
-:       ldy     #DIR::BUF + VTOC_SECTORS
+:       ldy     #DIR::BUF + VTOC::SECTORS
         lda     (dirptr),y
         cmp     #DOS_SECTORS
         bne     notdos
-        ldy     #DIR::BUF + VTOC_TSPAIRS
+        ldy     #DIR::BUF + VTOC::TSPAIRS
         lda     (dirptr),y
         cmp     #DOS_TSPAIRS
         bne     notdos
-        ldy     #DIR::BUF + VTOC_CATTRACK
+        ldy     #DIR::BUF + VTOC::CATTRACK
         lda     (dirptr),y
         beq     notdos
         cmp     #DOS_TRACKS
         bcs     notdos
         ldy     #DIR::FIRSTT
         sta     (dirptr),y
-        ldy     #DIR::BUF + VTOC_CATTRACK + 1
+        ldy     #DIR::BUF + VTOC::CATSECTOR
         lda     (dirptr),y
         cmp     #DOS_SECTORS
         bcs     notdos

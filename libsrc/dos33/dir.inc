@@ -5,23 +5,45 @@
 ;
 
 ; DOS 3.3 disk layout ("Beneath Apple DOS" ch. 4)
-VTOC_TRACK      = $11           ; VTOC: track 17, sector 0
-VTOC_CATTRACK   = $01           ; First catalog sector: track, sector
-VTOC_TSPAIRS    = $27           ; T/S pairs per T/S list sector (122)
-VTOC_SECTORS    = $35           ; Sectors per track (16)
 
-DOS_SECTORS     = 16            ; Sectors per track
-DOS_TSPAIRS     = 122           ; T/S pairs per T/S list sector
 DOS_TRACKS      = 35            ; Tracks on a disk
-CAT_NEXT        = $01           ; Catalog sector: next track, sector
-CAT_ENTRIES     = $0B           ; Catalog sector: first file entry
-CAT_ENTRYLEN    = 35            ; Bytes per file entry
-CAT_PERSECTOR   = 7             ; File entries per catalog sector
-ENT_TRACK       = $00           ; Entry: T/S list track ($00 unused, $FF deleted)
-ENT_SECTOR      = $01
-ENT_TYPE        = $02           ; Type in catalog coding; bit 7 = locked
-ENT_NAME        = $03           ; 30 bytes
-ENT_LENGTH      = $21           ; Length in sectors (2)
+DOS_SECTORS     = 16            ; Sectors per track
+DOS_TSPAIRS     = (256 - $0C) / 2 ; T/S pairs per T/S list sector, after its
+                                ; 12-byte header (122)
+VTOC_TRACK      = 17            ; The VTOC: track 17, sector 0
+
+.struct VTOC
+                .res    1
+        CATTRACK  .byte         ; First catalog sector: track
+        CATSECTOR .byte         ; and sector
+        .org    $27
+        TSPAIRS   .byte         ; T/S pairs per T/S list sector
+        .org    $35
+        SECTORS   .byte         ; Sectors per track
+.endstruct
+
+; A catalog file entry
+.struct CATENTRY
+        TRACK   .byte           ; T/S list track ($00 unused, $FF deleted)
+        SECTOR  .byte           ; T/S list sector
+        TYPE    .byte           ; Type in catalog coding; bit 7 = locked
+        NAME    .res ::NAME_LEN
+        LENGTH  .word           ; Length in sectors
+.endstruct
+
+; A catalog sector: a link to the next, then as many file entries as fit
+.struct CATSECTOR
+                .res    1
+        NEXT    .res    2       ; Next catalog sector: track, sector
+        .org    $0B
+        ENTRIES .res    256 - $0B ; The file entries
+.endstruct
+
+CAT_PERSECTOR   = .sizeof(CATSECTOR::ENTRIES) / .sizeof(CATENTRY)
+
+.assert .sizeof(CATENTRY) = 35, error, "A catalog entry is 35 bytes"
+.assert CAT_PERSECTOR = 7, error, "A catalog sector holds 7 entries"
+.assert DOS_TSPAIRS = 122, error, "A T/S list sector holds 122 pairs"
 
 ; DIRENT must match struct dirent in a2lib's dirent.h.
 

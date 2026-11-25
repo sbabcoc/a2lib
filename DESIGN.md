@@ -3517,6 +3517,16 @@ IDENTICAL, every module and program.
 Verified: `tools/samebytes.sh` against `002c52e` reports the tree
 IDENTICAL, every module and program.
 
+### 10.52 The catalog's layout as structs
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/dir.inc` | The VTOC, a catalog sector and a catalog entry as `.struct`s, in place of offset constants; the entries per catalog sector and the T/S pairs per T/S list sector computed from the layouts, with assertions of DOS 3.3's values (35-byte entries, 7 per sector, 122 pairs); the VTOC's offsets no longer duplicate the values they're checked against |
+| `libsrc/dos33/opendir.s`, `readdir.s` | The struct fields in place of the constants |
+
+Verified: `tools/samebytes.sh` against `572f97d` reports the tree
+IDENTICAL, every module and program.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

@@ -18,7 +18,7 @@
 
 ; Shared storage
 catentry        = ptr2          ; byte*: the catalog entry, in the DIR's BUF
-name_base       = ptr3          ; byte*: d_name - ENT_NAME, so one Y
+name_base       = ptr3          ; byte*: d_name - CATENTRY::NAME, so one Y
                                 ; indexes both names
 sectors_low     = tmp1          ; unsigned: the entry's length in
 sectors_high    = tmp2          ; sectors, then in blocks
@@ -67,11 +67,11 @@ next:   ldy     #DIR::DONE
         jsr     rwts_maperr
         jsr     ___mappederrno
         jmp     return0
-:       ldy     #DIR::BUF + CAT_NEXT
+:       ldy     #DIR::BUF + CATSECTOR::NEXT
         lda     (dirptr),y
         ldy     #DIR::NEXTT
         sta     (dirptr),y
-        ldy     #DIR::BUF + CAT_NEXT + 1
+        ldy     #DIR::BUF + CATSECTOR::NEXT + 1
         lda     (dirptr),y
         ldy     #DIR::NEXTS
         sta     (dirptr),y
@@ -79,17 +79,18 @@ next:   ldy     #DIR::DONE
         ldy     #DIR::INDEX
         sta     (dirptr),y
 
-        ; catentry = the entry: BUF + CAT_ENTRIES + INDEX * CAT_ENTRYLEN
+        ; catentry = the entry: BUF + CATSECTOR::ENTRIES
+        ; + INDEX * .sizeof(CATENTRY)
 entry:  tax
         clc
         adc     #$01
         sta     (dirptr),y      ; Y = DIR::INDEX: advance
         clc
         lda     dirptr
-        adc     #<(DIR::BUF + CAT_ENTRIES)
+        adc     #<(DIR::BUF + CATSECTOR::ENTRIES)
         sta     catentry
         lda     dirptr+1
-        adc     #>(DIR::BUF + CAT_ENTRIES)
+        adc     #>(DIR::BUF + CATSECTOR::ENTRIES)
         sta     catentry+1
         clc
         lda     catentry
@@ -98,27 +99,28 @@ entry:  tax
         bcc     :+
         inc     catentry+1
 
-:       ldy     #ENT_TRACK
+:       ldy     #CATENTRY::TRACK
         lda     (catentry),y
         jeq     end             ; Never used: end of the catalog
         cmp     #$FF
         jeq     next            ; Deleted
 
         ; d_name: 30 characters, bit 7 cleared, trailing blanks removed.
-        ; name_base = &d_name - ENT_NAME, so that one Y indexes both names.
+        ; name_base = &d_name - CATENTRY::NAME, so that one Y indexes both
+        ; names.
         clc
         lda     dirptr
-        adc     #<(DIR::ENT + DIRENT::NAME - ENT_NAME)
+        adc     #<(DIR::ENT + DIRENT::NAME - CATENTRY::NAME)
         sta     name_base
         lda     dirptr+1
-        adc     #>(DIR::ENT + DIRENT::NAME - ENT_NAME)
+        adc     #>(DIR::ENT + DIRENT::NAME - CATENTRY::NAME)
         sta     name_base+1
-        ldy     #ENT_NAME
+        ldy     #CATENTRY::NAME
 :       lda     (catentry),y
         and     #HIBIT_OFF
         sta     (name_base),y
         iny
-        cpy     #ENT_NAME + NAME_LEN
+        cpy     #CATENTRY::NAME + NAME_LEN
         bne     :-
         lda     #$00
         sta     (name_base),y
@@ -128,21 +130,21 @@ entry:  tax
         bne     :+
         lda     #$00
         sta     (name_base),y
-        cpy     #ENT_NAME
+        cpy     #CATENTRY::NAME
         bne     :-
 
         ; d_ino: T/S list track * 256 + sector
-:       ldy     #ENT_SECTOR
+:       ldy     #CATENTRY::SECTOR
         lda     (catentry),y
         ldy     #DIR::ENT + DIRENT::INO
         sta     (dirptr),y
-        ldy     #ENT_TRACK
+        ldy     #CATENTRY::TRACK
         lda     (catentry),y
         ldy     #DIR::ENT + DIRENT::INO + 1
         sta     (dirptr),y
 
         ; d_access (the lock bit) and d_type (the catalog's type, as is)
-        ldy     #ENT_TYPE
+        ldy     #CATENTRY::TYPE
         lda     (catentry),y
         pha
         and     #FMT_LOCKED
@@ -154,7 +156,7 @@ entry:  tax
         sta     (dirptr),y
 
         ; d_sectors; d_blocks = (d_sectors + 1) / 2
-        ldy     #ENT_LENGTH
+        ldy     #CATENTRY::LENGTH
         lda     (catentry),y
         sta     sectors_low
         iny
@@ -202,5 +204,5 @@ end:    lda     #$01
 
 entryofs:                       ; byte[7]: each entry's offset in a sector
         .repeat CAT_PERSECTOR, i
-        .byte   i * CAT_ENTRYLEN
+        .byte   i * .sizeof(CATENTRY)
         .endrepeat
