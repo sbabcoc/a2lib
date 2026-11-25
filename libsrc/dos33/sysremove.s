@@ -18,7 +18,7 @@
 ;
 ; Signature:    unsigned char __fastcall__ _sysremove (const char* name)
 ; Overrides:    cc65's _sysremove()
-; Input:        AX            char*     name: the file's path
+; Input:        X:A           char*     path name
 ; Output:       A             byte      0, or the __oserror value:
 ;                                       DOSERR_LOCKED (EACCES) for a locked
 ;                                       file, LIBERR_OPEN (EINVAL) for an open

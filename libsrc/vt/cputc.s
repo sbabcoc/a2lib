@@ -57,10 +57,10 @@ initconio:
 ;               char c)
 ; Overrides:    cc65's cputcxy()
 ; Input:        C stack       unsigned char
-;                                       x
+;                                       column
 ;               C stack       unsigned char
-;                                       y
-;               A             char      c
+;                                       row
+;               A             char      character
 ; Changes:      As gotoxy and _cputc. Pops x and y.
 
 _cputcxy:
@@ -75,7 +75,7 @@ _cputcxy:
 ;
 ; Signature:    void __fastcall__ cputc (char c)
 ; Overrides:    cc65's cputc()
-; Input:        A             char      c
+; Input:        A             char      character
 ; Changes:      A, X, Y and flags; the screen and the cursor. On the 40-column
 ;               screen: tmp3, and BASL/BASH at a new line (VTABZ). Not ptr1,
 ;               which cputs keeps a pointer in.
@@ -236,7 +236,7 @@ put:    lda     (BASL),Y        ; Get current character
 ;-----------------------------------------------------------------------------
 ; _cputc on the card.
 ;
-; Input:        A             char      c
+; Input:        A             char      character
 ; Changes:      A and flags; the screen and the cursor.
 
 vtcputc:

@@ -20,7 +20,7 @@
 ;
 ; Signature:    unsigned char wherex ()
 ; Overrides:    cc65's wherex()
-; Output:       AX            unsigned char
+; Output:       X:A           unsigned char
 ;                                       the column
 ; Changes:      Flags. Y is unchanged.
 

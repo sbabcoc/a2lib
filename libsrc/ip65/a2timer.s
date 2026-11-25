@@ -42,7 +42,7 @@ timer_init:
 ;
 ; Prepare:      timer_init
 ; Input:        base          word      t_ms's low word at timer_init
-; Output:       AX            word      the milliseconds since timer_init,
+; Output:       X:A           word      the milliseconds since timer_init,
 ;                                       modulo 65536
 ; Changes:      Y; what a2_idle changes, including the callbacks of due
 ;               timers.

@@ -19,7 +19,7 @@
 ; Overrides:    cc65's ___osmaperrno
 ; Input:        A             byte      oserror: a DOS 3.3 error number or a
 ;                                       library code
-; Output:       AX            int       the errno value, or EUNKNOWN for a
+; Output:       X:A           int       the errno value, or EUNKNOWN for a
 ;                                       code not in the table
 ; Changes:      Flags. Y is unchanged.
 

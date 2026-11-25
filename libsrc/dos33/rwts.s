@@ -31,7 +31,7 @@ iob             = ptr3          ; byte*: DOS's IOB
 ;               2 is enabled for reading on return.
 
 rwts_read:
-        jsr     RWTS_LOCATE     ; Y = low, A = high
+        jsr     RWTS_LOCATE     ; A:Y
         sty     iob
         sta     iob+1
 
@@ -84,8 +84,7 @@ rwts_read:
 ; Call RWTS. cc65 leaves Language Card bank 2 enabled for reading, so ROM is
 ; switched in around the call, as fm_call does.
 ;
-; Input:        Y             byte      the IOB's low byte
-;               A             byte      the IOB's high byte
+; Input:        A:Y           byte*     the IOB
 ;               iob           byte*     the IOB, set up for the call
 ; Output:       C             flag      as rwts_read
 ;               A             byte      as rwts_read

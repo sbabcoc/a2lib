@@ -588,10 +588,10 @@ curdraw:
 ; Signature:    void __fastcall__ s70_font (const void* set, unsigned char
 ;               nibble)
 ; Input:        C stack       const void*
-;                                       set: 96 glyphs x 8 scanlines, bit 0
-;                                       leftmost
+;                                       font set: 96 glyphs x 8 scanlines, bit
+;                                       0 leftmost
 ;               A             unsigned char
-;                                       nibble: 0 for bits 0-3, else bits 4-7
+;                                       0 for bits 0-3, else bits 4-7
 ; Output:       font          byte[768] the new font
 ; Changes:      A, X, Y and flags; source and dest; nibble and pages; the
 ;               display (disp_redraw). Pops set.

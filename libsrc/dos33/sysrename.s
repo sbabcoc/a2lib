@@ -33,9 +33,9 @@
 ; Signature:    unsigned char __fastcall__ _sysrename (const char* oldname,
 ;               const char* newname)
 ; Overrides:    cc65's _sysrename()
-; Input:        C stack       char*     oldname: the file's path
-;               AX            char*     newname: its new path, on the same
-;                                       slot and drive
+; Input:        C stack       char*     path name
+;               X:A           char*     new path name, on the same slot and
+;                                       drive
 ; Output:       A             byte      0, or the __oserror value:
 ;                                       DOSERR_SYNTAX (EINVAL) for a bad path
 ;                                       or another slot or drive,
@@ -152,7 +152,7 @@ done:   rts
 ; Point the parameter list's FM_NAME at a name buffer.
 ;
 ; Prepare:      fm_begin
-; Input:        AX            byte*     the name buffer (NAME_LEN bytes, as
+; Input:        X:A           byte*     the name buffer (NAME_LEN bytes, as
 ;                                       fm_name stores names)
 ;               fm_parmlist   byte*     the parameter list
 ; Changes:      A and Y. X is unchanged.

@@ -23,13 +23,13 @@ tp              = ptr1          ; struct timespec*: the caller's time
 ; Signature:    int __fastcall__ clock_gettime (clockid_t clk_id, struct
 ;               timespec* tp)
 ; Overrides:    cc65's clock_gettime()
-; Input:        C stack       clockid_t clk_id: ignored
-;               AX            struct timespec*
-;                                       tp: where to store the time
+; Input:        C stack       clockid_t ignored
+;               X:A           struct timespec*
+;                                       where to store the time
 ; Output:       *tp           struct timespec
 ;                                       tv_sec: t_sec + clk_offset; tv_nsec:
 ;                                       t_rem * 1000000
-;               AX            int       0
+;               X:A           int       0
 ; Changes:      Y; tp, mul, addend and nsec. Pops clk_id.
 
 _clock_gettime:

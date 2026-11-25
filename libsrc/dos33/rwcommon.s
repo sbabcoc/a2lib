@@ -26,9 +26,9 @@ count           = ptr2          ; unsigned: the bytes asked for
 ;               write's
 ; Prepare:      open(), for a file; the console's descriptors (0-2) are open
 ;               from the start
-; Input:        C stack       int       fd
-;               C stack       void*     buf
-;               AX            unsigned  count
+; Input:        C stack       int       file descriptor
+;               C stack       void*     buffer
+;               X:A           unsigned  byte count
 ; Output:       ptr1          byte*     buf (rwfile's buffer)
 ;               count         unsigned  count
 ;               C             flag      set: fd isn't open (getfd)
@@ -55,7 +55,7 @@ rwprolog:
 ; Prepare:      rwprolog, then the transfer (rwfile), which sets rw_count
 ; Input:        A             byte      the __oserror value (0)
 ;               rw_count      unsigned  the bytes transferred
-; Output:       AX            int       rw_count
+; Output:       X:A           int       rw_count
 ;               __oserror     byte      A
 ; Changes:      Y is unchanged.
 
@@ -69,7 +69,7 @@ rwepilog:
 ;-----------------------------------------------------------------------------
 ; Fail a transfer that rwcommon got before any file was opened.
 ;
-; Output:       AX            int       -1
+; Output:       X:A           int       -1
 ;               errno         int       EINVAL
 ; Changes:      As ___directerrno.
 

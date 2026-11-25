@@ -18,7 +18,7 @@
 ; Signature:    void __fastcall__ gotoy (unsigned char y)
 ; Overrides:    cc65's gotoy()
 ; Input:        A             unsigned char
-;                                       y: the row, 0-23
+;                                       row, 0-23
 ; Changes:      X and flags; the cursor. On the VideoTerm: A.
 
 _gotoy:

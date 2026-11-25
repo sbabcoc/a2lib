@@ -23,7 +23,7 @@
 ; Signature:    char cgetc ()
 ; Overrides:    cc65's cgetc()
 ; Input:        cursor        byte      nonzero: show the cursor
-; Output:       AX            char      the key, high bit clear (no Open Apple
+; Output:       X:A           char      the key, high bit clear (no Open Apple
 ;                                       on a II+)
 ; Changes:      Y and flags; RNDL and RNDH; KBDSTRB, cleared; what a2_tick,
 ;               s70_curshow and s70_curhide change.

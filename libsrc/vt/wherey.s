@@ -16,7 +16,7 @@
 ;
 ; Signature:    unsigned char wherey ()
 ; Overrides:    cc65's wherey()
-; Output:       AX            unsigned char
+; Output:       X:A           unsigned char
 ;                                       the row
 ; Changes:      Flags. Y is unchanged.
 

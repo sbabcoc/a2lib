@@ -28,9 +28,8 @@
 ;
 ; Signature:    DIR* __fastcall__ _opendir_a2lib (const char* name)
 ; Overrides:    opendir(), as a2lib's dirent.h defines it
-; Input:        AX            char*     name: "", ".", "D" or "/S/D"
-;                                       (fm_location)
-; Output:       AX            DIR*      the directory, or NULL
+; Input:        X:A           char*     "", ".", "D" or "/S/D"
+; Output:       X:A           DIR*      directory object pointer, or NULL
 ;               errno         int       if NULL: EINVAL (not a directory
 ;                                       path), or as dir_at
 ; Changes:      Y; dirptr, path (ptr1, fm_location) and what dir_at changes.
@@ -47,7 +46,8 @@ __opendir_a2lib:
 ; Input:        fm_slot       byte      the slot (1-7)
 ;               fm_drive      byte      the drive (1-2)
 ;               fm_volume     byte      the volume, 0 for any
-; Output:       AX            DIR*      the directory (malloc), or NULL
+; Output:       X:A           DIR*      directory object pointer (malloc), or
+;                                       NULL
 ;               errno         int       if NULL: ENOMEM, ENODEV (no DOS 3.3
 ;                                       VTOC), or as rwts_maperr maps
 ;               __oserror     byte      if NULL, unless ENOMEM: the DOS 3.3 or
@@ -135,7 +135,7 @@ nulldirect:
 ; Prepare:      dir_at
 ; Input:        A             byte      the track
 ;               X             byte      the sector
-;               dirptr        DIR*      the directory
+;               dirptr        DIR*      directory object pointer
 ; Output:       C             flag      as rwts_read
 ;               A             byte      as rwts_read
 ; Changes:      X, Y and iob (ptr3); the rwts_* inputs, set for the sector.

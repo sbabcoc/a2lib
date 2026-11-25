@@ -22,9 +22,9 @@
 ;
 ; Overrides:    cc65's gotoxy
 ; Input:        C stack       unsigned char
-;                                       x
+;                                       column
 ;               C stack       unsigned char
-;                                       y, pushed last
+;                                       row, pushed last
 ; Changes:      As _gotoxy. Pops x and y.
 
 gotoxy:
@@ -36,9 +36,9 @@ gotoxy:
 ; Signature:    void __fastcall__ gotoxy (unsigned char x, unsigned char y)
 ; Overrides:    cc65's gotoxy()
 ; Input:        C stack       unsigned char
-;                                       x: the column
+;                                       column
 ;               A             unsigned char
-;                                       y: the row, from the top of the window
+;                                       row, from the top of the window
 ; Changes:      A, X, Y and flags; the cursor; on the 40-column screen, CV and
 ;               BASL/BASH (VTABZ). Pops x.
 
@@ -57,7 +57,7 @@ _gotoxy:
 ; Signature:    void __fastcall__ gotox (unsigned char x)
 ; Overrides:    cc65's gotox()
 ; Input:        A             unsigned char
-;                                       x: the column
+;                                       column
 ; Changes:      Flags; the cursor. On the card: A and X.
 
 _gotox:

@@ -148,8 +148,7 @@ init:   ldx     #zpspace-1
 ;-----------------------------------------------------------------------------
 ; Point the RESET vector at a routine, and set its check byte.
 ;
-; Input:        X             byte      the routine's address, low byte
-;               A             byte      the routine's address, high byte
+; Input:        A:X           word      the routine's address
 ; Output:       SOFTEV        word      the routine
 ;               PWREDUP       byte      A EOR $A5
 ; Changes:      A and flags. X and Y are unchanged.

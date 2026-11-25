@@ -22,7 +22,7 @@
 ;
 ; Signature:    char cpeekc ()
 ; Overrides:    cc65's cpeekc()
-; Output:       AX            char      the character
+; Output:       X:A           char      the character
 ; Changes:      Y and flags. On the card: the card's VRAM page and $C800
 ;               space.
 
@@ -66,7 +66,7 @@ peek:   lda     (BASL),Y        ; Get character
 ; Input:        VT_CHORZ      byte      the cursor's column (80: wrap pending)
 ;               VT_BASEL      word      the cursor line's VRAM address (high
 ;                                       byte in VT_BASEH)
-; Output:       AX            char      the character, bit 7 clear (bit 7 is
+; Output:       X:A           char      the character, bit 7 clear (bit 7 is
 ;                                       the character set)
 ; Changes:      Y and flags; the card's VRAM page and $C800 space.
 

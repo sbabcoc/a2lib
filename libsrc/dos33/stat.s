@@ -49,10 +49,10 @@ name_char       = tmp1          ; char: one of d_name's characters (cmpname)
 ; Signature:    int __fastcall__ stat (const char* pathname, struct stat*
 ;               statbuf)
 ; Overrides:    cc65's stat()
-; Input:        C stack       char*     pathname: the file's path
-;               AX            struct stat*
-;                                       statbuf: where the description goes
-; Output:       AX            int       0, or -1
+; Input:        C stack       char*     path name
+;               X:A           struct stat*
+;                                       where the description goes
+; Output:       X:A           int       0, or -1
 ;               errno         int       if -1: as open(), lseek() or readdir()
 ;                                       set it; if 0: the caller's, unchanged
 ;               statbuf       struct stat*

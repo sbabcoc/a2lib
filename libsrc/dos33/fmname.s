@@ -31,7 +31,7 @@ path            = ptr1          ; char*: the path being parsed
 ; each optionally ending in "/". Sets no parameter list fields, so it needs no
 ; fm_begin.
 ;
-; Input:        AX            char*     the path
+; Input:        X:A           char*     the path
 ; Output:       C             flag      clear: parsed; set: not a directory
 ;                                       path
 ;               A             byte      if C set: DOSERR_SYNTAX (EINVAL)
@@ -56,7 +56,7 @@ fm_location:
 ; fields.
 ;
 ; Prepare:      fm_begin
-; Input:        AX            char*     the path: "/S/D/NAME", "D/NAME",
+; Input:        X:A           char*     the path: "/S/D/NAME", "D/NAME",
 ;                                       "NAME" or "./NAME"
 ;               fm_parmlist   byte*     the parameter list
 ; Output:       C             flag      clear: parsed; set: not a file's path
@@ -138,7 +138,7 @@ store:  ldy     #FM_NAME
 ; by the end or "/" (skipped). A path that starts with none of these has no
 ; location, and is all name.
 ;
-; Input:        AX            char*     the path
+; Input:        X:A           char*     the path
 ; Output:       C             flag      clear: parsed; set: a syntax error
 ;               Y             byte      if C clear: the offset of what follows
 ;                                       the location (the name, or the end)

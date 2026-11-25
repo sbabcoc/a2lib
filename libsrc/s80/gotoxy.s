@@ -20,9 +20,9 @@
 ;
 ; Overrides:    cc65's gotoxy
 ; Input:        C stack       unsigned char
-;                                       x
+;                                       column
 ;               C stack       unsigned char
-;                                       y, pushed last
+;                                       row, pushed last
 ; Changes:      As _gotoxy. Pops y.
 
 gotoxy:
@@ -35,9 +35,9 @@ gotoxy:
 ; Signature:    void __fastcall__ gotoxy (unsigned char x, unsigned char y)
 ; Overrides:    cc65's gotoxy()
 ; Input:        C stack       unsigned char
-;                                       x: the column, 0-79
+;                                       column, 0-79
 ;               A             unsigned char
-;                                       y: the row, 0-23
+;                                       row, 0-23
 ; Changes:      A, X, Y and flags; the cursor. Pops x.
 
 _gotoxy:
@@ -56,7 +56,7 @@ _gotoxy:
 ; Signature:    void __fastcall__ gotox (unsigned char x)
 ; Overrides:    cc65's gotox()
 ; Input:        A             unsigned char
-;                                       x: the column, 0-79
+;                                       column, 0-79
 ; Changes:      A, X and flags; the cursor.
 
 _gotox:

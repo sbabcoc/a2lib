@@ -130,7 +130,7 @@ a2_savehooks:
 ; in CSW directly. For details, see section 3.5 of DESIGN.
 ;
 ; Prepare:      a2_savehooks
-; Input:        AX            void (*)()
+; Input:        X:A           void (*)()
 ;                                       the routine
 ; Output:       hooked        word      the routine
 ;               viados        byte      $80 if it became DOS's true output

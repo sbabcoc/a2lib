@@ -63,7 +63,7 @@ fm_fdbegin:
 ; Changes:      A, X and Y.
 
 fm_begin:
-        jsr     FM_LOCATE       ; Y = low, A = high
+        jsr     FM_LOCATE       ; A:Y
         sty     fm_parmlist
         sta     fm_parmlist+1
 
@@ -173,7 +173,7 @@ fm_call:
 ; POSITION an open file to a byte offset from its start (record 0).
 ;
 ; Prepare:      fm_begin
-; Input:        AX            unsigned  the byte offset
+; Input:        X:A           unsigned  the byte offset
 ;               fm_parmlist   byte*     the parameter list
 ; Output:       C             flag      as fm_call
 ;               A             byte      as fm_call

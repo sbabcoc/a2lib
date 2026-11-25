@@ -31,8 +31,8 @@ sectors_high    = tmp2          ; sectors, then in blocks
 ; Signature:    struct dirent* __fastcall__ _readdir_a2lib (DIR* dir)
 ; Overrides:    readdir(), as a2lib's dirent.h defines it
 ; Prepare:      opendir()
-; Input:        AX            DIR*      dir: the directory
-; Output:       AX            struct dirent*
+; Input:        X:A           DIR*      directory object pointer
+; Output:       X:A           struct dirent*
 ;                                       the entry, inside dir and valid until
 ;                                       the next call; NULL at the end, with
 ;                                       errno unchanged, or after an error

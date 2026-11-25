@@ -535,8 +535,7 @@ gauge_hide:
 ;
 ; Signature:    void __fastcall__ s70_pan (unsigned char left)
 ; Input:        A             unsigned char
-;                                       left: the leftmost column, at most 80
-;                                       - S80_VIEW
+;                                       leftmost column, at most 80 - S80_VIEW
 ; Output:       s80_left      byte      left
 ;               s80_follow    byte      0
 ; Changes:      A, X, Y and flags; the display and the gauge.
@@ -574,7 +573,7 @@ gauge_hide:
 ; The leftmost visible column. Named S80_API + "left".
 ;
 ; Signature:    unsigned char s70_left ()
-; Output:       AX            unsigned char
+; Output:       X:A           unsigned char
 ;                                       s80_left, or 0 while the VideoTerm is
 ;                                       in use
 ; Changes:      Flags. Y is unchanged.
@@ -591,7 +590,7 @@ gauge_hide:
 ; Is the 80 x 24 model in use? Named S80_API + "active".
 ;
 ; Signature:    unsigned char s70_active ()
-; Output:       AX            unsigned char
+; Output:       X:A           unsigned char
 ;                                       1, or 0 while the VideoTerm is in use
 ; Changes:      Flags. Y is unchanged.
 

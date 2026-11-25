@@ -22,7 +22,7 @@
 ; Signature:    unsigned char kbhit ()
 ; Overrides:    cc65's kbhit()
 ; Input:        a2_tickon     byte      bit 7: the timer is in use
-; Output:       AX            unsigned char
+; Output:       X:A           unsigned char
 ;                                       1 if a key is waiting, else 0
 ; Changes:      Flags. When the timer is in use: Y, RNDL and RNDH, and what
 ;               a2_tick changes.

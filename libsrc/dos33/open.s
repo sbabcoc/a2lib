@@ -41,17 +41,16 @@ REF_FLAG = $40
 ;
 ; Signature:    int open (const char* name, int flags, ...)
 ; Overrides:    cc65's open()
-; Input:        C stack       char*     name: the path
-;               C stack       int       flags: O_RDONLY, O_WRONLY or O_RDWR,
-;                                       with O_CREAT, O_EXCL, O_TRUNC and
-;                                       O_APPEND
-;               C stack       ...       ignored (a mode)
+; Input:        C stack       char*     path name
+;               C stack       int       O_RDONLY, O_WRONLY or O_RDWR, with
+;                                       O_CREAT, O_EXCL, O_TRUNC and O_APPEND
+;               C stack       ...       mode, ignored
 ;               Y             byte      the number of argument bytes on the C
 ;                                       stack (variadic)
 ;               __filetype    byte      O_CREAT: the type for a new file
 ;                                       (FMT_*)
 ;               __auxtype     unsigned  O_CREAT: a new B file's load address
-; Output:       AX            int       the file descriptor, or -1
+; Output:       X:A           int       the file descriptor, or -1
 ;               errno         int       if -1: EMFILE (no fdtab slot), ENOMEM
 ;                                       (no free DOS buffer), EINVAL (a bad
 ;                                       path, or a _filetype that can't be

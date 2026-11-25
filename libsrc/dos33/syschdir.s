@@ -21,8 +21,8 @@
 ;
 ; Signature:    unsigned char __fastcall__ _syschdir (const char* name)
 ; Overrides:    cc65's _syschdir()
-; Input:        AX            char*     name: "/S/D", "D" or ".", each
-;                                       optionally ending in "/"
+; Input:        X:A           char*     "/S/D", "D" or ".", each optionally
+;                                       ending in "/"
 ; Output:       A             byte      0, or DOSERR_SYNTAX (EINVAL) for any
 ;                                       other path
 ; Changes:      Y and ptr1 (fm_location). On success: DOS_SLOT and DOS_DRIVE,

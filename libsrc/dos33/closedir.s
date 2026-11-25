@@ -13,8 +13,8 @@
 ; Signature:    int __fastcall__ _closedir_a2lib (DIR* dir)
 ; Overrides:    closedir(), as a2lib's dirent.h defines it
 ; Prepare:      opendir()
-; Input:        AX            DIR*      dir: the directory
-; Output:       AX            int       0
+; Input:        X:A           DIR*      directory object pointer
+; Output:       X:A           int       0
 ; Changes:      Y and what free changes. dir is freed.
 
 __closedir_a2lib:

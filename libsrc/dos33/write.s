@@ -31,10 +31,10 @@
 ; Overrides:    cc65's write()
 ; Prepare:      open(), for a file; the console's descriptors (0-2) are open
 ;               from the start
-; Input:        C stack       int       fd: open for writing
-;               C stack       void*     buf: the bytes
-;               AX            unsigned  count: how many
-; Output:       AX            int       the number of bytes written, or -1
+; Input:        C stack       int       file descriptor, open for writing
+;               C stack       void*     the bytes
+;               X:A           unsigned  byte count
+; Output:       X:A           int       the number of bytes written, or -1
 ;               errno         int       if -1: EBADF, EINVAL (fd not open for
 ;                                       writing), or as rwfile sets it
 ;               __oserror     byte      0, or as rwfile sets it

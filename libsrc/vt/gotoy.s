@@ -19,7 +19,7 @@
 ; Signature:    void __fastcall__ gotoy (unsigned char y)
 ; Overrides:    cc65's gotoy()
 ; Input:        A             unsigned char
-;                                       y: the row, from the top of the window
+;                                       row, from the top of the window
 ; Changes:      A and flags; the cursor. On the card: X. Otherwise: CV and
 ;               BASL/BASH (VTABZ).
 

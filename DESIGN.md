@@ -104,7 +104,7 @@ follows them, so the code stays as readable as they left it.
   details, see section 5.9 of DESIGN." File headers name no other source
   file and repeat no C signature; the generated font names its generator,
   where it is edited.
-- **Routine headers (10.40, 10.49).** Every exported routine, and each
+- **Routine headers (10.40, 10.49, 10.50).** Every exported routine, and each
   internal one worth a name, has a header after a 78-column rule: what it
   does, without its name (the label follows), then `Signature:` (the C
   declaration, for a function C calls; no `void` in an empty argument
@@ -122,11 +122,22 @@ follows them, so the code stays as readable as they left it.
   came from. What a C programmer already knows is left out. Types are C's
   where C sees the value (`int`, `char*`, `unsigned`), else `byte`,
   `word`, `flag` or `T*`. A module's storage is given by its name; another
-  module's cells as `ptr1 (fm_name)`. The stack is mentioned only where
-  its use is out of the ordinary, such as exec()'s reset. Vendored modules
-  get headers too, as comments that leave stock's code as it is. The
-  guards and selectors define no routine, so their file headers are all
-  they have.
+  module's cells as `ptr1 (fm_name)`. Registers that hold one 16-bit or
+  32-bit value are named together, high byte first:
+
+  | Notation | Meaning |
+  |---|---|
+  | `X:A` | X high, A low: cc65's order, for every C function and a2lib interface |
+  | `A:X` | A high, X low: cc65's `reset` only |
+  | `A:Y` | A high, Y low: DOS 3.3's `LOCATE` calls, and RWTS's IOB |
+  | `sreg:X:A` | a `long`: `sreg` the high word, X:A the low |
+
+  The meaning column says what the value is in words, such as "directory
+  object pointer", without repeating the C parameter's name. The stack
+  is mentioned only where its use is out of the ordinary, such as
+  exec()'s reset. Vendored modules get headers too, as comments that
+  leave stock's code as it is. The guards and selectors define no
+  routine, so their file headers are all they have.
 - **Labels.** An anonymous label is only for a jump to the nearest one
   (`:+`, `:-`). A jump past another label (`:++`, `:--`), including the
   outer loop of a nested pair, gets a named label (`@row`, `@col`).
@@ -3477,6 +3488,18 @@ IDENTICAL, every module and program.
 Comments only.
 
 Verified: `tools/samebytes.sh` against `5e31003` reports the tree
+IDENTICAL, every module and program.
+
+### 10.50 Register pairs and meanings in headers
+
+| File | Change |
+|---|---|
+| 43 modules in `libsrc/` | Register pairs as `X:A`, `A:X`, `A:Y` and `sreg:X:A`, one line each, in place of `AX`, `sreg:AX`, `AX, sreg` and pairs split over two lines; meanings in words, without the C parameter's name; the comments on the two `LOCATE` calls the same way |
+| `DESIGN.md` | The key to the notation, in the header convention |
+
+Comments only.
+
+Verified: `tools/samebytes.sh` against `cab6e0a` reports the tree
 IDENTICAL, every module and program.
 
 ## 11. Sources

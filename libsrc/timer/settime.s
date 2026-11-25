@@ -22,13 +22,13 @@ tp              = ptr1          ; struct timespec*: the caller's time
 ; Signature:    int __fastcall__ clock_settime (clockid_t clk_id, const struct
 ;               timespec* tp)
 ; Overrides:    cc65's clock_settime()
-; Input:        C stack       clockid_t clk_id: ignored
-;               AX            struct timespec*
-;                                       tp: the time
+; Input:        C stack       clockid_t ignored
+;               X:A           struct timespec*
+;                                       the time
 ; Output:       clk_offset    long      tv_sec - t_sec
 ;               clk_setat     long      t_sec, now
 ;               clk_isset     byte      $80
-;               AX            int       0
+;               X:A           int       0
 ; Changes:      Y; tp. Pops clk_id.
 
 _clock_settime:
@@ -60,7 +60,7 @@ _clock_settime:
 ; Signature:    unsigned long a2_clock_age ()
 ; Input:        clk_isset     byte      bit 7: the clock was set
 ;               clk_setat     long      t_sec when it was
-; Output:       AX, sreg      long      t_sec - clk_setat, or A2_CLOCK_UNSET
+; Output:       sreg:X:A      long      t_sec - clk_setat, or A2_CLOCK_UNSET
 ;                                       ($FFFFFFFF) if the clock was never set
 ; Changes:      Flags. Y is unchanged.
 

@@ -28,10 +28,10 @@
 ;               char c)
 ; Overrides:    cc65's cputcxy()
 ; Input:        C stack       unsigned char
-;                                       x
+;                                       column
 ;               C stack       unsigned char
-;                                       y
-;               A             char      c
+;                                       row
+;               A             char      character
 ; Changes:      As gotoxy and _cputc. Pops x and y.
 
 _cputcxy:
@@ -45,7 +45,7 @@ _cputcxy:
 ;
 ; Signature:    void __fastcall__ cputc (char c)
 ; Overrides:    cc65's cputc()
-; Input:        A             char      c
+; Input:        A             char      character
 ; Changes:      A, X, Y and flags; the screen and the cursor; in the model,
 ;               BASL and BAS2L. Not ptr1, tmp1 or tmp2.
 
@@ -120,7 +120,7 @@ putchardirect:
 ;-----------------------------------------------------------------------------
 ; _cputc on the VideoTerm.
 ;
-; Input:        A             char      c
+; Input:        A             char      character
 ; Changes:      A and flags; the screen and the cursor.
 
 vtcputc:

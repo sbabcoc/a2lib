@@ -29,7 +29,7 @@
 ; Signature:    char cgetc ()
 ; Overrides:    cc65's cgetc()
 ; Input:        cursor        byte      nonzero: show the cursor
-; Output:       AX            char      the key, with the high bit set if Open
+; Output:       X:A           char      the key, with the high bit set if Open
 ;                                       Apple is down on a IIe or later
 ; Changes:      Y; RNDL and RNDH; KBDSTRB, cleared; what a2_tick changes. On
 ;               the 40-column screen: tmp3 (putchardirect).

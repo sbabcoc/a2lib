@@ -18,7 +18,7 @@
 ; Signature:    void __fastcall__ _rewinddir_a2lib (DIR* dir)
 ; Overrides:    rewinddir(), as a2lib's dirent.h defines it
 ; Prepare:      opendir()
-; Input:        AX            DIR*      dir: the directory
+; Input:        X:A           DIR*      directory object pointer
 ; Changes:      A, Y and dirptr. X is unchanged.
 
 __rewinddir_a2lib:
@@ -30,7 +30,8 @@ __rewinddir_a2lib:
 ; readdir reads. Used by opendir too.
 ;
 ; Prepare:      dir_at
-; Input:        dirptr        DIR*      the directory, FIRSTT and FIRSTS set
+; Input:        dirptr        DIR*      directory object pointer, FIRSTT and
+;                                       FIRSTS set
 ; Changes:      A and Y. X is unchanged.
 
 rewind_dir:

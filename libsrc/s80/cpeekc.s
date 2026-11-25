@@ -19,7 +19,7 @@
 ;
 ; Signature:    char cpeekc ()
 ; Overrides:    cc65's cpeekc()
-; Output:       AX            char      the character
+; Output:       X:A           char      the character
 ; Changes:      Y and flags; BAS2L. On the VideoTerm: the card's VRAM page and
 ;               $C800 space.
 
@@ -42,7 +42,7 @@ _cpeekc:
 ; cpeekc on the VideoTerm, as the VideoTerm library's: the cursor line's VRAM
 ; address plus the column, modulo 2048, through the $CC00-$CDFF window.
 ;
-; Output:       AX            char      the character, bit 7 clear
+; Output:       X:A           char      the character, bit 7 clear
 ; Changes:      Y and flags; the card's VRAM page and $C800 space.
 
 vt:     ldy     VT_CHORZ

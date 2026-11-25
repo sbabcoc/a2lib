@@ -330,7 +330,7 @@ dn:     inx
 ;
 ; Signature:    unsigned long a2_millis ()
 ; Input:        t_ms          long      milliseconds since startup
-; Output:       AX, sreg      long      t_ms
+; Output:       sreg:X:A      long      t_ms
 ; Changes:      Flags. Y is unchanged.
 
 _a2_millis:
@@ -364,13 +364,13 @@ _a2_idle:
 ;
 ; Signature:    unsigned char __fastcall__ a2_timer_start (unsigned ms, void
 ;               (*fn) (), unsigned char periodic)
-; Input:        C stack       unsigned  ms: the interval in milliseconds
+; Input:        C stack       unsigned  interval in milliseconds
 ;               C stack       void (*)()
-;                                       fn: the callback
+;                                       callback
 ;               A             unsigned char
-;                                       periodic: nonzero to restart it each
-;                                       time it expires
-; Output:       AX            unsigned char
+;                                       nonzero to restart it each time it
+;                                       expires
+; Output:       X:A           unsigned char
 ;                                       the handle (the slot), or
 ;                                       A2_TIMER_NONE ($FF) if no slot is free
 ; Changes:      Y; tmr_ticks, tmr_fn, tmr_per, ms, prod, mult and rem. Pops ms
@@ -527,7 +527,7 @@ a2_timer_restart:
 ; Signature:    void __fastcall__ a2_timer_stop (unsigned char handle)
 ; Prepare:      a2_timer_start()
 ; Input:        A             unsigned char
-;                                       handle
+;                                       timer handle
 ; Changes:      A, X and flags; the slot, and nact if it was counting.
 
 _a2_timer_stop:

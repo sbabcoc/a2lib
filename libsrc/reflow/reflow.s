@@ -40,9 +40,9 @@ REFLOW_MAX      = 81            ; Widest width; the word buffer holds 80
 ;
 ; Signature:    void __fastcall__ reflow_on (unsigned char width)
 ; Input:        A             unsigned char
-;                                       width: the screen width to wrap for,
-;                                       2-81 (others are clamped); 0 for the
-;                                       visible width (a2_viewport)
+;                                       screen width to wrap for, 2-81 (others
+;                                       are clamped); 0 for the visible width
+;                                       (a2_viewport)
 ; Output:       maxlen        byte      width - 1, the longest line
 ;               col           byte      the cursor's column (wherex), at most
 ;                                       maxlen

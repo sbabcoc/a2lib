@@ -39,11 +39,10 @@ CMDMAX  = 1 + 4 + 1 + NAME_LEN + 6 + 1 ; ^D BRUN sp name ,S7,D2 CR
 ; Signature:    int __fastcall__ exec (const char* progname, const char*
 ;               cmdline)
 ; Overrides:    cc65's exec()
-; Input:        C stack       char*     progname: the program's path, a B or A
-;                                       file
-;               AX            char*     cmdline: its arguments for main (B
-;                                       files), or NULL or ""
-; Output:       AX            int       -1, if it returns
+; Input:        C stack       char*     path of the program, a B or A file
+;               X:A           char*     arguments for its main() (B files), or
+;                                       NULL or ""
+; Output:       X:A           int       -1, if it returns
 ;               errno         int       EINVAL (a bad path, a name with a
 ;                                       comma, or an A file with a cmdline),
 ;                                       ENOENT and OPEN's other errors,

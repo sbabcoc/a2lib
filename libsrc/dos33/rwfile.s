@@ -67,7 +67,7 @@ initrwfile:
 ;               Y             byte      READ_CALL or WRITE_CALL
 ;               buffer        byte*     the caller's buffer
 ;               count         unsigned  the number of bytes
-; Output:       AX            int       the number of bytes transferred (fewer
+; Output:       X:A           int       the number of bytes transferred (fewer
 ;                                       at the end of a file), or -1
 ;               errno         int       if -1: EINVAL (a byte $80-$FF for a T
 ;                                       file; O_APPEND on a raw file), ENOSPC

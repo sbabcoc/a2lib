@@ -37,11 +37,11 @@ offset_high     = ptr2          ; unsigned: the offset's high word
 ; Signature:    off_t __fastcall__ lseek (int fd, off_t offset, int whence)
 ; Overrides:    cc65's lseek()
 ; Prepare:      open()
-; Input:        C stack       int       fd: an open file, not the console
-;               C stack       long      offset: from the position whence names
-;               AX            int       whence: SEEK_CUR (0), SEEK_END (1) or
-;                                       SEEK_SET (2)
-; Output:       sreg:AX       long      the new position, or -1
+; Input:        C stack       int       file descriptor of an open file, not
+;                                       the console
+;               C stack       long      offset from the position whence names
+;               X:A           int       SEEK_CUR, SEEK_END or SEEK_SET
+; Output:       sreg:X:A      long      the new position, or -1
 ;               errno         int       if -1: EBADF, EINVAL (the console, a
 ;                                       bad whence, a position below 0 or
 ;                                       above $FFFF), ESPIPE (past a header
