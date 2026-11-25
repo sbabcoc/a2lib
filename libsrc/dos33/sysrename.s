@@ -127,11 +127,11 @@ __sysrename:
 :       cmp     #DOSERR_NOTFOUND
         bne     fmerr
 
-        ; RENAME: old name at FM_NAME, new name at FM_NEWNAME
+        ; RENAME: old name at FMPARMS::NAME, new name at FMPARMS::NEWNAME
         lda     #<fm_namebuf
         ldx     #>fm_namebuf
         jsr     setname
-        ldy     #FM_NEWNAME
+        ldy     #FMPARMS::NEWNAME
         lda     #<newbuf
         sta     (fm_parmlist),y
         iny
@@ -149,7 +149,7 @@ free:   jsr     fm_freefcb      ; Preserves A
 done:   rts
 
 ;-----------------------------------------------------------------------------
-; Point the parameter list's FM_NAME at a name buffer.
+; Point the parameter list's FMPARMS::NAME at a name buffer.
 ;
 ; Prepare:      fm_begin
 ; Input:        X:A           byte*     the name buffer (NAME_LEN bytes, as
@@ -158,7 +158,7 @@ done:   rts
 ; Changes:      A and Y. X is unchanged.
 
 setname:
-        ldy     #FM_NAME
+        ldy     #FMPARMS::NAME
         sta     (fm_parmlist),y
         iny
         txa

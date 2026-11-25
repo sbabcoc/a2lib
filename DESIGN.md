@@ -1700,7 +1700,7 @@ as stock `exec()` does:
    `EINVAL`, and SYNTAX ERROR for a name with a comma, which DOS's command
    parser would end there (increment 14).
 2. **Exists, and its type:** OPEN without allocating (X ≠ 0, as
-   `fm_isopen` does), take `FM_TYPE` and mask the lock bit (as `open.s`
+   `fm_isopen` does), take `FMPARMS::TYPE` and mask the lock bit (as `open.s`
    does), CLOSE, `fm_freefcb`. OPEN errors are mapped by `fm_maperr`
    (`ENOENT`, `EIO`, …).
 3. **Verb:**
@@ -3534,6 +3534,16 @@ IDENTICAL, every module and program.
 | `libsrc/dos33/dir.inc`, `fm.inc`, `libsrc/timer/timer.inc`, `libsrc/vt/vt.inc`, `libsrc/s80/s80.inc` | Each `.global` on a line of its own with what the symbol is, in titled groups, in place of lists with one comment for all; the order kept, as it decides the order of each object's symbols |
 
 Verified: `tools/samebytes.sh` against `77fd320` reports the tree
+IDENTICAL, every module and program.
+
+### 10.54 The IOB and the parameter list as structs
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/fm.inc` | RWTS's IOB as `.struct IOB`, every field and gap from "Beneath Apple DOS" ch. 6, in place of `IOB_*` offsets; the File Manager's parameter list as `.struct FMPARMS`, its bytes $02-$09 a union of the OPEN, RENAME and READ/WRITE/POSITION layouts, in place of `FM_*` offsets; assertions of their sizes (17 and 18 bytes). OPEN's record length is `RECLEN`, apart from READ's and WRITE's record number, `RECORD`, which shared `FM_RECORD`. The values (`IOB_TABLE`, `IOB_READ`, `RWTS_*`, `FMC_*`, `FMS_*`) stay constants |
+| `libsrc/dos33/fm.s`, `fmname.s`, `rwts.s`, `open.s`, `exec.s`, `sysrename.s` | The struct fields in place of the offsets |
+
+Verified: `tools/samebytes.sh` against `c7f6911` reports the tree
 IDENTICAL, every module and program.
 
 ## 11. Sources

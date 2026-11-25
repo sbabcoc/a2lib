@@ -58,8 +58,9 @@ fm_fdbegin:
 ;
 ; Prepare:      fm_getfcb or fm_fdfcb
 ; Input:        ctlblock      FCB*      the control block
-; Output:       fm_parmlist   byte*     the parameter list, with FM_WORK,
-;                                       FM_TSL and FM_DATA set
+; Output:       fm_parmlist   byte*     the parameter list, with
+;                                       FMPARMS::WORK, FMPARMS::TSL and
+;                                       FMPARMS::DATA set
 ; Changes:      A, X and Y.
 
 fm_begin:
@@ -67,11 +68,11 @@ fm_begin:
         sty     fm_parmlist
         sta     fm_parmlist+1
 
-        .assert FM_TSL = FM_WORK + 2, error
-        .assert FM_DATA = FM_TSL + 2, error
+        .assert FMPARMS::TSL = FMPARMS::WORK + 2, error
+        .assert FMPARMS::DATA = FMPARMS::TSL + 2, error
         .assert FCB_TSL = $100 && FCB_DATA = $200, error
         ldx     ctlblock+1
-        ldy     #FM_WORK
+        ldy     #FMPARMS::WORK
 :       lda     ctlblock        ; Each buffer a page below the last
         sta     (fm_parmlist),y
         iny
@@ -79,7 +80,7 @@ fm_begin:
         sta     (fm_parmlist),y
         iny
         dex
-        cpy     #FM_DATA + 2
+        cpy     #FMPARMS::DATA + 2
         bne     :-
         rts
 
@@ -109,7 +110,7 @@ fm_simple:
 ;               A             byte      as fm_call
 ; Changes:      Y.
 
-fm_op:  ldy     #FM_CALL
+fm_op:  ldy     #FMPARMS::CALL
         sta     (fm_parmlist),y
         jmp     fm_call         ; fm_call is in another segment
 
@@ -124,15 +125,15 @@ fm_op:  ldy     #FM_CALL
 ;               fm_parmlist   byte*     the parameter list
 ; Output:       C             flag      as fm_call
 ;               A             byte      as fm_call
-;               fm_parmlist   byte*     if C clear: FM_TYPE is the file's
-;                                       type, with its lock bit
+;               fm_parmlist   byte*     if C clear: FMPARMS::TYPE is the
+;                                       file's type, with its lock bit
 ; Changes:      Y.
 
 fm_open:
-        ldy     #FM_TYPE
+        ldy     #FMPARMS::TYPE
         sta     (fm_parmlist),y
         lda     #$00
-        ldy     #FM_RECORD
+        ldy     #FMPARMS::RECLEN
         sta     (fm_parmlist),y
         iny
         sta     (fm_parmlist),y
@@ -162,7 +163,7 @@ fm_call:
         bit     LC_ROM_RO
         jsr     FM_ENTRY
         bit     LC_BANK2_RO
-        ldy     #FM_RC
+        ldy     #FMPARMS::RC
         lda     (fm_parmlist),y
         cmp     #$01            ; C = (return code <> 0)
         rts
@@ -180,13 +181,13 @@ fm_call:
 ; Changes:      X and Y.
 
 fm_position:
-        ldy     #FM_OFFSET
+        ldy     #FMPARMS::OFFSET
         sta     (fm_parmlist),y
         iny
         txa
         sta     (fm_parmlist),y
         lda     #$00
-        ldy     #FM_RECORD
+        ldy     #FMPARMS::RECORD
         sta     (fm_parmlist),y
         iny
         sta     (fm_parmlist),y
@@ -205,7 +206,7 @@ fm_position:
 ; Changes:      X and Y.
 
 fm_readbyte:
-        ldy     #FM_CALL
+        ldy     #FMPARMS::CALL
         lda     #FMC_READ
         sta     (fm_parmlist),y
         iny
@@ -214,7 +215,7 @@ fm_readbyte:
         ldx     #$01
         jsr     fm_call
         bcs     :+
-        ldy     #FM_BYTE
+        ldy     #FMPARMS::BYTE
         lda     (fm_parmlist),y
         clc
 :       rts
@@ -230,9 +231,9 @@ fm_readbyte:
 ; Changes:      X and Y.
 
 fm_writebyte:
-        ldy     #FM_BYTE
+        ldy     #FMPARMS::BYTE
         sta     (fm_parmlist),y
-        ldy     #FM_CALL
+        ldy     #FMPARMS::CALL
         lda     #FMC_WRITE
         sta     (fm_parmlist),y
         iny
@@ -257,7 +258,7 @@ fm_writebyte:
 
 fm_rangeio:
         sta     call_type
-        ldy     #FM_CALL
+        ldy     #FMPARMS::CALL
         sta     (fm_parmlist),y
         iny
         lda     #FMS_RANGE
@@ -273,14 +274,14 @@ fm_rangeio:
         sbc     #FM_WRITE_ADJUST
         bcs     :+
         dex
-:       ldy     #FM_RANGE
+:       ldy     #FMPARMS::RANGE
         sta     (fm_parmlist),y
         iny
         txa
         sta     (fm_parmlist),y
 
         ; Range address
-        ldy     #FM_ADDR
+        ldy     #FMPARMS::ADDR
         lda     fm_rio_addr
         sta     (fm_parmlist),y
         iny

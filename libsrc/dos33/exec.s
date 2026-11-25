@@ -77,7 +77,7 @@ _exec:
         ldx     #$01            ; Don't allocate
         jsr     fm_open
         bcs     fail
-        ldy     #FM_TYPE
+        ldy     #FMPARMS::TYPE
         lda     (fm_parmlist),y
         and     #FMT_TYPE_MASK
         sta     type

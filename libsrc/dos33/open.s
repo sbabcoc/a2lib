@@ -161,7 +161,7 @@ exists: lda     flags
         jmp     errclose
 
         ; Set up the control block from the type of the file opened
-opened: ldy     #FM_TYPE
+opened: ldy     #FMPARMS::TYPE
         lda     (fm_parmlist),y
         ldy     #FCB::TYPE      ; Keep the lock bit for stat
         sta     (ctlblock),y

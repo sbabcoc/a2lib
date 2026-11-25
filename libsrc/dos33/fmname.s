@@ -67,8 +67,9 @@ fm_location:
 ;               fm_slot       byte      the slot (1-7), as fm_location
 ;               fm_drive      byte      the drive (1-2), as fm_location
 ;               fm_volume     byte      0 (any volume)
-;               fm_parmlist   byte*     if C clear: FM_NAME = fm_namebuf;
-;                                       FM_VOLUME, FM_DRIVE and FM_SLOT from
+;               fm_parmlist   byte*     if C clear: FMPARMS::NAME =
+;                                       fm_namebuf; FMPARMS::VOLUME,
+;                                       FMPARMS::DRIVE and FMPARMS::SLOT from
 ;                                       the above
 ; Changes:      X, Y and path. If C is set, fm_namebuf, fm_slot and fm_drive
 ;               may be changed.
@@ -112,16 +113,16 @@ bad:    lda     #DOSERR_SYNTAX  ; -> EINVAL
         rts
 
         ; Set the parameter list fields
-store:  ldy     #FM_NAME
+store:  ldy     #FMPARMS::NAME
         lda     #<fm_namebuf
         sta     (fm_parmlist),y
         iny
         lda     #>fm_namebuf
         sta     (fm_parmlist),y
 
-        .assert FM_DRIVE = FM_VOLUME + 1, error
-        .assert FM_SLOT = FM_DRIVE + 1, error
-        ldy     #FM_VOLUME
+        .assert FMPARMS::DRIVE = FMPARMS::VOLUME + 1, error
+        .assert FMPARMS::SLOT = FMPARMS::DRIVE + 1, error
+        ldy     #FMPARMS::VOLUME
         lda     fm_volume
         sta     (fm_parmlist),y
         iny

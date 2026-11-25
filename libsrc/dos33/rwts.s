@@ -35,20 +35,20 @@ rwts_read:
         sty     iob
         sta     iob+1
 
-        ldy     #IOB_TYPE
+        ldy     #IOB::TYPE
         lda     #IOB_TABLE
         sta     (iob),y
-        iny                     ; IOB_SLOT
+        iny                     ; IOB::SLOT
         lda     rwts_slot
         asl
         asl
         asl
         asl
         sta     (iob),y
-        .assert IOB_DRIVE = IOB_SLOT + 1, error
-        .assert IOB_VOLUME = IOB_DRIVE + 1, error
-        .assert IOB_TRACK = IOB_VOLUME + 1, error
-        .assert IOB_SECTOR = IOB_TRACK + 1, error
+        .assert IOB::DRIVE = IOB::SLOT + 1, error
+        .assert IOB::VOLUME = IOB::DRIVE + 1, error
+        .assert IOB::TRACK = IOB::VOLUME + 1, error
+        .assert IOB::SECTOR = IOB::TRACK + 1, error
         iny
         lda     rwts_drive
         sta     (iob),y
@@ -61,16 +61,16 @@ rwts_read:
         iny
         lda     rwts_sector
         sta     (iob),y
-        ldy     #IOB_BUF
+        ldy     #IOB::BUF
         lda     rwts_buf
         sta     (iob),y
         iny
         lda     rwts_buf+1
         sta     (iob),y
-        ldy     #IOB_COUNT
+        ldy     #IOB::COUNT
         lda     #$00            ; 256 bytes
         sta     (iob),y
-        ldy     #IOB_CMD
+        ldy     #IOB::CMD
         lda     #IOB_READ
         sta     (iob),y
 
@@ -93,7 +93,7 @@ rwts_read:
 call:   bit     LC_ROM_RO
         jsr     RWTS_ENTRY
         bit     LC_BANK2_RO
-        ldy     #IOB_RC
+        ldy     #IOB::RC
         lda     (iob),y
         cmp     #$01            ; C = (return code <> 0)
         rts

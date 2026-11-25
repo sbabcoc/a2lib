@@ -19,7 +19,7 @@
 ; ------------------------------------------------------------------------
 ; Page 3 vectors
 
-FM_LOCATE       := $03DC        ; Returns parameter list address in Y (lo), A (hi)
+FM_LOCATE       := $03DC        ; Returns the parameter list's address in A:Y
 FM_ENTRY        := $03D6        ; File Manager entry; X=0 allocates on OPEN
 
 ; Last-used slot and drive kept by 48K DOS 3.3 ("Beneath Apple DOS" ch. 8,
@@ -33,7 +33,7 @@ DOS_SLOT        := $AA6A        ; 2 bytes
 DOS_BUFS        := $9D00        ; The first buffer's name field
 
 ; RWTS ("Beneath Apple DOS" ch. 6): JSR $3E3 returns DOS's IOB address in
-; Y (lo), A (hi); JSR $3D9 calls RWTS with the IOB address in Y and A.
+; A:Y; JSR $3D9 calls RWTS with the IOB address in A:Y.
 
 RWTS_LOCATE     := $03E3
 RWTS_ENTRY      := $03D9
@@ -41,42 +41,72 @@ RWTS_ENTRY      := $03D9
 NSLOTS          = 7             ; Slots 1-7
 NDRIVES         = 2             ; Drives 1-2
 
-IOB_TYPE        = $00           ; Table type, must be IOB_TABLE
-IOB_SLOT        = $01           ; Slot * 16
-IOB_DRIVE       = $02           ; Drive (1 or 2)
-IOB_VOLUME      = $03           ; Volume expected (0 = any)
-IOB_TRACK       = $04
-IOB_SECTOR      = $05
-IOB_BUF         = $08           ; Address of 256-byte buffer (2)
-IOB_COUNT       = $0B           ; Byte count ($00 = 256)
-IOB_CMD         = $0C           ; Command ($01 = READ)
-IOB_RC          = $0D           ; Return code
+; RWTS's input/output control block ("Beneath Apple DOS" ch. 6, "IOB")
+.struct IOB
+        TYPE      .byte         ; Table type, must be IOB_TABLE
+        SLOT      .byte         ; Slot * 16
+        DRIVE     .byte         ; Drive (1 or 2)
+        VOLUME    .byte         ; Volume expected (0 = any)
+        TRACK     .byte
+        SECTOR    .byte
+        DCT       .addr         ; Device characteristics table
+        BUF       .addr         ; 256-byte buffer
+                  .res    1
+        COUNT     .byte         ; Byte count ($00 = 256)
+        CMD       .byte         ; Command
+        RC        .byte         ; Return code
+        LASTVOL   .byte         ; Volume of the last access
+        LASTSLOT  .byte         ; Slot * 16 of the last access
+        LASTDRIVE .byte         ; Drive of the last access
+.endstruct
 
-IOB_TABLE       = $01           ; IOB_TYPE value
-IOB_READ        = $01           ; IOB_CMD value
-RWTS_WPROT      = $10           ; IOB_RC: write protected
-RWTS_VOLUME     = $20           ; IOB_RC: volume mismatch (others: drive or read error)
+.assert .sizeof(IOB) = $11, error, "The IOB is 17 bytes"
+
+IOB_TABLE       = $01           ; IOB::TYPE value
+IOB_READ        = $01           ; IOB::CMD value
+RWTS_WPROT      = $10           ; IOB::RC: write protected
+RWTS_VOLUME     = $20           ; IOB::RC: volume mismatch (others: drive or
+                                ; read error)
 
 ; ------------------------------------------------------------------------
-; Parameter list offsets
+; The File Manager's parameter list ("Beneath Apple DOS" ch. 6, "File
+; Manager Parameter List"). Bytes $02-$09 depend on the call.
 
-FM_CALL         = $00           ; Call type
-FM_SUB          = $01           ; Sub-call type for READ / WRITE
-FM_RECORD       = $02           ; OPEN: record length; RW: record number (2)
-FM_NEWNAME      = $02           ; RENAME: address of new name (2)
-FM_VOLUME       = $04           ; OPEN: volume number (0 = any)
-FM_OFFSET       = $04           ; RW: byte offset (2)
-FM_DRIVE        = $05           ; OPEN: drive (1-2)
-FM_SLOT         = $06           ; OPEN: slot (1-7)
-FM_RANGE        = $06           ; RW: range length (2)
-FM_TYPE         = $07           ; OPEN: file type in (new files) and out
-FM_NAME         = $08           ; OPEN: address of 30-byte name (2)
-FM_ADDR         = $08           ; RW: range address (2)
-FM_BYTE         = $08           ; RW one byte: byte read or to write
-FM_RC           = $0A           ; Return code
-FM_WORK         = $0C           ; Address of 45-byte work area (2)
-FM_TSL          = $0E           ; Address of 256-byte T/S list buffer (2)
-FM_DATA         = $10           ; Address of 256-byte data buffer (2)
+.struct FMPARMS
+        CALL    .byte           ; Call type (FMC_*)
+        SUB     .byte           ; READ, WRITE: sub-call type (FMS_*)
+        .union
+          .struct               ; OPEN, DELETE, LOCK, UNLOCK, VERIFY
+            RECLEN  .word       ; Fixed record length, or 0
+            VOLUME  .byte       ; Volume number (0 = any)
+            DRIVE   .byte       ; Drive (1-2)
+            SLOT    .byte       ; Slot (1-7)
+            TYPE    .byte       ; File type: in for a new file, and out
+            NAME    .addr       ; 30-byte name
+          .endstruct
+          .struct               ; RENAME: as OPEN, but
+            NEWNAME .addr       ; New 30-byte name
+          .endstruct
+          .struct               ; READ, WRITE, POSITION
+            RECORD  .word       ; Record number
+            OFFSET  .word       ; Byte offset
+            RANGE   .word       ; Range length
+            .union
+              ADDR  .addr       ; Range address
+              BYTE  .byte       ; One byte: read, or to write
+            .endunion
+          .endstruct
+        .endunion
+        RC      .byte           ; Return code
+                .res    1
+        WORK    .addr           ; 45-byte work area
+        TSL     .addr           ; 256-byte T/S list buffer
+        DATA    .addr           ; 256-byte data buffer
+.endstruct
+
+.assert .sizeof(FMPARMS) = $12, error, "The parameter list is 18 bytes"
+.assert FMPARMS::NAME = $08, error, "FMPARMS::NAME is at $08"
+.assert FMPARMS::RC = $0A, error, "FMPARMS::RC is at $0A"
 
 ; Call types
 FMC_OPEN        = $01
