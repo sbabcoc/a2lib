@@ -175,15 +175,44 @@ FCBS_DIRTY      = $40           ; Header file: length changed, rewrite on close
 FCB_TEXT        = $80           ; FCB::KIND value for T files
 
 ; ------------------------------------------------------------------------
-; Shared routines
+; Shared routines and storage
 
-        .global         fm_fdfcb, fm_fdbegin, fm_begin, fm_call, fm_simple, fm_op, fm_open, fm_maperr
-        .global         fm_position, fm_readbyte, fm_writebyte
-        .global         fm_rangeio, fm_rio_addr, fm_rio_count
-        .global         fm_incpos
-        .global         fm_name, fm_location, fm_namebuf
-        .global         fm_slot, fm_drive, fm_volume
-        .global         rwts_read, rwts_maperr
-        .global         rwts_slot, rwts_drive, rwts_volume
-        .global         rwts_track, rwts_sector, rwts_buf
-        .global         fm_getfcb, fm_freefcb, fm_isopen
+; File Manager calls
+        .global         fm_fdfcb         ; A descriptor's control block
+        .global         fm_fdbegin       ; fm_fdfcb, then fm_begin
+        .global         fm_begin         ; Find the parameter list
+        .global         fm_call          ; Call the File Manager
+        .global         fm_simple        ; A call with no sub-call
+        .global         fm_op            ; A call and sub-call
+        .global         fm_open          ; OPEN the named file
+        .global         fm_maperr        ; A return code as __oserror
+        .global         fm_position      ; POSITION
+        .global         fm_readbyte      ; READ one byte
+        .global         fm_writebyte     ; WRITE one byte
+        .global         fm_rangeio       ; READ or WRITE a range
+        .global         fm_rio_addr      ; fm_rangeio's buffer
+        .global         fm_rio_count     ; fm_rangeio's byte count
+        .global         fm_incpos        ; Advance the position by one
+
+; Path names
+        .global         fm_name          ; Parse a path into fm_namebuf
+        .global         fm_location      ; Parse a slot and drive
+        .global         fm_namebuf       ; The last name parsed
+        .global         fm_slot          ; The last path's slot
+        .global         fm_drive         ; The last path's drive
+        .global         fm_volume        ; The last path's volume (0)
+
+; RWTS
+        .global         rwts_read        ; Read a sector
+        .global         rwts_maperr      ; A return code as __oserror
+        .global         rwts_slot        ; The slot
+        .global         rwts_drive       ; The drive
+        .global         rwts_volume      ; The volume, 0 for any
+        .global         rwts_track       ; The track
+        .global         rwts_sector      ; The sector
+        .global         rwts_buf         ; The 256-byte buffer
+
+; Control blocks
+        .global         fm_getfcb        ; Take a free DOS buffer
+        .global         fm_freefcb       ; Free a DOS buffer
+        .global         fm_isopen        ; Is the named file open?

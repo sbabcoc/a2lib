@@ -40,5 +40,14 @@ CSWL            := $36          ; Output hook
 DOS_CSW         := $AA53        ; 48K DOS 3.3: saved true output hook
 DOS_VINT        := $9D04        ; 48K DOS 3.3: address of its video intercept
 
-        .global         vt_active, vt_write, vt_goto, vt_r10, vt_screen
-        .global         a2_savehooks, a2_hookout, a2_unhookout
+; The card
+        .global         vt_active        ; Bit 7: the card is in use
+        .global         vt_write         ; Write a character
+        .global         vt_goto          ; Move the cursor
+        .global         vt_r10           ; Set the cursor's mode
+        .global         vt_screen        ; A screen code as the card shows it
+
+; Output hooks, for the VideoTerm and Soft-70
+        .global         a2_savehooks     ; Keep CSW and DOS's true hook
+        .global         a2_hookout       ; Install an output routine
+        .global         a2_unhookout     ; Put the kept hooks back

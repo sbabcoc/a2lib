@@ -3527,6 +3527,15 @@ IDENTICAL, every module and program.
 Verified: `tools/samebytes.sh` against `572f97d` reports the tree
 IDENTICAL, every module and program.
 
+### 10.53 Shared symbols one to a line
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/dir.inc`, `fm.inc`, `libsrc/timer/timer.inc`, `libsrc/vt/vt.inc`, `libsrc/s80/s80.inc` | Each `.global` on a line of its own with what the symbol is, in titled groups, in place of lists with one comment for all; the order kept, as it decides the order of each object's symbols |
+
+Verified: `tools/samebytes.sh` against `77fd320` reports the tree
+IDENTICAL, every module and program.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

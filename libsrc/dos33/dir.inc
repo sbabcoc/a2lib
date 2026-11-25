@@ -75,9 +75,7 @@ CAT_PERSECTOR   = .sizeof(CATSECTOR::ENTRIES) / .sizeof(CATENTRY)
 
 .define dirptr          ptr1    ; DIR*: the directory
 
-; dir_at: open the catalog at fm_slot, fm_drive and fm_volume, for opendir
-; and stat. read_dir_sector: read track A, sector X of dirptr's disk into
-; its BUF. rewind_dir: start dirptr's directory again at the first catalog
-; sector.
-
-        .global         dir_at, read_dir_sector, rewind_dir
+; Shared routines
+        .global         dir_at           ; Open the catalog at the last path
+        .global         read_dir_sector  ; Read a sector into dirptr's BUF
+        .global         rewind_dir       ; Back to the first catalog sector

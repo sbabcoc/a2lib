@@ -30,7 +30,20 @@ KSWL            := $38          ; Input hook
 DOS_KSW         := $AA55        ; 48K DOS 3.3: saved true input hook
 DOS_KINT        := $9D02        ; 48K DOS 3.3: address of its keyboard intercept
 
-        .global         a2_tickhook, a2_tickon
-        .global         a2_tick, a2_timer_arm, a2_timer_restart
-        .global         tmr_ticks, tmr_fn, tmr_per
-        .global         t_ms, t_rem, t_sec, t_sec60
+; The tick
+        .global         a2_tickhook      ; JSR here from a wait loop
+        .global         a2_tickon        ; Bit 7: the timer is in use
+        .global         a2_tick          ; One tick
+
+; Timers that leave the zero page alone
+        .global         a2_timer_arm     ; Start a timer
+        .global         a2_timer_restart ; Restart a timer
+        .global         tmr_ticks        ; a2_timer_arm's interval in ticks
+        .global         tmr_fn           ; a2_timer_arm's callback
+        .global         tmr_per          ; a2_timer_arm's periodic flag
+
+; The clocks
+        .global         t_ms             ; Milliseconds since startup
+        .global         t_rem            ; Milliseconds into the second
+        .global         t_sec            ; Seconds since startup
+        .global         t_sec60          ; t_sec modulo 60

@@ -18,28 +18,35 @@ S80_ROWS        = 24
 
 BAS2L           := $2A          ; Monitor zero page, used as a second pointer
 
-        ; The model
-        .global         s80_x, s80_y, s80_left, s80_follow
-        .global         s80_put, s80_putnoadv, s80_cr, s80_lf
-        .global         s80_goto, s80_show, s80_clear, s80_cout
-        .global         s80_bufptr, s80_setbuf, s80_cursorcol
-        .global         s80_buf         ; 80 x 24, screen codes XOR S80_BUF_XOR
+; The model
+        .global         s80_x            ; Cursor column; 80: wrap pending
+        .global         s80_y            ; The cursor's row
+        .global         s80_left         ; The leftmost visible column
+        .global         s80_follow       ; Bit 7: follow the cursor
+        .global         s80_put          ; Write a screen code and advance
+        .global         s80_putnoadv     ; Write a screen code
+        .global         s80_cr           ; Column 0
+        .global         s80_lf           ; Down a row, scrolling
+        .global         s80_goto         ; Move the cursor
+        .global         s80_show         ; Pan to the cursor if following
+        .global         s80_clear        ; Clear and home
+        .global         s80_cout         ; The COUT hook
+        .global         s80_bufptr       ; BAS2L: the cursor's row
+        .global         s80_setbuf       ; BAS2L: a row
+        .global         s80_cursorcol    ; The cursor's screen column
+        .global         s80_buf          ; Screen codes XOR S80_BUF_XOR
 
 S80_BUF_XOR     = $A0           ; s80_buf holds screen code XOR this, so a
                                 ; blank (screen code $A0) is stored as $00
 
-        ; The display. Each may use A, X, Y, BASL and BAS2L, and no other
-        ; zero page (cputs keeps ptr1, chline tmp1 and tmp2).
-        ;   disp_init:          constructor, before the model clears the
-        ;                       screen (ONCE)
-        ;   disp_done:          destructor
-        ;   disp_cell:          show screen code A at screen column X, row Y
-        ;   disp_redraw:        show the window's columns of every row
-        ;   disp_scroll:        the buffer has scrolled up one row
-        ;   disp_clear:         the buffer has been cleared, s80_left is 0
-        ;   disp_gauge_draw:    show the position gauge for s80_left (shown
-        ;                       or not)
-        ;   disp_gauge_erase:   remove it (a timer callback)
-        .global         disp_init, disp_done, disp_cell, disp_redraw
-        .global         disp_scroll, disp_clear
-        .global         disp_gauge_draw, disp_gauge_erase
+; The display's routines, which the model calls. Each may use A, X, Y, BASL
+; and BAS2L, and no other zero page: cputs() keeps ptr1, chline() tmp1 and
+; tmp2.
+        .global         disp_init        ; Start, before the buffer is cleared
+        .global         disp_done        ; Stop
+        .global         disp_cell        ; Show a screen code in a cell
+        .global         disp_redraw      ; Show the window's columns
+        .global         disp_scroll      ; The buffer has scrolled a row
+        .global         disp_clear       ; The buffer has been cleared
+        .global         disp_gauge_draw  ; Show the position gauge
+        .global         disp_gauge_erase ; Remove it (a timer callback)
