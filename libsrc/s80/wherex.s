@@ -2,11 +2,8 @@
 ; Kevin Ruland
 ; Scott Babcock, 2026-11-14
 ;
-; unsigned char wherex (void);
-;
-; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
-; libsrc/apple2/wherex.s. The cursor's column, 0-79 (79 while a wrap is
-; pending).
+; wherex() for the Soft-70 library: the VideoTerm's cursor column, or the 80 x
+; 24 model's. For details, see section 3.8 of DESIGN.
 ;
 
         .export         _wherex
@@ -16,10 +13,10 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _wherex: The cursor's column, 0-79 (79 while a wrap is pending): unsigned
-; char wherex (void).
+; The cursor's column, 0-79 (79 while a wrap is pending).
 ;
-; Input:        none
+; Signature:    unsigned char wherex ()
+; Overrides:    cc65's wherex()
 ; Output:       AX            unsigned char
 ;                                       the column
 ; Changes:      Flags. Y is unchanged.

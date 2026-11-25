@@ -1,10 +1,12 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; Control blocks (FCB, fm.inc) are DOS's own file buffers ("Beneath Apple
-; DOS" ch. 6, DOS BUFFERS; DESIGN.md 4.4): MAXFILES of them, between
-; HIMEM and DOS, chained from DOS_BUFS. A buffer is in use while the first
-; byte of its name field is nonzero, as DOS's own commands mark it.
+; Control blocks for open files. Each is one of DOS's own file buffers
+; ("Beneath Apple DOS" ch. 6): MAXFILES of them, between HIMEM and DOS,
+; chained from DOS_BUFS. A buffer is in use while the first byte of its name
+; field is nonzero, as DOS's own commands mark it. Also tells whether a file
+; is already open, which DELETE and RENAME need, as DOS doesn't check. For
+; details, see section 4.4 of DESIGN.
 ;
 
         .include        "zeropage.inc"
@@ -27,9 +29,8 @@ WA_DRIVE        = $27           ; Drive
         .code
 
 ;-----------------------------------------------------------------------------
-; fm_getfcb: Reserve a free DOS file buffer as a control block.
+; Reserve a free DOS file buffer as a control block.
 ;
-; Input:        none
 ; Output:       C             flag      clear: reserved; set: every buffer is
 ;                                       in use
 ;               A             byte      if C set: DOSERR_NOBUFS, the __oserror
@@ -80,7 +81,7 @@ fm_getfcb:
         rts
 
 ;-----------------------------------------------------------------------------
-; fm_freefcb: Release a control block's DOS file buffer.
+; Release a control block's DOS file buffer.
 ;
 ; Prepare:      fm_getfcb
 ; Input:        ctlblock      FCB*      the control block
@@ -97,10 +98,10 @@ fm_freefcb:
         rts
 
 ;-----------------------------------------------------------------------------
-; fm_isopen: Is the file that the parameter list names already open? Asked
-; before DELETE and RENAME (DESIGN.md 5.5a). OPENs the file without creating
-; it, CLOSEs it, and compares its work area's first T/S list, slot and drive
-; with each open file's.
+; Is the file that the parameter list names already open? Asked before DELETE
+; and RENAME. OPENs the file without creating it, CLOSEs it,
+; and compares its work area's first T/S list, slot and drive with each open
+; file's.
 ;
 ; Prepare:      fm_begin, fm_name
 ; Input:        fm_parmlist   byte*     the parameter list, with the name
@@ -123,7 +124,7 @@ fm_isopen:
 :       lda     #FMC_CLOSE
         jsr     fm_simple
 
-        ; Compare with each open file: REF_NUM $40-$7F (open.s)
+        ; Compare with each open file: REF_NUM $40-$7F
         ldx     #$00
 file:   lda     fdtab + FD::REF_NUM,x
         and     #$C0
@@ -159,7 +160,7 @@ next:   inx
         rts
 
 ;-----------------------------------------------------------------------------
-; same: Compare one byte of two control blocks.
+; Compare one byte of two control blocks.
 ;
 ; Input:        Y             byte      the byte's offset in each
 ;               open_ctlblock FCB*      an open file's control block

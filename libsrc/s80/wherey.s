@@ -2,10 +2,8 @@
 ; Kevin Ruland
 ; Scott Babcock, 2026-11-14
 ;
-; unsigned char wherey (void);
-;
-; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
-; libsrc/apple2/wherey.s. The cursor's row.
+; wherey() for the Soft-70 library: the VideoTerm's cursor row, or the 80 x 24
+; model's. For details, see section 3.8 of DESIGN.
 ;
 
         .export         _wherey
@@ -15,9 +13,10 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _wherey: The cursor's row: unsigned char wherey (void).
+; The cursor's row.
 ;
-; Input:        none
+; Signature:    unsigned char wherey ()
+; Overrides:    cc65's wherey()
 ; Output:       AX            unsigned char
 ;                                       the row
 ; Changes:      Flags. Y is unchanged.

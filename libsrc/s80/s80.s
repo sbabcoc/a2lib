@@ -1,38 +1,26 @@
 ;
 ; Scott Babcock, 2026-11-14
 ;
-; Shared 80 x 24 screen model (DESIGN.md 3.1, 3.6, 3.8; s80.inc)
+; The 80 x 24 screen model that Soft-70 shows part of: a screen in memory, of
+; which columns s80_left to s80_left + S80_VIEW - 1 are shown. It behaves like
+; the VideoTerm: a delayed wrap at column 80, '\r' to column 0, a line feed in
+; the same column, scrolling at the bottom. The view follows the cursor by
+; default, in steps of S80_STEP columns, when a character is written or the
+; cursor is about to be shown. The C interface lets a program pan the view
+; itself.
 ;
-; An 80 x 24 screen kept in memory (s80_buf), of which columns s80_left to
-; s80_left + S80_VIEW - 1 are shown by the display (display.inc). It
-; behaves like the VideoTerm backend: delayed wrap at column 80, '\r' to
-; column 0, line feed in the same column, scrolling at the bottom. Panning
-; follows the cursor by default, in steps of S80_STEP columns, when a
-; character is written or the cursor is about to be shown.
+; After each pan, a position gauge shows which columns are visible, and a
+; one-shot timer removes it after a second, if a timer slot is free.
 ;
-; s80_buf holds screen codes XOR $A0, so that zeroed memory is a blank
-; screen. crt0 clears BSS after the constructors run (DESIGN.md 6.1), so
-; all state set by the constructor is in DATA. A buffer in BSS is left to
-; crt0: BSS starts where the constructors' code (ONCE) does, so writing it
-; from a constructor would overwrite that code. The constructor clears a
-; buffer outside BSS (Soft-70's, in LOWBSS) itself.
-;
-; Uses BASL and BAS2L ($28-$2B) as pointers, set on every use, and no other
-; zero page: chline keeps counters in tmp1/tmp2 across cputdirect, and
-; cputs its string in ptr1.
-;
-; C interface, named S80_API + pan, follow, left, active
-; (include/soft70.h). They do nothing (or report 0) while the VideoTerm is
-; in use.
-;
-; Position gauge (DESIGN.md 6.3): after each pan, the display shows which
-; columns are visible; a one-shot timer removes it after a second. Shown
-; only if a timer slot is free. The timer functions used here touch no
-; zero page, since this runs inside cputc (cputs keeps ptr1, chline tmp1
-; and tmp2).
+; The buffer holds screen codes XOR $A0, so that zeroed memory is a blank
+; screen. The startup code clears BSS after the constructors run, so all the
+; state the constructor sets is in DATA. The model uses BASL and BAS2L as
+; pointers, set on every use, and no other zero page: it runs inside cputc(),
+; and cputs() keeps its string in ptr1, chline() its counters in tmp1 and
+; tmp2. For details, see sections 3.8 and 6.3 of DESIGN.
 ;
 
-        .constructor    s80init, 6      ; After vt.s's (7): needs vt_active
+        .constructor    s80init, 6      ; After the VideoTerm's (7)
         .destructor     s80done
 
         .include        "apple2.inc"
@@ -52,12 +40,12 @@ GAUGE_TICKS     = MS_TICKS(1000)
         .segment        "ONCE"
 
 ;-----------------------------------------------------------------------------
-; s80init: The module constructor, unless the VideoTerm is in use: start the
-; display, clear the buffer, write the text marker, and hook console output to
+; The module constructor, unless the VideoTerm is in use: start the display,
+; clear the buffer, write the text marker, and hook console output to
 ; s80_cout.
 ;
 ; Input:        vt_active     byte      bit 7: the VideoTerm is in use
-; Output:       s80_marker    byte[16]  the text marker (DESIGN.md 3.9)
+; Output:       s80_marker    byte[16]  the text marker
 ;               s80_buf       byte[]    blank
 ; Changes:      A, X and Y; BAS2L; the output hooks (a2_hookout); what
 ;               disp_init changes.
@@ -74,22 +62,22 @@ s80init:
         jsr     clearbuf
 
         ; The text marker, for emulators and other tools that copy the
-        ; screen's text (DESIGN.md 3.9)
+        ; screen's text
         ldx     #MARKLEN-1
 :       lda     marktpl,x
         sta     s80_marker,x
         dex
         bpl     :-
 
-        ; Console output into the model (vt.s: a2_hookout)
+        ; Console output into the model
         lda     #<s80_cout
         ldx     #>s80_cout
         jmp     a2_hookout
 initdone:
         rts
 
-; The text marker (DESIGN.md 3.9): written before the buffer at startup,
-; its first byte cleared at exit
+; The text marker: written before the buffer at startup, its first byte
+; cleared at exit. For details, see section 3.9 of DESIGN.
 marktpl:
         .byte   "A2SCR80"       ; Signature
         .byte   1               ; Version
@@ -103,12 +91,10 @@ MARKLEN = * - marktpl
         .code
 
 ;-----------------------------------------------------------------------------
-; s80done: The module destructor, unless the VideoTerm is in use: clear the
-; text marker's first byte, remove the gauge, put back the output hooks, and
-; stop the display.
+; The module destructor, unless the VideoTerm is in use: clear the text
+; marker's first byte, remove the gauge, put back the output hooks, and stop
+; the display.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      A, X and Y; the output hooks; what disp_done changes.
 
 s80done:
@@ -124,7 +110,7 @@ s80done:
         jsr     gauge_hide
 :
 
-        ; Restore the output hooks (vt.s)
+        ; Restore the output hooks
         jsr     a2_unhookout
         jmp     disp_done
 done:   rts
@@ -133,8 +119,8 @@ done:   rts
 ; Output
 
 ;-----------------------------------------------------------------------------
-; s80_put: Write a screen code at the cursor and advance; column 80 is a
-; pending wrap, which the next character turns into CR and LF.
+; Write a screen code at the cursor and advance; column 80 is a pending wrap,
+; which the next character turns into CR and LF.
 ;
 ; Input:        A             byte      the screen code
 ; Output:       s80_x         byte      one higher
@@ -149,11 +135,9 @@ s80_put:
         rts
 
 ;-----------------------------------------------------------------------------
-; s80_putnoadv: Write a screen code at the cursor, without advancing. Falls
-; into store.
+; Write a screen code at the cursor, without advancing. Falls into store.
 ;
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      A, X, Y and flags; the buffer and the display; BASL and BAS2L.
 
 s80_putnoadv:
@@ -164,12 +148,11 @@ s80_putnoadv:
 
 
 ;-----------------------------------------------------------------------------
-; store: Put a screen code at the cursor: in the buffer and, if its column is
+; Put a screen code at the cursor: in the buffer and, if its column is
 ; visible, on the display. Pans first if following (s80_show).
 ;
 ; Input:        A             byte      the screen code
 ;               s80_x, s80_y  byte      the cursor
-; Output:       none
 ; Changes:      A, X, Y and flags; the buffer and the display; BASL and BAS2L.
 
 store:  pha
@@ -189,10 +172,9 @@ store:  pha
 :       rts
 
 ;-----------------------------------------------------------------------------
-; wrap: Turn a pending wrap (column 80) into CR and LF.
+; Turn a pending wrap (column 80) into CR and LF.
 ;
 ; Input:        s80_x         byte      the cursor's column
-; Output:       none
 ; Changes:      A, X, Y and flags; s80_x and s80_y; on a scroll, the buffer,
 ;               the display, BASL and BAS2L.
 
@@ -204,9 +186,8 @@ wrap:   lda     s80_x
 :       rts
 
 ;-----------------------------------------------------------------------------
-; s80_cr: Move the cursor to column 0.
+; Move the cursor to column 0.
 ;
-; Input:        none
 ; Output:       s80_x         byte      0
 ; Changes:      A and flags. X and Y are unchanged.
 
@@ -215,10 +196,8 @@ s80_cr: lda     #$00
         rts
 
 ;-----------------------------------------------------------------------------
-; s80_lf: Move the cursor down a row, in the same column, scrolling at the
-; bottom.
+; Move the cursor down a row, in the same column, scrolling at the bottom.
 ;
-; Input:        none
 ; Output:       s80_y         byte      one higher, at most 23
 ; Changes:      A and flags. On a scroll: X and Y, the buffer, the display,
 ;               BASL and BAS2L.
@@ -232,11 +211,9 @@ s80_lf: inc     s80_y
 :       rts
 
 ;-----------------------------------------------------------------------------
-; scroll: Move the buffer's rows 1-23 up a row, blank row 23, and update the
-; display (disp_scroll).
+; Move the buffer's rows 1-23 up a row, blank row 23, and update the display
+; (disp_scroll).
 ;
-; Input:        none
-; Output:       none
 ; Changes:      A, X, Y and flags; the buffer and the display; BASL and BAS2L.
 
 scroll: ldx     #$00
@@ -260,7 +237,7 @@ scroll: ldx     #$00
         jmp     disp_scroll
 
 ;-----------------------------------------------------------------------------
-; rowptrs: Point BASL at a buffer row and BAS2L at the next.
+; Point BASL at a buffer row and BAS2L at the next.
 ;
 ; Input:        A             byte      the row, 0-22
 ; Output:       BASL          byte*     row A
@@ -284,7 +261,7 @@ rowptrs:
 ; Cursor and window
 
 ;-----------------------------------------------------------------------------
-; s80_goto: Move the cursor, ignoring each coordinate that is out of range.
+; Move the cursor, ignoring each coordinate that is out of range.
 ;
 ; Input:        X             byte      the column, 0-79
 ;               A             byte      the row, 0-23
@@ -301,8 +278,7 @@ s80_goto:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; s80_cursorcol: The cursor's screen column. A pending wrap counts as column
-; 79.
+; The cursor's screen column. A pending wrap counts as column 79.
 ;
 ; Input:        s80_x         byte      the cursor's column
 ;               s80_left      byte      the leftmost visible column
@@ -324,8 +300,8 @@ s80_cursorcol:
         rts
 
 ;-----------------------------------------------------------------------------
-; s80_show: If following, pan by the smallest number of S80_STEP steps that
-; shows the cursor's column, redraw, and show the gauge.
+; If following, pan by the smallest number of S80_STEP steps that shows the
+; cursor's column, redraw, and show the gauge.
 ;
 ; Input:        s80_follow    byte      bit 7: follow the cursor
 ;               s80_x         byte      the cursor's column
@@ -379,10 +355,8 @@ setleft:
 done2:  rts
 
 ;-----------------------------------------------------------------------------
-; s80_clear: Blank the buffer, home the cursor, and show columns 0 to S80_VIEW
-; - 1.
+; Blank the buffer, home the cursor, and show columns 0 to S80_VIEW - 1.
 ;
-; Input:        none
 ; Output:       s80_x         byte      0
 ;               s80_y         byte      0
 ;               s80_left      byte      0
@@ -397,9 +371,8 @@ s80_clear:
         jmp     disp_clear
 
 ;-----------------------------------------------------------------------------
-; clearbuf: Blank the buffer.
+; Blank the buffer.
 ;
-; Input:        none
 ; Output:       s80_buf       byte[]    blank (zero)
 ; Changes:      A, X, Y and flags; BAS2L.
 
@@ -418,7 +391,7 @@ clearbuf:
         rts
 
 ;-----------------------------------------------------------------------------
-; s80_bufptr: Point BAS2L at the cursor's buffer row. Falls into s80_setbuf.
+; Point BAS2L at the cursor's buffer row. Falls into s80_setbuf.
 ;
 ; Input:        s80_y         byte      the cursor's row
 ; Output:       BAS2L         byte*     the row
@@ -428,7 +401,7 @@ s80_bufptr:
         lda     s80_y
 
 ;-----------------------------------------------------------------------------
-; s80_setbuf: Point BAS2L at a buffer row.
+; Point BAS2L at a buffer row.
 ;
 ; Input:        A             byte      the row, 0-23
 ; Output:       BAS2L         byte*     the row
@@ -447,13 +420,12 @@ s80_setbuf:
 ; Console output
 
 ;-----------------------------------------------------------------------------
-; s80_cout: The COUT hook: console output into the model. Return is CR and LF,
-; and line feed and backspace work as on the VideoTerm; other controls are
-; ignored. The others are stored as the monitor's COUT stores them (S80_ATTR),
-; stdio having already applied uppercasemask.
+; The COUT hook: console output into the model. Return is CR and LF, and line
+; feed and backspace work as on the VideoTerm; other controls are ignored. The
+; others are stored as the monitor's COUT stores them (S80_ATTR), stdio having
+; already applied uppercasemask.
 ;
 ; Input:        A             char      the character, bit 7 set
-; Output:       none
 ; Changes:      Flags; the buffer and the display; BASL and BAS2L. A, X and Y
 ;               are unchanged, as COUT's callers expect.
 
@@ -490,12 +462,10 @@ out:    pla
         rts
 
 ;-----------------------------------------------------------------------------
-; back: Move the cursor one column left, as the VideoTerm firmware's backspace
+; Move the cursor one column left, as the VideoTerm firmware's backspace
 ; ($C96F): from a pending wrap (80) to 79, and from column 0 to column 79 of
 ; the row above, staying on row 0 at the top.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      A and flags; s80_x and s80_y. X and Y are unchanged.
 
 back:   lda     s80_x
@@ -513,9 +483,8 @@ back:   lda     s80_x
 ; Position gauge
 
 ;-----------------------------------------------------------------------------
-; gauge_show: Restart the gauge's one-shot timer, or arm one if none is
-; counting, then have the display show the gauge. No gauge if no timer slot is
-; free.
+; Restart the gauge's one-shot timer, or arm one if none is counting, then
+; have the display show the gauge. No gauge if no timer slot is free.
 ;
 ; Input:        gslot         byte      the gauge's timer slot; bit 7: none
 ; Output:       gslot         byte      the slot, if one was armed
@@ -546,10 +515,9 @@ gauge_show:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; gauge_hide: The gauge's timer callback, also used at exit: forget the slot
-; (a one-shot frees its own) and have the display remove the gauge.
+; The gauge's timer callback, also used at exit: forget the slot (a one-shot
+; frees its own) and have the display remove the gauge.
 ;
-; Input:        none
 ; Output:       gslot         byte      $FF
 ; Changes:      A, X, Y and flags; the display.
 
@@ -562,10 +530,10 @@ gauge_hide:
 ; C interface
 
 ;-----------------------------------------------------------------------------
-; _s70_pan: Show the columns from left on, and stop following the cursor: void
-; __fastcall__ s70_pan (unsigned char left). Named S80_API + "pan". Does
-; nothing while the VideoTerm is in use.
+; Show the columns from left on, and stop following the cursor. Named S80_API
+; + "pan". Does nothing while the VideoTerm is in use.
 ;
+; Signature:    void __fastcall__ s70_pan (unsigned char left)
 ; Input:        A             unsigned char
 ;                                       left: the leftmost column, at most 80
 ;                                       - S80_VIEW
@@ -587,11 +555,10 @@ gauge_hide:
 @done:  rts
 
 ;-----------------------------------------------------------------------------
-; _s70_follow: Follow the cursor again, panning now if needed: void s70_follow
-; (void). Named S80_API + "follow". Does nothing while the VideoTerm is in
-; use.
+; Follow the cursor again, panning now if needed. Named S80_API + "follow".
+; Does nothing while the VideoTerm is in use.
 ;
-; Input:        none
+; Signature:    void s70_follow ()
 ; Output:       s80_follow    byte      $80
 ; Changes:      As s80_show.
 
@@ -604,10 +571,9 @@ gauge_hide:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; _s70_left: The leftmost visible column: unsigned char s70_left (void). Named
-; S80_API + "left".
+; The leftmost visible column. Named S80_API + "left".
 ;
-; Input:        none
+; Signature:    unsigned char s70_left ()
 ; Output:       AX            unsigned char
 ;                                       s80_left, or 0 while the VideoTerm is
 ;                                       in use
@@ -622,10 +588,9 @@ gauge_hide:
         rts
 
 ;-----------------------------------------------------------------------------
-; _s70_active: Is the 80 x 24 model in use? unsigned char s70_active (void).
-; Named S80_API + "active".
+; Is the 80 x 24 model in use? Named S80_API + "active".
 ;
-; Input:        none
+; Signature:    unsigned char s70_active ()
 ; Output:       AX            unsigned char
 ;                                       1, or 0 while the VideoTerm is in use
 ; Changes:      Flags. Y is unchanged.

@@ -1,12 +1,10 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; unsigned int __fastcall__ dir_entry_count (DIR* dir);
-;
-; Link-time guard (DESIGN.md 4.2): replaces cc65's ProDOS module of the
-; same name, which reads the ProDOS DIR, not DOS 3.3's, and would return a
-; wrong count. A program that calls dir_entry_count fails to link
-; instead, naming the symbol below.
+; A link-time guard for dir_entry_count(), in place of cc65's ProDOS version,
+; which reads the ProDOS DIR, not DOS 3.3's, and would return a wrong count. A
+; program that calls dir_entry_count() fails to link instead, naming the
+; symbol below. For details, see section 4.2 of DESIGN.
 ;
 
         .export         _dir_entry_count

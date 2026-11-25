@@ -3,13 +3,11 @@
 ; Ullrich von Bassewitz, 2005-03-25
 ; Scott Babcock, 2026-11-13
 ;
-; unsigned char kbhit (void);
-;
-; Cooperative timer (DESIGN.md 6.3): modified copy of libsrc/apple2/kbhit.s
-; from cc65. While the timer is in use and no key is pending, waits for
-; one tick (about 3.9 ms) or a key, with the same 15-cycle loop as cgetc,
-; so programs that poll kbhit advance the timer and run its callbacks.
-; Otherwise unchanged.
+; kbhit() for the timer library, as cc65's, except that while the timer is in
+; use and no key is waiting, it waits for one tick (about 3.9 ms) or a key,
+; with the same 15-cycle loop as cgetc(). Programs that poll kbhit() so
+; advance the timer and run its callbacks. For details, see section 6.3 of
+; DESIGN.
 ;
 
         .export _kbhit
@@ -18,9 +16,11 @@
         .include "timer.inc"
 
 ;-----------------------------------------------------------------------------
-; _kbhit: Is a key waiting? unsigned char kbhit (void). While the timer is in
-; use and none is, waits for a key or one tick first.
+; Is a key waiting? While the timer is in use and none is, waits for a key or
+; one tick first.
 ;
+; Signature:    unsigned char kbhit ()
+; Overrides:    cc65's kbhit()
 ; Input:        a2_tickon     byte      bit 7: the timer is in use
 ; Output:       AX            unsigned char
 ;                                       1 if a key is waiting, else 0

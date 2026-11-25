@@ -5,7 +5,7 @@
 ** program waits inside the library: in cgetc, kbhit, stdio input, a2_idle,
 ** and (with lib/a2lib-ip65.o) IP65's timer_read. While a program computes
 ** without calling these, the count stands still. One tick is about
-** 3.86 ms (NTSC Apple II+). See DESIGN.md section 6.3.
+** 3.86 ms (NTSC Apple II+). For details, see section 6.3 of DESIGN.
 **
 ** Link lib/a2lib-timer.o and lib/a2lib-timer.lib ahead of
 ** lib/a2lib-dos33.lib. a2lib-soft70 includes the timer, which its gauge

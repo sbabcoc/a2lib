@@ -1,7 +1,7 @@
 ;
-; Apple II and DOS 3.3 addresses and values used by a2lib's modules,
-; beside cc65's apple2.inc (which they also include). Included by fm.inc,
-; so every File Manager module has them.
+; Apple II and DOS 3.3 addresses and values the library uses, beside cc65's
+; apple2.inc, which its modules also include. The File Manager's definitions
+; include it, so every file module has them.
 ;
 
 .ifndef MACHINE_INC

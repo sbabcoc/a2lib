@@ -1,11 +1,8 @@
 ;
 ; Scott Babcock, 2026-11-19
 ;
-; DOS 3.3 current directory for the cc65 apple2 target (DESIGN.md 5.5)
-;
-; Replaces libsrc/apple2/initcwd.s from cc65, which asks ProDOS for its
-; prefix. The current directory is DOS 3.3's last-used slot and drive
-; (fmname.s, syschdir.s).
+; The current directory, which getcwd() reports: DOS's last-used slot and
+; drive. For details, see section 5.5 of DESIGN.
 ;
 
         .export         initcwd
@@ -16,10 +13,11 @@
         .code
 
 ;-----------------------------------------------------------------------------
-; initcwd: Set __cwd, which getcwd() copies, to "/S/D" from DOS's last-used
-; slot and drive: at startup, called by the constructor of cc65's _cwd.s, and
-; after chdir().
+; Set __cwd, which getcwd() copies, to "/S/D" from DOS's last-used slot and
+; drive: at startup, called by the constructor of cc65's getcwd() support,
+; and after chdir().
 ;
+; Overrides:    cc65's initcwd
 ; Input:        DOS_SLOT      byte      the slot (1-7)
 ;               DOS_DRIVE     byte      the drive (1-2)
 ; Output:       __cwd         char[]    "/S/D"

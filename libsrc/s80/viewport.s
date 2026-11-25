@@ -1,10 +1,9 @@
 ;
 ; Scott Babcock, 2026-11-14
 ;
-; a2_viewport: the visible width of the text screen, in A (DESIGN.md 3.7)
-;
-; Soft-70 (a2lib-soft70.lib): 80 on the VideoTerm; otherwise S80_VIEW
-; (display.inc), the columns of the 80 x 24 screen shown at a time, 70.
+; The visible width of the text screen, for reflow_on()'s default: 80 on the
+; VideoTerm, else S80_VIEW, the 70 columns Soft-70 shows. For details, see
+; section 3.7 of DESIGN.
 ;
 
         .export         a2_viewport
@@ -14,10 +13,9 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; a2_viewport: The visible width of the text screen, for reflow.s (DESIGN.md
-; 3.7): 80 on the VideoTerm, else S80_VIEW.
+; The visible width of the text screen, for reflow_on: 80 on
+; the VideoTerm, else S80_VIEW.
 ;
-; Input:        none
 ; Output:       A             byte      the width in columns
 ; Changes:      Flags. X and Y are unchanged.
 

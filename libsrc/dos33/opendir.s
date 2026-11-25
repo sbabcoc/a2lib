@@ -1,19 +1,16 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; DIR* __fastcall__ _opendir_a2lib (const char* name);
+; opendir() for DOS 3.3 disks, and the catalog reads that readdir() and stat()
+; share. The File Manager's CATALOG only prints, so the catalog is read
+; directly through RWTS: the VTOC (track 17, sector 0) gives the first catalog
+; sector, and each catalog sector links to the next and holds seven file
+; entries.
 ;
-; DOS 3.3 directories for the cc65 apple2 target (DESIGN.md 5.9). The DOS
-; 3.3 struct dirent isn't stock's, so include/dirent.h maps opendir,
-; readdir, closedir and rewinddir to names only these modules define
-; (DESIGN.md 2), and these take the place of stock opendir.s, readdir.s,
-; closedir.s and rewinddir.s in a2lib-dos33.lib: the DOS 3.3 header
-; without them, or stock's with them, fails to link.
-;
-; The File Manager's CATALOG call only prints, so the catalog is read
-; directly through RWTS: the VTOC (track 17, sector 0) gives the first
-; catalog sector, and each catalog sector links to the next and holds
-; seven file entries (readdir.s).
+; a2lib's struct dirent isn't cc65's, so a2lib's dirent.h maps the directory
+; functions to names only a2lib defines: cc65's header with a2lib's library,
+; or a2lib's header without it, fails to link. For details, see sections 2 and
+; 5.9 of DESIGN.
 ;
 
         .export         __opendir_a2lib
@@ -27,9 +24,10 @@
         .code
 
 ;-----------------------------------------------------------------------------
-; __opendir_a2lib: Open a directory: DIR* __fastcall__ _opendir_a2lib (const
-; char* name), which dirent.h names opendir().
+; Open a directory.
 ;
+; Signature:    DIR* __fastcall__ _opendir_a2lib (const char* name)
+; Overrides:    opendir(), as a2lib's dirent.h defines it
 ; Input:        AX            char*     name: "", ".", "D" or "/S/D"
 ;                                       (fm_location)
 ; Output:       AX            DIR*      the directory, or NULL
@@ -43,9 +41,8 @@ __opendir_a2lib:
         jmp     nullmapped      ; A = DOSERR_SYNTAX -> EINVAL
 
 ;-----------------------------------------------------------------------------
-; dir_at: Open the catalog of a disk, for opendir() and stat(): read its VTOC
-; through RWTS, check that it's a DOS 3.3 disk, and take its first catalog
-; sector.
+; Open the catalog of a disk, for opendir() and stat(): read its VTOC through
+; RWTS, check that it's a DOS 3.3 disk, and take its first catalog sector.
 ;
 ; Input:        fm_slot       byte      the slot (1-7)
 ;               fm_drive      byte      the drive (1-2)
@@ -133,7 +130,7 @@ nulldirect:
         jmp     return0
 
 ;-----------------------------------------------------------------------------
-; read_dir_sector: Read a sector of the directory's disk into its BUF.
+; Read a sector of the directory's disk into its BUF.
 ;
 ; Prepare:      dir_at
 ; Input:        A             byte      the track

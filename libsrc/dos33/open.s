@@ -1,18 +1,17 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; int open (const char* name, int flags, ...);
+; open() for DOS 3.3 files, closing files for cc65's close() and at exit, with
+; the symbols cc65's own read(), close() and descriptor table expect, so those
+; work unchanged. A file's fdtab slot holds:
 ;
-; Replaces libsrc/apple2/open.s from cc65 and exports the same symbols, so
-; the stock close.s, read.s and filedes.s work unchanged. See DESIGN.md,
-; sections 4 and 5.
+;   REF_NUM  the slot's offset ORed with $40: nonzero and below $80, so
+;            read(), write() and close() treat it as a file, and the slot
+;            can be found again from it
+;   BUFFER   the file's control block, a DOS buffer; 0 for the console
 ;
-; fdtab usage:
-;   REF_NUM  fdtab offset of the slot ORed with $40: nonzero and below $80,
-;            so read.s/write.s/close.s treat it as a file, and rwcommon can
-;            find the slot again from it
-;   BUFFER   the file's control block (FCB): a DOS buffer (fmbuf.s); 0 for
-;            the console
+; Each file is classified by type when it opens: text, a hidden header (A, I
+; and B files), or raw. For details, see sections 4 and 5 of DESIGN.
 ;
 
         .export         _open, closedirect, freebuffer
@@ -35,12 +34,14 @@ REF_FLAG = $40
         .code
 
 ;-----------------------------------------------------------------------------
-; _open: Open a file: int open (const char* name, int flags, ...). A new file
-; gets the type in _filetype, and a new B file the load address in _auxtype.
-; With O_CREAT and a _filetype that the File Manager can't create, a file that
-; exists is opened, and one that doesn't fails with EINVAL.
+; Open a file. A new file gets the type in _filetype, and a new B file the
+; load address in _auxtype. With O_CREAT and a _filetype that the File Manager
+; can't create, a file that exists is opened, and one that doesn't fails with
+; EINVAL.
 ;
-; Input:        C stack       char*     name: the path (fmname.s)
+; Signature:    int open (const char* name, int flags, ...)
+; Overrides:    cc65's open()
+; Input:        C stack       char*     name: the path
 ;               C stack       int       flags: O_RDONLY, O_WRONLY or O_RDWR,
 ;                                       with O_CREAT, O_EXCL, O_TRUNC and
 ;                                       O_APPEND
@@ -55,7 +56,7 @@ REF_FLAG = $40
 ;                                       (no free DOS buffer), EINVAL (a bad
 ;                                       path, or a _filetype that can't be
 ;                                       created), ENOENT, EEXIST, or as
-;                                       __oserror maps (DESIGN.md 5.6)
+;                                       __oserror maps
 ;               __oserror     byte      0, or the DOS 3.3 or library error
 ;                                       (DOSERR_*, LIBERR_*)
 ; Changes:      Y; ptr1 (fm_name), fm_parmlist, ctlblock and tmp1
@@ -277,8 +278,8 @@ errfreedirect:                  ; A = errno code, file not open
         jmp     ___directerrno
 
 ;-----------------------------------------------------------------------------
-; truncate: Replace the open file with an empty one of the same type, as the
-; File Manager can't shorten a file. A B file keeps its load address.
+; Replace the open file with an empty one of the same type, as the File
+; Manager can't shorten a file. A B file keeps its load address.
 ;
 ; Prepare:      fm_begin, fmopen
 ; Input:        ctlblock      FCB*      the file's control block
@@ -341,7 +342,7 @@ tfree:  pla
         jmp     errfree
 
 ;-----------------------------------------------------------------------------
-; fmopen: OPEN the named file, with type as the type for a new file.
+; OPEN the named file, with type as the type for a new file.
 ;
 ; Prepare:      fm_begin, setname
 ; Input:        X             byte      as fm_call
@@ -354,10 +355,9 @@ fmopen: lda     type
         jmp     fm_open
 
 ;-----------------------------------------------------------------------------
-; rewind: POSITION the open file to its start.
+; POSITION the open file to its start.
 ;
 ; Prepare:      fm_begin
-; Input:        none
 ; Output:       C             flag      as fm_call
 ;               A             byte      as fm_call
 ; Changes:      X and Y.
@@ -367,7 +367,7 @@ rewind: lda     #$00
         jmp     fm_position
 
 ;-----------------------------------------------------------------------------
-; setname: Set the parameter list's name fields from open()'s path.
+; Set the parameter list's name fields from open()'s path.
 ;
 ; Prepare:      fm_begin
 ; Input:        name          char*     the path
@@ -381,8 +381,7 @@ setname:
         jmp     fm_name
 
 ;-----------------------------------------------------------------------------
-; hdrsize: Point fm_rangeio at the hidden header: the last HDRLEN bytes of
-; hdrbuf.
+; Point fm_rangeio at the hidden header: the last HDRLEN bytes of hdrbuf.
 ;
 ; Prepare:      classify
 ; Input:        ctlblock      FCB*      the file's control block, with HDRLEN
@@ -411,10 +410,10 @@ hdrsize:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; classify: Set the control block's KIND, HDRLEN and LENOFS for the file's
-; type. T: the text codec, no header. B: a 4-byte header (load address,
-; length), the length at offset 2. I and A: a 2-byte header (length) at offset
-; 0. Others: raw, no header.
+; Set the control block's KIND, HDRLEN and LENOFS for the file's type. T: the
+; text codec, no header. B: a 4-byte header (load address, length), the length
+; at offset 2. I and A: a 2-byte header (length) at offset 0. Others: raw, no
+; header.
 ;
 ; Prepare:      fm_getfcb
 ; Input:        A             byte      the type (FMT_*, without the lock bit)
@@ -449,9 +448,9 @@ text:   lda     #FCB_TEXT
         rts
 
 ;-----------------------------------------------------------------------------
-; closedirect: Close the file in an fdtab slot, for close() and at exit.
-; Rewrites the hidden header's length first if it changed, and closes the file
-; even if that fails.
+; Close the file in an fdtab slot, for close() and at exit. Rewrites the
+; hidden header's length first if it changed, and closes the file even if that
+; fails.
 ;
 ; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset, of an open
@@ -507,12 +506,11 @@ cclose: lda     #FMC_CLOSE
         rts
 
 ;-----------------------------------------------------------------------------
-; freebuffer: Release the control block of an fdtab slot, if it has one (the
-; console has none), for close() and at exit.
+; Release the control block of an fdtab slot, if it has one (the console has
+; none), for close() and at exit.
 ;
 ; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset
-; Output:       none
 ; Changes:      A, Y and ctlblock. X is unchanged.
 
 freebuffer:
@@ -522,12 +520,10 @@ freebuffer:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; closeallfiles: Close every open file at exit (a destructor), so that
-; buffered sectors and header lengths reach the disk, and release their DOS
-; buffers. Errors are ignored.
+; Close every open file at exit (a destructor), so that buffered sectors and
+; header lengths reach the disk, and release their DOS buffers. Errors are
+; ignored.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      A, X, Y; fm_parmlist, ctlblock and tmp1 (fm_rangeio).
 
 closeallfiles:

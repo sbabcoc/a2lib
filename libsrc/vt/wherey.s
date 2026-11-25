@@ -2,11 +2,9 @@
 ; Kevin Ruland
 ; Scott Babcock, 2026-11-12
 ;
-; unsigned char wherey (void);
+; wherey() for the VideoTerm library: on the card, its cursor's row. For
+; details, see section 3.4 of DESIGN.
 ;
-;
-; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/wherey.s
-; from cc65; if the card is in use, returns its cursor row (DESIGN.md 3.4).
 
         .export         _wherey
 
@@ -14,10 +12,10 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _wherey: The cursor's row, from the top of the window: unsigned char wherey
-; (void).
+; The cursor's row, from the top of the window.
 ;
-; Input:        none
+; Signature:    unsigned char wherey ()
+; Overrides:    cc65's wherey()
 ; Output:       AX            unsigned char
 ;                                       the row
 ; Changes:      Flags. Y is unchanged.

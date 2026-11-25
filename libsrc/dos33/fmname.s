@@ -1,24 +1,21 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; DOS 3.3 path names for the cc65 apple2 target (DESIGN.md 5.5)
-;
-; DOS 3.3 has a slot and drive for every file, and no subdirectories, so a
-; path names at most a slot, a drive and a file, as POSIX paths do:
+; Path names. DOS 3.3 has a slot and drive for every file, and no
+; subdirectories, so a path names at most a slot, a drive and a file:
 ;
 ;   "/6/2/NAME"         slot 6, drive 2
 ;   "2/NAME"            drive 2 in the current slot
 ;   "NAME", "./NAME"    the current slot and drive
 ;
-; The current directory is DOS's last-used slot and drive ($AA6A, $AA68):
-; chdir() sets them (syschdir.s), and getcwd() gives "/6/2" (initcwd.s).
-; A path's own slot and drive don't change it. The volume is always 0, any
-; volume, as for a DOS command without ",V".
+; The current directory is DOS's last-used slot and drive; a path's own slot
+; and drive don't change it. The volume is always 0, any volume, as for a DOS
+; command without ",V".
 ;
-; A name starts with a letter (so a leading digit is a drive, never part
-; of a name), has at most NAME_LEN characters, and may hold any character
-; but "/". It is converted to uppercase and stored with the high bit set,
-; padded with HI_SPACE, as DOS's command parser stores names.
+; A name starts with a letter, so a leading digit is a drive, never part of a
+; name. It has at most NAME_LEN characters, any but "/", and is stored in
+; uppercase with the high bit set, padded with spaces, as DOS's command parser
+; stores names. For details, see section 5.5 of DESIGN.
 ;
 
         .include        "zeropage.inc"
@@ -30,9 +27,9 @@ path            = ptr1          ; char*: the path being parsed
         .code
 
 ;-----------------------------------------------------------------------------
-; fm_location: Parse a directory path, for opendir() and chdir(): "", ".", "D"
-; or "/S/D", each optionally ending in "/". Sets no parameter list fields, so
-; it needs no fm_begin.
+; Parse a directory path, for opendir() and chdir(): "", ".", "D" or "/S/D",
+; each optionally ending in "/". Sets no parameter list fields, so it needs no
+; fm_begin.
 ;
 ; Input:        AX            char*     the path
 ; Output:       C             flag      clear: parsed; set: not a directory
@@ -55,8 +52,8 @@ fm_location:
         rts
 
 ;-----------------------------------------------------------------------------
-; fm_name: Parse a file's path into the parameter list's name, volume, drive
-; and slot fields.
+; Parse a file's path into the parameter list's name, volume, drive and slot
+; fields.
 ;
 ; Prepare:      fm_begin
 ; Input:        AX            char*     the path: "/S/D/NAME", "D/NAME",
@@ -137,9 +134,9 @@ store:  ldy     #FM_NAME
         rts
 
 ;-----------------------------------------------------------------------------
-; location: Parse the location at the start of a path: "/S/D", "D" or ".",
-; each followed by the end or "/" (skipped). A path that starts with none of
-; these has no location, and is all name.
+; Parse the location at the start of a path: "/S/D", "D" or ".", each followed
+; by the end or "/" (skipped). A path that starts with none of these has no
+; location, and is all name.
 ;
 ; Input:        AX            char*     the path
 ; Output:       C             flag      clear: parsed; set: a syntax error
@@ -204,8 +201,7 @@ location:
         rts
 
 ;-----------------------------------------------------------------------------
-; endpart: End a location component: the end of the path, or "/", which is
-; skipped.
+; End a location component: the end of the path, or "/", which is skipped.
 ;
 ; Input:        Y             byte      the offset after the component
 ;               path          char*     the path
@@ -227,8 +223,7 @@ endpart:
         rts
 
 ;-----------------------------------------------------------------------------
-; drive: Parse a drive digit ('1' or '2') that the end of the path or "/"
-; follows.
+; Parse a drive digit ('1' or '2') that the end of the path or "/" follows.
 ;
 ; Input:        Y             byte      the digit's offset
 ;               path          char*     the path
@@ -261,7 +256,7 @@ drive:  lda     (path),y
         rts                     ; C clear
 
 ;-----------------------------------------------------------------------------
-; upcase: Convert a lowercase ASCII letter to uppercase.
+; Convert a lowercase ASCII letter to uppercase.
 ;
 ; Input:        A             char      the character, high bit clear
 ; Output:       A             char      uppercase if it was a lowercase

@@ -1,25 +1,19 @@
 ;
 ; Scott Babcock, 2026-11-13
 ;
-; IP65 timer driver using a2lib's cooperative timer (DESIGN.md 6.3)
+; An IP65 timer driver built on the cooperative timer. IP65's own Apple II
+; driver has no time base, and makes each timer_read busy-wait about 33 ms.
+; This one waits one tick, about 3.9 ms, running due timer callbacks, and
+; returns the milliseconds since timer_init. Callbacks run inside timer_read,
+; so they must not call IP65.
 ;
-; Replaces IP65's drivers/a2timer.s, which has no time base and makes each
-; timer_read busy-wait about 33 ms. Here timer_read waits one tick (about
-; 3.9 ms, running due timer callbacks) and returns the milliseconds
-; counted since timer_init. Same interface:
+; ld65 scans each library once, so this ships as an object file, listed before
+; IP65's library, with the timer library after it:
 ;
-;   timer_init:     reset the counter to 0
-;   timer_read:     AX = milliseconds since timer_init (16 bits)
-;   timer_seconds:  A = seconds of the minute, 00-59 in BCD, as IP65's
-;                   time-of-day drivers return
-;
-; ld65 scans each library once, so this ships as an object file
-; (lib/a2lib-ip65.o) to list on the link line, before IP65's library, and
-; the timer library after it:
 ;   cl65 -t apple2 ... lib/a2lib-ip65.o ip65.lib ... \
 ;       lib/a2lib-timer.o lib/a2lib-timer.lib lib/a2lib-dos33.lib
 ;
-; Callbacks run inside timer_read, so they must not call IP65.
+; For details, see section 6.3 of DESIGN.
 ;
 
         .export         timer_init, timer_read, timer_seconds
@@ -30,7 +24,7 @@
         .code
 
 ;-----------------------------------------------------------------------------
-; timer_init: Start IP65's millisecond counter from 0.
+; Start IP65's millisecond counter from 0.
 ;
 ; Input:        t_ms          long      the timer's milliseconds since startup
 ; Output:       base          word      t_ms's low word
@@ -44,7 +38,7 @@ timer_init:
         rts
 
 ;-----------------------------------------------------------------------------
-; timer_read: Wait one tick, then return the milliseconds since timer_init.
+; Wait one tick, then return the milliseconds since timer_init.
 ;
 ; Prepare:      timer_init
 ; Input:        base          word      t_ms's low word at timer_init
@@ -66,8 +60,8 @@ timer_read:
         rts
 
 ;-----------------------------------------------------------------------------
-; timer_seconds: The seconds of the current minute, as IP65's time-of-day
-; drivers return them.
+; The seconds of the current minute, as IP65's time-of-day drivers return
+; them.
 ;
 ; Input:        t_sec60       byte      the seconds since startup, modulo 60
 ; Output:       A             byte      t_sec60 in BCD, $00-$59

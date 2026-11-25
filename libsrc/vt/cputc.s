@@ -2,25 +2,15 @@
 ; Ullrich von Bassewitz, 06.08.1998
 ; Scott Babcock, 2026-11-12
 ;
-; void __fastcall__ cputcxy (unsigned char x, unsigned char y, char c);
-; void __fastcall__ cputc (char c);
+; cputc(), cputcxy() and the routines other conio functions write with, for
+; the VideoTerm library. While the card is in use, each writes through the
+; firmware in place of the stock screen. None of the card's paths change ptr1.
 ;
 ; Important note: The implementation of cputs() relies on the cputc() function
 ; not clobbering ptr1. Beware when rewriting or changing this function!
 ;
-; VideoTerm backend (a2lib-vt.lib): modified copy of
-; libsrc/apple2/cputc.s from cc65. Each exported entry point first tests
-; vt_active; if the card is in use, it writes through the firmware instead
-; of the 40-column screen (DESIGN.md 3.4):
-;   cputc:          '\r' -> CR only, '\n' -> line feed (same column); other
-;                   controls show as their letters, as screen codes
-;                   $80-$9F do
-;   cputdirect:     screen code, advancing
-;   putchar,
-;   putchardirect:  screen code, not advancing (write, then backspace)
-;   newline:        line feed
-; INVFLG (revers) has no effect on the card (DESIGN.md 3.4).
-; None of the VideoTerm paths change ptr1.
+; For details, see section 3.4 of DESIGN.
+;
 
         .constructor    initconio
         .export         _cputcxy, _cputc
@@ -41,11 +31,10 @@
         .segment        "ONCE"
 
 ;-----------------------------------------------------------------------------
-; initconio: The module constructor, as stock's: on a IIe or later, the
-; alternate character set, and SET80COL-HISCR limited to text.
+; The module constructor, as stock's: on a IIe or later, the alternate
+; character set, and SET80COL-HISCR limited to text.
 ;
-; Input:        none
-; Output:       none
+; Overrides:    cc65's initconio
 ; Changes:      A and flags; the soft switches.
 
 initconio:
@@ -62,15 +51,16 @@ initconio:
         .code
 
 ;-----------------------------------------------------------------------------
-; _cputcxy: Move the cursor, then write a character: void __fastcall__ cputcxy
-; (unsigned char x, unsigned char y, char c).
+; Move the cursor, then write a character.
 ;
+; Signature:    void __fastcall__ cputcxy (unsigned char x, unsigned char y,
+;               char c)
+; Overrides:    cc65's cputcxy()
 ; Input:        C stack       unsigned char
 ;                                       x
 ;               C stack       unsigned char
 ;                                       y
 ;               A             char      c
-; Output:       none
 ; Changes:      As gotoxy and _cputc. Pops x and y.
 
 _cputcxy:
@@ -79,13 +69,13 @@ _cputcxy:
         pla                     ; Restore C and run into _cputc
 
 ;-----------------------------------------------------------------------------
-; _cputc: Write a character at the cursor and advance: void __fastcall__ cputc
-; (char c). '\r' goes to column 0 and '\n' down a line, in the same column. On
-; the card, other controls show as their letters, as screen codes $80-$9F do,
-; and INVFLG (revers) has no effect.
+; Write a character at the cursor and advance. '\r' goes to column 0 and '\n'
+; down a line, in the same column. On the card, other controls show as their
+; letters, as screen codes $80-$9F do, and INVFLG (revers) has no effect.
 ;
+; Signature:    void __fastcall__ cputc (char c)
+; Overrides:    cc65's cputc()
 ; Input:        A             char      c
-; Output:       none
 ; Changes:      A, X, Y and flags; the screen and the cursor. On the 40-column
 ;               screen: tmp3, and BASL/BASH at a new line (VTABZ). Not ptr1,
 ;               which cputs keeps a pointer in.
@@ -105,10 +95,10 @@ _cputc:
         .endif
 
 ;-----------------------------------------------------------------------------
-; cputdirect: Write a screen code at the cursor and advance.
+; Write a screen code at the cursor and advance.
 ;
+; Overrides:    cc65's cputdirect
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      As _cputc.
 
 cputdirect:
@@ -159,11 +149,10 @@ left:
 done:   rts
 
 ;-----------------------------------------------------------------------------
-; newline: Move the cursor down a line, in the same column. On the 40-column
-; screen, the bottom line wraps to the window's top.
+; Move the cursor down a line, in the same column. On the 40-column screen,
+; the bottom line wraps to the window's top.
 ;
-; Input:        none
-; Output:       none
+; Overrides:    cc65's newline
 ; Changes:      A and flags; the cursor. On the 40-column screen: CV and
 ;               BASL/BASH (VTABZ).
 
@@ -179,11 +168,11 @@ newline:
 :       jmp     VTABZ
 
 ;-----------------------------------------------------------------------------
-; putchar: Store a character at the cursor, without advancing, as INVFLG shows
-; it. On the card, INVFLG has no effect.
+; Store a character at the cursor, without advancing, as INVFLG shows it. On
+; the card, INVFLG has no effect.
 ;
+; Overrides:    cc65's putchar
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      As putchardirect.
 
 putchar:
@@ -199,9 +188,10 @@ putchar:
         ora     #$40            ; Restore lowercase bit for //e and up
 
 ;-----------------------------------------------------------------------------
-; putchardirect: Store a screen code at the cursor, without advancing. On the
-; card: write it, then backspace.
+; Store a screen code at the cursor, without advancing. On the card: write it,
+; then backspace.
 ;
+; Overrides:    cc65's putchardirect
 ; Input:        A             byte      the screen code
 ; Output:       tmp3          byte      on the 40-column screen: the character
 ;                                       it replaced, for cgetc
@@ -244,10 +234,9 @@ put:    lda     (BASL),Y        ; Get current character
 ; VideoTerm
 
 ;-----------------------------------------------------------------------------
-; vtcputc: _cputc on the card.
+; _cputc on the card.
 ;
 ; Input:        A             char      c
-; Output:       none
 ; Changes:      A and flags; the screen and the cursor.
 
 vtcputc:
@@ -262,10 +251,9 @@ vtcputc:
 vtw:    jmp     vt_write
 
 ;-----------------------------------------------------------------------------
-; vtdirect: cputdirect on the card.
+; cputdirect on the card.
 ;
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      A and flags; the screen and the cursor.
 
 vtdirect:
@@ -273,10 +261,8 @@ vtdirect:
         jmp     vt_write
 
 ;-----------------------------------------------------------------------------
-; vtnewline: newline on the card: a line feed.
+; newline on the card: a line feed.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      A and flags; the cursor.
 
 vtnewline:
@@ -284,10 +270,9 @@ vtnewline:
         jmp     vt_write
 
 ;-----------------------------------------------------------------------------
-; vtput: putchar and putchardirect on the card.
+; putchar and putchardirect on the card.
 ;
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      A and flags; the screen.
 
 vtput:  jsr     vt_screen

@@ -2,14 +2,13 @@
 ; Kevin Ruland
 ; Scott Babcock, 2026-11-12
 ;
-; char cgetc (void);
+; cgetc() for the timer library, as cc65's, with a wait loop that ticks the
+; cooperative timer each time it increments RNDH. The library's selector links
+; it, so that cgets() and cscanf() get it too.
 ;
 ; If open_apple key is pressed then the high-bit of the key is set.
 ;
-; Cooperative timer (DESIGN.md 6.3): modified copy of libsrc/apple2/cgetc.s
-; from cc65. The wait loop calls a2_tickhook each time it increments RNDH.
-; In a2lib-timer.lib; a2lib-timer.o pulls it in, so that cgets and cscanf,
-; stock modules that call cgetc, get it too.
+; For details, see section 6.3 of DESIGN.
 ;
 
         .export         _cgetc
@@ -24,9 +23,11 @@
         .include        "timer.inc"
 
 ;-----------------------------------------------------------------------------
-; _cgetc: Wait for a key and return it: char cgetc (void). Shows a caret while
-; waiting if the cursor is on; ticks the timer while waiting.
+; Wait for a key. Shows a caret while waiting if the cursor is on, and ticks
+; the timer.
 ;
+; Signature:    char cgetc ()
+; Overrides:    cc65's cgetc()
 ; Input:        cursor        byte      nonzero: show the caret
 ; Output:       AX            char      the key, with the high bit set if Open
 ;                                       Apple is down on a IIe or later

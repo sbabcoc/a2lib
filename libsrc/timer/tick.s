@@ -1,13 +1,11 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; Tick hook for the cc65 apple2 target (DESIGN.md 6.3)
-;
-; The wait loops of a2lib-timer.lib's cgetc and kbhit, and of the display
-; libraries' cgetc, JSR a2_tickhook each time they increment RNDH. It does
-; nothing until the timer module (timer.s), linked when the program or a
-; display library uses it, points it at a2_tick and sets a2_tickon. In
-; a2lib-timer.lib and in each display library.
+; The tick hook that the wait loops of cgetc() and kbhit() call each time they
+; increment RNDH. It does nothing until the cooperative timer, linked when the
+; program or a display library uses it, points it at its tick routine. In the
+; timer library and each display library. For details, see section 6.3 of
+; DESIGN.
 ;
 
         .include        "timer.inc"
@@ -15,26 +13,23 @@
         .data
 
 ;-----------------------------------------------------------------------------
-; a2_tickhook: The tick hook: the wait loops of cgetc, kbhit and the display
-; libraries' cgetc JSR here each time they increment RNDH. Returns at once
-; until timer.s's constructor points it at a2_tick.
+; The tick hook: the wait loops of cgetc, kbhit and the display libraries'
+; cgetc JSR here each time they increment RNDH. Returns at once until
+; the timer's constructor points it at a2_tick.
 ;
-; Input:        none
-; Output:       none
-; Changes:      Nothing, until timer.s is linked; then what a2_tick changes.
+; Changes:      Nothing, until the timer is linked; then what a2_tick
+;               changes.
 
 a2_tickhook:
-        jmp     tickrts         ; Target set by timer.s's constructor
+        jmp     tickrts         ; Target set by the timer's constructor
 a2_tickon:
         .byte   $00             ; Bit 7: the timer is in use
 
         .code
 
 ;-----------------------------------------------------------------------------
-; tickrts: a2_tickhook's target while the timer isn't in use.
+; a2_tickhook's target while the timer isn't in use.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      Nothing.
 
 tickrts:

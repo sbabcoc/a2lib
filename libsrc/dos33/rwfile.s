@@ -1,26 +1,23 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; Reading and writing open files, for read() and write() through
-; rwcommon (rwcommon.s). open.s forces this module in, so programs that
-; never open a file don't link it.
+; Reading and writing open files, linked only into programs that open one.
+; With O_APPEND, a write first moves to the end of the file. Each kind of file
+; is transferred its own way:
 ;
-; O_APPEND: a write first moves to the end of the file (seekend.s).
+;   T files:      a write fails with EINVAL if any byte is $80-$FF;
+;                 otherwise $0A and $0D are swapped and bit 7 set. A read
+;                 ends at the first $00 on disk, clears bit 7 and swaps
+;                 $0A and $0D back, so every byte written reads back
+;                 unchanged ($00 too, stored as $80).
+;   Header files: A, I and B. The header is hidden; reads stop at the
+;                 length it records, and writes extend it, rewritten on
+;                 close.
+;   Other files:  raw.
 ;
-; T files (DESIGN.md 5.1):
-;   write: rejects the whole request with EINVAL if any byte is $80-$FF;
-;          otherwise swaps $0A/$0D and sets bit 7
-;   read:  the first $00 on disk ends the file; clears bit 7 and swaps
-;          $0A/$0D back, so every byte written reads back unchanged
-;          (including $00, stored as $80)
-; Header files (A, I, B; DESIGN.md 5.3): the header is hidden; reads stop
-; at the length it records, and writes extend it (rewritten on close).
-; Other files are transferred raw.
-;
-; Zero page: like the stock rwcommon, this may change ptr1-ptr3, but it
-; preserves ptr4, which it uses for the control block (ctlblock). cc65's
-; fgets keeps its destination pointer in ptr4 across fgetc -> read
-; (DESIGN.md 10.1).
+; Like cc65's, this may change ptr1-ptr3, but it preserves ptr4, which it uses
+; for the control block: cc65's fgets keeps its destination in ptr4 across
+; fgetc and read. For details, see sections 5.1 and 5.3 of DESIGN.
 ;
 
         .export         rwfile
@@ -50,10 +47,8 @@ COUNT = rw_count                ; Bytes transferred, for rwepilog
         .segment        "ONCE"
 
 ;-----------------------------------------------------------------------------
-; initrwfile: Point rwcommon's JMP at rwfile (a constructor).
+; Point rwcommon's JMP at rwfile (a constructor).
 ;
-; Input:        none
-; Output:       none
 ; Changes:      A.
 
 initrwfile:
@@ -66,10 +61,9 @@ initrwfile:
         .code
 
 ;-----------------------------------------------------------------------------
-; rwfile: Read or write an open file, for read() and write(), through
-; rwcommon.
+; Read or write an open file, for read() and write(), through rwcommon.
 ;
-; Input:        A             byte      the file's REF_NUM (open.s)
+; Input:        A             byte      the file's REF_NUM
 ;               Y             byte      READ_CALL or WRITE_CALL
 ;               buffer        byte*     the caller's buffer
 ;               count         unsigned  the number of bytes
@@ -362,9 +356,8 @@ ok:     jsr     restore
         jmp     rwepilog
 
 ;-----------------------------------------------------------------------------
-; restore: Restore the caller's ptr4, which rwfile used as ctlblock.
+; Restore the caller's ptr4, which rwfile used as ctlblock.
 ;
-; Input:        none
 ; Output:       A             byte      unchanged
 ; Changes:      N and Z set from A. X, Y and C are unchanged.
 
@@ -378,7 +371,7 @@ restore:
         rts
 
 ;-----------------------------------------------------------------------------
-; whole: Point fm_rangeio at the whole request.
+; Point fm_rangeio at the whole request.
 ;
 ; Input:        buffer        byte*     the caller's buffer
 ;               count         unsigned  the number of bytes
@@ -397,8 +390,8 @@ whole:  lda     buffer
         rts
 
 ;-----------------------------------------------------------------------------
-; putbyte: Store a byte in the caller's buffer, and advance past it (falls
-; into nextbyte).
+; Store a byte in the caller's buffer, and advance past it (falls into
+; nextbyte).
 ;
 ; Input:        A             byte      the byte
 ;               buffer        byte*     where it goes
@@ -410,7 +403,7 @@ putbyte:
         sta     (buffer),y      ; Falls into nextbyte
 
 ;-----------------------------------------------------------------------------
-; nextbyte: Advance past one byte of the caller's buffer, and count it.
+; Advance past one byte of the caller's buffer, and count it.
 ;
 ; Input:        buffer        byte*     the byte
 ;               count         unsigned  the bytes asked for
@@ -434,7 +427,7 @@ nextbyte:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; swapnl: Exchange $0A and $0D (DESIGN.md 5.1, newlines).
+; Exchange $0A and $0D. For details, see section 5.1 of DESIGN.
 ;
 ; Input:        A             char      the character
 ; Output:       A             char      $0D for $0A, $0A for $0D, else

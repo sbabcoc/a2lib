@@ -2,12 +2,10 @@
 ; Ullrich von Bassewitz, 17.05.2000
 ; Scott Babcock, 2026-11-19
 ;
-; int __fastcall__ __osmaperrno (unsigned char oserror);
-;
-; Replaces libsrc/apple2/oserror.s from cc65 (DESIGN.md 5.6). __oserror
-; holds DOS 3.3's own error numbers, as ONERR reports them, and the
-; library's codes from $10 for conditions DOS 3.3 has no number for
-; (fm.inc). Same search as the stock module; only the table differs.
+; The errno value for each __oserror value: DOS 3.3's own error numbers, as
+; ONERR reports them, and the library's codes from $10 for conditions DOS 3.3
+; has no number for. The search is cc65's; only the table differs. For
+; details, see section 5.6 of DESIGN.
 ;
 
         .export         ___osmaperrno
@@ -16,11 +14,11 @@
         .include        "fm.inc"
 
 ;-----------------------------------------------------------------------------
-; ___osmaperrno: Map an __oserror value to an errno value, for cc65's
-; ___mappederrno.
+; Map an __oserror value to an errno value, for cc65's ___mappederrno.
 ;
+; Overrides:    cc65's ___osmaperrno
 ; Input:        A             byte      oserror: a DOS 3.3 error number or a
-;                                       library code (fm.inc)
+;                                       library code
 ; Output:       AX            int       the errno value, or EUNKNOWN for a
 ;                                       code not in the table
 ; Changes:      Flags. Y is unchanged.

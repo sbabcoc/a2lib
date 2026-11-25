@@ -1,24 +1,22 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; int __fastcall__ stat (const char* pathname, struct stat* statbuf);
+; stat() for DOS 3.3 files. The size comes from opening the file and seeking
+; to its end, so it follows the same rules as reads and seeks:
 ;
-; Replaces libsrc/apple2/stat.s from cc65. Opens the file with this
-; library's open() and takes the size from lseek(fd, 0, SEEK_END), so the
-; size follows the same rules as reads and seeks (DESIGN.md 5.8):
-;
-;   st_dev      slot | (drive - 1) << 3, the encoding stock stat derives
+;   st_dev      slot | (drive - 1) << 3, the encoding cc65's stat derives
 ;               from ProDOS's unit number
-;   st_mode     S_IFREG (DOS 3.3 has no directories)
+;   st_mode     S_IFREG: DOS 3.3 has no directories
 ;   st_size     T: bytes before the first $00; A, I, B: the header's
 ;               length; others: bytes up to the end of the data
 ;   st_access   DOS33_LOCKED ($80) if the file is locked, else 0
 ;   st_type     DOS 3.3's type, in the catalog's coding (DOS33_T_*)
 ;   st_auxtype  B: load address; others 0
-;   st_blocks   512-byte blocks, (sectors + 1) / 2, from the file's catalog
-;               entry; the same value readdir() gives in d_blocks
+;   st_blocks   512-byte blocks, (sectors + 1) / 2, from the catalog
+;               entry, as readdir() gives in d_blocks
 ;
-; Everything else is 0: DOS 3.3 keeps no dates.
+; Everything else is 0: DOS 3.3 keeps no dates. For details, see section 5.8
+; of DESIGN.
 ;
 
         .export         _stat
@@ -45,10 +43,12 @@ name_char       = tmp1          ; char: one of d_name's characters (cmpname)
         .code
 
 ;-----------------------------------------------------------------------------
-; _stat: Describe a file: int __fastcall__ stat (const char* pathname, struct
-; stat* statbuf). Opens it with open() and takes the size from lseek (fd, 0,
+; Describe a file. Opens it with open() and takes the size from lseek (fd, 0,
 ; SEEK_END), then finds its catalog entry for st_blocks.
 ;
+; Signature:    int __fastcall__ stat (const char* pathname, struct stat*
+;               statbuf)
+; Overrides:    cc65's stat()
 ; Input:        C stack       char*     pathname: the file's path
 ;               AX            struct stat*
 ;                                       statbuf: where the description goes

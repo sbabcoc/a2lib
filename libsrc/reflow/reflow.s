@@ -1,37 +1,26 @@
 ;
 ; Scott Babcock, 2026-11-13
 ;
-; Reflow filter for stdio console output (DESIGN.md 3.7)
+; Word-wrapping stdio console output, with reflow_on() and reflow_off().
+; Linked only into programs that call them.
 ;
-; void __fastcall__ reflow_on (unsigned char width);
-; void reflow_off (void);
-;
-; reflow_on points COUT (cout.s) at the filter below, which word-wraps the
-; text passing through it; reflow_off restores it. Linked only into
-; programs that call them.
-;
-; width is the screen width to wrap for, 2-81; 0 means the visible width
-; (a2_viewport: 40 on the stock screen, 70 on Soft-70, 80 on the
-; VideoTerm). A line holds at most width - 1 characters, so the filter
-; never relies on the display's own wrap at the edge, which differs
-; between backends (immediate on the stock screen, delayed on the
-; VideoTerm and on Soft-70).
+; A line holds at most width - 1 characters, so the filter never relies on the
+; display's own wrap at the edge, which differs between displays: immediate on
+; the stock screen, delayed on the VideoTerm and on Soft-70.
 ;
 ; Nothing is held back, so a prompt without a trailing space still appears
-; before input: each character is printed at once, and the filter keeps
-; the current word. When a word would overflow the line, the filter backs
-; up over it, blanks it, and prints it again on the next line. A word that
-; fills a whole line is broken there. A space that ends a full line becomes
-; the line break, and spaces at the start of a line that the filter began
-; are dropped; spaces after a carriage return are kept (indentation).
+; before input: each character is printed at once, and the filter keeps the
+; current word. When a word would overflow the line, the filter backs up over
+; it, blanks it, and prints it again on the next line. A word that fills a
+; whole line is broken there. A space that ends a full line becomes the line
+; break, and spaces at the start of a line the filter began are dropped;
+; spaces after a carriage return are kept, for indentation.
 ;
-; The filter tracks the column itself, starting from wherex at reflow_on:
-; after moving the cursor with conio, call reflow_on again. Typed input
-; echoed by stdio passes through it too.
-;
-; COUT's callers rely on A, X and Y being preserved (write.s on X and Y,
-; read.s on A), and write.s keeps its buffer in the zero page, so the
-; filter preserves the registers and uses no zero page.
+; The filter tracks the column itself, from the cursor's at reflow_on(). Typed
+; input echoed by stdio passes through it too. COUT's callers rely on A, X and
+; Y being kept, and write() keeps its buffer in the zero page, so the filter
+; keeps the registers and uses no zero page. For details, see section 3.7 of
+; DESIGN.
 ;
 
         .export         _reflow_on, _reflow_off
@@ -46,10 +35,10 @@ REFLOW_MAX      = 81            ; Widest width; the word buffer holds 80
         .code
 
 ;-----------------------------------------------------------------------------
-; _reflow_on: Word-wrap stdio console output: void __fastcall__ reflow_on
-; (unsigned char width). Points COUT at filter, starting at the cursor's
-; column. After moving the cursor with conio, call it again.
+; Word-wrap stdio console output, starting at the cursor's column: points COUT
+; at filter. After moving the cursor with conio, call it again.
 ;
+; Signature:    void __fastcall__ reflow_on (unsigned char width)
 ; Input:        A             unsigned char
 ;                                       width: the screen width to wrap for,
 ;                                       2-81 (others are clamped); 0 for the
@@ -90,10 +79,9 @@ _reflow_on:
         rts
 
 ;-----------------------------------------------------------------------------
-; _reflow_off: Stop word-wrapping: void reflow_off (void). Points COUT back at
-; a2_rawcout.
+; Stop word-wrapping: points COUT back at a2_rawcout.
 ;
-; Input:        none
+; Signature:    void reflow_off ()
 ; Output:       a2_coutvec    word      a2_rawcout
 ; Changes:      A and flags. X and Y are unchanged.
 
@@ -105,7 +93,7 @@ _reflow_off:
         rts
 
 ;-----------------------------------------------------------------------------
-; filter: COUT while reflow is on, word-wrapping as described above.
+; COUT while reflow is on, word-wrapping as described above.
 ;
 ; Input:        A             char      the character, bit 7 set
 ;               col           byte      the column of the next character

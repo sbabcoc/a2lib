@@ -1,15 +1,17 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; The end of a file, for O_APPEND:
+; Moving an open file to its end, for O_APPEND:
 ;
-;   Header files: the end is the length recorded in the header.
-;   T files:      the end is the first $00 on disk, found by scanning
-;                 forward from the current position (after the first
-;                 append the scan stops at once).
+;   Header files: the length recorded in the header.
+;   T files:      the first $00 on disk, found by reading forward from
+;                 the current position, so after the first append the
+;                 search stops at once.
 ;   Raw files:    no end is recorded below sector granularity, so
 ;                 O_APPEND fails with EINVAL rather than append after
-;                 padding (DESIGN.md 1, guiding principle).
+;                 padding.
+;
+; For details, see section 5.7 of DESIGN.
 ;
 
         .export         seekend
@@ -21,7 +23,7 @@
         .code
 
 ;-----------------------------------------------------------------------------
-; seekend: Move an open file to its end, before a write with O_APPEND.
+; Move an open file to its end, before a write with O_APPEND.
 ;
 ; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset, of an open
@@ -100,7 +102,7 @@ out:    ldy     sslot
         rts
 
 ;-----------------------------------------------------------------------------
-; topos: POSITION a T file, which has no header, to its logical position.
+; POSITION a T file, which has no header, to its logical position.
 ;
 ; Prepare:      fm_begin
 ; Input:        ctlblock      FCB*      the control block

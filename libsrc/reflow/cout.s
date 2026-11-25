@@ -2,14 +2,10 @@
 ; Oliver Schmidt, 03.03.2007
 ; Scott Babcock, 2026-11-13
 ;
-; COUT routine
-;
-; Reflow support (DESIGN.md 3.7): modified copy of libsrc/apple2/cout.s
-; from cc65. COUT, through which all stdio console output passes (write.s,
-; and read.s for its echo), is a JMP in DATA that reflow.s's reflow_on
-; points at its filter; a2_rawcout is the stock routine. In
-; a2lib-reflow.lib; a2lib-reflow.o pulls it in, in place of stock cout.s.
-; The display libraries have their own.
+; COUT for the reflow library: as cc65's, but a JMP in DATA that reflow_on()
+; can point at its filter. All stdio console output passes through it. The
+; library's selector links it in place of cc65's; the display libraries have
+; their own. For details, see section 3.7 of DESIGN.
 ;
 
         .export         COUT, a2_rawcout, a2_coutvec
@@ -25,12 +21,11 @@ a2_coutvec      = COUT + 1      ; The JMP's target
         .segment        "LOWCODE"
 
 ;-----------------------------------------------------------------------------
-; a2_rawcout: Write a character through COUT ($FDED) with ROM banked in, as
-; stock cout.s: the output routine itself, which COUT's JMP reaches unless
-; reflow_on has pointed it at its filter.
+; Write a character through COUT ($FDED) with ROM banked in, as cc65's COUT
+; does: the output routine itself, which COUT's JMP reaches unless reflow_on
+; has pointed it at its filter.
 ;
 ; Input:        A             char      the character, with the high bit set
-; Output:       none
 ; Changes:      What COUT and the output hook change. Ends with LC bank 2
 ;               read-only.
 

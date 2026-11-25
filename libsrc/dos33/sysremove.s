@@ -1,12 +1,9 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; unsigned char __fastcall__ _sysremove (const char* name);
-;
-; Replaces libsrc/apple2/sysremove.s from cc65. remove() passes the result
-; to ___mappederrno, so it returns 0 or an __oserror value (DESIGN.md
-; 5.6). As under ProDOS, a locked file fails with EACCES, and
-; an open file with EINVAL (DESIGN.md 5.5a).
+; remove() for DOS 3.3 files. As under ProDOS, a locked file fails with
+; EACCES, and an open file with EINVAL. For details, see section 5.5 of
+; DESIGN.
 ;
 
         .export         __sysremove
@@ -17,9 +14,10 @@
         .code
 
 ;-----------------------------------------------------------------------------
-; __sysremove: Delete a file, for remove(): unsigned char __fastcall__
-; _sysremove (const char* name).
+; Delete a file, for remove().
 ;
+; Signature:    unsigned char __fastcall__ _sysremove (const char* name)
+; Overrides:    cc65's _sysremove()
 ; Input:        AX            char*     name: the file's path
 ; Output:       A             byte      0, or the __oserror value:
 ;                                       DOSERR_LOCKED (EACCES) for a locked
@@ -30,7 +28,7 @@
 ;                                       DOS 3.3 error
 ; Changes:      X and Y; ptr1 (fm_name), ptr2 (fm_isopen), fm_parmlist and
 ;               ctlblock. Takes a DOS buffer for the call and releases it.
-; Note:         X isn't set: the only caller, cc65's common/remove.s,
+; Note:         X isn't set: the only caller, cc65's remove(),
 ;               ends in ___mappederrno, which sets it.
 
 __sysremove:

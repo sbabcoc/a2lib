@@ -1,21 +1,18 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; off_t __fastcall__ lseek (int fd, off_t offset, int whence);
+; lseek() for DOS 3.3 files. Each kind of file has its own end:
 ;
-; Replaces libsrc/apple2/lseek.s from cc65 (same interface: whence 0 =
-; SEEK_CUR, 1 = SEEK_END, 2 = SEEK_SET; result in sreg:X:A, or -1).
-; See DESIGN.md 5.7.
+;   Header files (A, I, B): the length in the header. Seeking past it
+;     fails with ESPIPE.
+;   T files: the first $00 on disk, found by reading from the start. Any
+;     position can be set, past the end too, so that records of
+;     random-access files can be reached.
+;   Raw files: the end of the data, as for reads.
 ;
-;   Header files (A, I, B): the end is the length in the header. Seeking
-;     past it fails with ESPIPE, as SET_MARK past EOF does under ProDOS.
-;   T files: the end is the first $00 on disk, found by scanning from the
-;     start. Any position may be set, including past the end, so that
-;     records of random-access files can be reached (DESIGN.md 5.2).
-;   Raw files: the end is the end of the data, as for reads.
-;   All: positions are limited to 16 bits (the File Manager's POSITION
-;     takes a 16-bit whole-file offset); larger ones fail with EINVAL, as
-;     positions beyond ProDOS's 24-bit range do.
+; Positions are limited to 16 bits, as the File Manager's POSITION takes a
+; 16-bit offset; larger ones fail with EINVAL. For details, see section 5.7 of
+; DESIGN.
 ;
 
         .export         _lseek
@@ -35,9 +32,10 @@ offset_high     = ptr2          ; unsigned: the offset's high word
         .code
 
 ;-----------------------------------------------------------------------------
-; _lseek: Move an open file's position: off_t __fastcall__ lseek (int fd,
-; off_t offset, int whence).
+; Move an open file's position.
 ;
+; Signature:    off_t __fastcall__ lseek (int fd, off_t offset, int whence)
+; Overrides:    cc65's lseek()
 ; Prepare:      open()
 ; Input:        C stack       int       fd: an open file, not the console
 ;               C stack       long      offset: from the position whence names

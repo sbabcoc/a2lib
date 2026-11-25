@@ -1,23 +1,20 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; unsigned char __fastcall__ _sysrename (const char* oldname, const char* newname);
-;
-; Replaces libsrc/apple2/sysrename.s from cc65. rename() passes the result
-; to ___mappederrno, so it returns 0 or an __oserror value (DESIGN.md 5.6).
+; rename() for DOS 3.3 files:
 ;
 ;   - Either path may give the slot and drive ("/6/2/NAME", "2/NAME"),
 ;     but the new one must be where the old one is: DOS's RENAME can't
 ;     move a file. Another slot or drive fails with EINVAL (cc65 has no
 ;     EXDEV).
-;   - DOS's RENAME doesn't check whether the new name is already in use
-;     and would leave two files with the same name. As under ProDOS, an
+;   - DOS's RENAME doesn't check whether the new name is in use, and
+;     would leave two files with the same name. As under ProDOS, an
 ;     existing new name fails with EEXIST.
 ;   - A locked file fails with EACCES, and an open file with EINVAL, as
-;     under ProDOS (DESIGN.md 5.5a).
+;     under ProDOS.
 ;   - A file renamed to its own name is left as it is, as POSIX says.
 ;
-; See DESIGN.md 5.5.
+; For details, see section 5.5 of DESIGN.
 ;
 
         .export         __sysrename
@@ -31,9 +28,11 @@
         .code
 
 ;-----------------------------------------------------------------------------
-; __sysrename: Rename a file, for rename(): unsigned char __fastcall__
-; _sysrename (const char* oldname, const char* newname).
+; Rename a file, for rename().
 ;
+; Signature:    unsigned char __fastcall__ _sysrename (const char* oldname,
+;               const char* newname)
+; Overrides:    cc65's _sysrename()
 ; Input:        C stack       char*     oldname: the file's path
 ;               AX            char*     newname: its new path, on the same
 ;                                       slot and drive
@@ -49,7 +48,7 @@
 ; Changes:      X and Y; ptr1 (fm_name), ptr2 (fm_isopen), fm_parmlist and
 ;               ctlblock. Pops oldname. Takes a DOS buffer for the call and
 ;               releases it.
-; Note:         X isn't set: the only caller, cc65's common/rename.s,
+; Note:         X isn't set: the only caller, cc65's rename(),
 ;               ends in ___mappederrno, which sets it.
 
 __sysrename:
@@ -150,13 +149,12 @@ free:   jsr     fm_freefcb      ; Preserves A
 done:   rts
 
 ;-----------------------------------------------------------------------------
-; setname: Point the parameter list's FM_NAME at a name buffer.
+; Point the parameter list's FM_NAME at a name buffer.
 ;
 ; Prepare:      fm_begin
 ; Input:        AX            byte*     the name buffer (NAME_LEN bytes, as
 ;                                       fm_name stores names)
 ;               fm_parmlist   byte*     the parameter list
-; Output:       none
 ; Changes:      A and Y. X is unchanged.
 
 setname:

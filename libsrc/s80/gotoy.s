@@ -2,10 +2,8 @@
 ; Ullrich von Bassewitz, 06.08.1998
 ; Scott Babcock, 2026-11-14
 ;
-; void __fastcall__ gotoy (unsigned char y);
-;
-; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
-; libsrc/apple2/gotoy.s. Same column (79 while a wrap is pending), new row.
+; gotoy() for the Soft-70 library: the same column, 79 while a wrap is
+; pending, on a new row. For details, see section 3.8 of DESIGN.
 ;
 
         .export         _gotoy
@@ -15,12 +13,12 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _gotoy: Move the cursor to a row, keeping its column (79 while a wrap is
-; pending): void __fastcall__ gotoy (unsigned char y).
+; Move the cursor to a row, keeping its column (79 while a wrap is pending).
 ;
+; Signature:    void __fastcall__ gotoy (unsigned char y)
+; Overrides:    cc65's gotoy()
 ; Input:        A             unsigned char
 ;                                       y: the row, 0-23
-; Output:       none
 ; Changes:      X and flags; the cursor. On the VideoTerm: A.
 
 _gotoy:

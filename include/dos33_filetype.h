@@ -1,10 +1,11 @@
 /*
-** DOS 3.3 file types for a2lib (DESIGN.md 5.4)
+** DOS 3.3 file types for a2lib
 **
 ** The type byte of a catalog entry, as CATALOG lists it ("Beneath Apple
 ** DOS" ch. 4). These are the values of _filetype (for new files), of
 ** st_type (stat) and of d_type (readdir). DOS 3.3's own codes, not
-** ProDOS's: note that PRODOS_T_TXT ($04) is DOS33_T_BIN here.
+** ProDOS's: note that PRODOS_T_TXT ($04) is DOS33_T_BIN here. For
+** details, see section 5.4 of DESIGN.
 **
 ** Copyright (c) 2026 Scott Babcock. zlib license; see LICENSE.
 */

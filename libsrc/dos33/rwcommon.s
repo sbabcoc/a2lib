@@ -1,9 +1,10 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; Replaces libsrc/apple2/rwcommon.s from cc65 and exports the same symbols,
-; for the stock read.s and for write.s. The file code is in rwfile.s, which
-; only programs that open files link.
+; The argument handling and result that read() and write() share, under the
+; names cc65's read() expects. The file transfer itself is linked only into
+; programs that open files; until a file is open, a transfer fails with
+; EINVAL.
 ;
 
         .export         rwprolog, rwcommon, rwepilog, rw_count
@@ -19,9 +20,10 @@ count           = ptr2          ; unsigned: the bytes asked for
         .code
 
 ;-----------------------------------------------------------------------------
-; rwprolog: Take read()'s or write()'s arguments: int __fastcall__ read (int
-; fd, void* buf, unsigned count), and write's.
+; Take read()'s or write()'s arguments.
 ;
+; Signature:    int __fastcall__ read (int fd, void* buf, unsigned count), and
+;               write's
 ; Prepare:      open(), for a file; the console's descriptors (0-2) are open
 ;               from the start
 ; Input:        C stack       int       fd
@@ -48,7 +50,7 @@ rwprolog:
         jmp     getfd           ; Returns A, Y and C
 
 ;-----------------------------------------------------------------------------
-; rwepilog: Return the number of bytes transferred, from read() or write().
+; Return the number of bytes transferred, from read() or write().
 ;
 ; Prepare:      rwprolog, then the transfer (rwfile), which sets rw_count
 ; Input:        A             byte      the __oserror value (0)
@@ -65,9 +67,8 @@ rwepilog:
         rts
 
 ;-----------------------------------------------------------------------------
-; nofile: Fail a transfer that rwcommon got before any file was opened.
+; Fail a transfer that rwcommon got before any file was opened.
 ;
-; Input:        none
 ; Output:       AX            int       -1
 ;               errno         int       EINVAL
 ; Changes:      As ___directerrno.
@@ -78,10 +79,11 @@ nofile: lda     #EINVAL
         .data
 
 ;-----------------------------------------------------------------------------
-; rwcommon: Read or write an open file: a JMP to rwfile (rwfile.s), which
-; its constructor sets. A program that opens no file has no file to pass
-; here; until then it fails with EINVAL.
+; Read or write an open file: a JMP to rwfile, which its
+; constructor sets. A program that opens no file has no file to pass here;
+; until then it fails with EINVAL.
 ;
+; Overrides:    cc65's rwcommon
 ; Input:        as rwfile
 ; Output:       as rwfile
 ; Changes:      as rwfile

@@ -2,15 +2,11 @@
 ; Oliver Schmidt, 03.03.2007
 ; Scott Babcock, 2026-11-12
 ;
-; RDKEY routine
-;
-; Soft-70 backend (a2lib-soft70.lib), based on cc65's
-; libsrc/apple2/rdkey.s (Oliver Schmidt). On the VideoTerm, shows its
-; cursor while waiting. With Soft-70, shows the blinking cursor at the
-; model's cursor (panning to it if following) while the monitor's RDKEY
-; reads through the input hook, as stdio input does; the monitor's own
-; cursor goes to the hidden text screen, at row 0, column 0. The echo goes
-; through COUT into the model.
+; RDKEY, which stdio input reads keys with, for the Soft-70 library. On the
+; VideoTerm, it shows the card's cursor while waiting. With Soft-70, it shows
+; the blinking cursor at the model's, panning to it if following, and puts the
+; monitor's own cursor on the hidden text screen, at row 0, column 0. The echo
+; goes through COUT into the model. For details, see section 3.8 of DESIGN.
 ;
 
         .export         RDKEY
@@ -24,13 +20,13 @@
         .segment        "LOWCODE"
 
 ;-----------------------------------------------------------------------------
-; RDKEY: Read a key through the monitor's RDKEY ($FD0C) with ROM banked in, so
-; the input hook (KSW) gets it, as stdio input does. On the VideoTerm, shows
-; the card's cursor while waiting. With Soft-70, shows the blinking cursor at
-; the model's, and puts the monitor's own cursor at row 0, column 0 of the
-; hidden text screen. The echo goes through COUT into the model.
+; Read a key through the monitor's RDKEY ($FD0C) with ROM banked in, so the
+; input hook (KSW) gets it, as stdio input does. On the VideoTerm, shows the
+; card's cursor while waiting. With Soft-70, shows the blinking cursor at the
+; model's, and puts the monitor's own cursor at row 0, column 0 of the hidden
+; text screen. The echo goes through COUT into the model.
 ;
-; Input:        none
+; Overrides:    cc65's RDKEY
 ; Output:       A             char      the key, with the high bit set
 ; Changes:      X, Y and flags; what RDKEY and the input hook change. With
 ;               Soft-70: CH, CV and BASL/BASH (VTABZ), and what s70_curshow
@@ -49,9 +45,8 @@ RDKEY:
         rts
 
 ;-----------------------------------------------------------------------------
-; s70: RDKEY with Soft-70.
+; RDKEY with Soft-70.
 ;
-; Input:        none
 ; Output:       A             char      the key
 ; Changes:      As RDKEY.
 
@@ -67,10 +62,8 @@ s70:    jsr     s70_curshow
         rts
 
 ;-----------------------------------------------------------------------------
-; rom: Call the monitor's RDKEY with ROM banked in, then LC bank 2 read-only
-; again.
+; Call the monitor's RDKEY with ROM banked in, then LC bank 2 read-only again.
 ;
-; Input:        none
 ; Output:       A             char      the key
 ; Changes:      What RDKEY and the input hook change.
 

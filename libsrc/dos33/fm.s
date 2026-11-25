@@ -1,11 +1,10 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; DOS 3.3 File Manager glue for the cc65 apple2 target
-;
-; Calls into DOS 3.3's File Manager ("Beneath Apple DOS" ch. 6, 8) through
-; its parameter list (fm_parmlist), for a file whose buffers are a control
-; block (FCB, fm.inc; ctlblock).
+; Calls into DOS 3.3's File Manager ("Beneath Apple DOS" ch. 6 and 8):
+; locating the parameter list, OPEN, POSITION, byte and range READ and WRITE,
+; and mapping its return codes to __oserror values. Each open file's buffers
+; are a control block (FCB). For details, see section 4.4 of DESIGN.
 ;
 
         .include        "zeropage.inc"
@@ -18,7 +17,7 @@ call_type       = tmp1          ; byte: FMC_READ or FMC_WRITE (fm_rangeio)
         .code
 
 ;-----------------------------------------------------------------------------
-; fm_fdfcb: Find the control block of an fdtab slot.
+; Find the control block of an fdtab slot.
 ;
 ; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset (fd *
@@ -38,8 +37,8 @@ fm_fdfcb:
         rts
 
 ;-----------------------------------------------------------------------------
-; fm_fdbegin: Find the control block of an fdtab slot and begin File Manager
-; calls on it: fm_fdfcb, then fm_begin (falls into it).
+; Find the control block of an fdtab slot and begin File Manager calls on it:
+; fm_fdfcb, then fm_begin (falls into it).
 ;
 ; Prepare:      open()
 ; Input:        Y             byte      the fdtab slot's offset, of an open
@@ -52,10 +51,10 @@ fm_fdbegin:
         jsr     fm_fdfcb        ; Falls into fm_begin
 
 ;-----------------------------------------------------------------------------
-; fm_begin: Begin a series of File Manager calls: locate the parameter list
-; and point its buffer fields at the control block's work area and the T/S
-; list and data buffers below it. Needed before each series, because DOS owns
-; the parameter list between calls.
+; Begin a series of File Manager calls: locate the parameter list and point
+; its buffer fields at the control block's work area and the T/S list and data
+; buffers below it. Needed before each series, because DOS owns the parameter
+; list between calls.
 ;
 ; Prepare:      fm_getfcb or fm_fdfcb
 ; Input:        ctlblock      FCB*      the control block
@@ -85,9 +84,8 @@ fm_begin:
         rts
 
 ;-----------------------------------------------------------------------------
-; fm_simple: Make a File Manager call that takes no parameters but the call
-; type (CLOSE, or DELETE once fm_name has set the name fields). Falls into
-; fm_op.
+; Make a File Manager call that takes no parameters but the call type (CLOSE,
+; or DELETE once fm_name has set the name fields). Falls into fm_op.
 ;
 ; Prepare:      fm_begin
 ; Input:        A             byte      the call type (FMC_*)
@@ -100,8 +98,8 @@ fm_simple:
         ldx     #$01            ; Falls into fm_op
 
 ;-----------------------------------------------------------------------------
-; fm_op: Make a File Manager call of the given type, its other parameters
-; already set.
+; Make a File Manager call of the given type, its other parameters already
+; set.
 ;
 ; Prepare:      fm_begin
 ; Input:        A             byte      the call type (FMC_*)
@@ -116,8 +114,7 @@ fm_op:  ldy     #FM_CALL
         jmp     fm_call         ; fm_call is in another segment
 
 ;-----------------------------------------------------------------------------
-; fm_open: OPEN the file that the name fields name, with variable-length
-; records.
+; OPEN the file that the name fields name, with variable-length records.
 ;
 ; Prepare:      fm_begin, fm_name
 ; Input:        A             byte      the type for a new file (FMT_*);
@@ -145,9 +142,9 @@ fm_open:
         .segment        "LOWCODE"
 
 ;-----------------------------------------------------------------------------
-; fm_call: Call the File Manager. cc65 leaves Language Card bank 2 enabled for
-; reading, so ROM is switched in around the call, as rdkey.s does around the
-; monitor's RDKEY.
+; Call the File Manager. cc65 leaves Language Card bank 2 enabled for reading,
+; so ROM is switched in around the call, as cc65's RDKEY does around the
+; monitor's.
 ;
 ; Prepare:      fm_begin
 ; Input:        X             byte      OPEN only: 0 creates the file if it
@@ -173,8 +170,7 @@ fm_call:
         .code
 
 ;-----------------------------------------------------------------------------
-; fm_position: POSITION an open file to a byte offset from its start (record
-; 0).
+; POSITION an open file to a byte offset from its start (record 0).
 ;
 ; Prepare:      fm_begin
 ; Input:        AX            unsigned  the byte offset
@@ -198,7 +194,7 @@ fm_position:
         bne     fm_simple       ; Branch always
 
 ;-----------------------------------------------------------------------------
-; fm_readbyte: READ one byte from an open file.
+; READ one byte from an open file.
 ;
 ; Prepare:      fm_begin
 ; Input:        fm_parmlist   byte*     the parameter list
@@ -224,7 +220,7 @@ fm_readbyte:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; fm_writebyte: WRITE one byte to an open file.
+; WRITE one byte to an open file.
 ;
 ; Prepare:      fm_begin
 ; Input:        A             byte      the byte
@@ -246,9 +242,9 @@ fm_writebyte:
         jmp     fm_call
 
 ;-----------------------------------------------------------------------------
-; fm_rangeio: READ or WRITE a range of bytes of an open file. A WRITE passes
-; the File Manager the count less FM_WRITE_ADJUST, as "Beneath Apple DOS" ch.
-; 6 says a range WRITE takes (fm.inc).
+; READ or WRITE a range of bytes of an open file. A WRITE passes the File
+; Manager the count less FM_WRITE_ADJUST, as "Beneath Apple DOS" ch. 6 says a
+; range WRITE takes.
 ;
 ; Prepare:      fm_begin
 ; Input:        A             byte      FMC_READ or FMC_WRITE
@@ -295,7 +291,7 @@ fm_rangeio:
         jmp     fm_call
 
 ;-----------------------------------------------------------------------------
-; fm_incpos: Add 1 to the control block's logical position.
+; Add 1 to the control block's logical position.
 ;
 ; Prepare:      fm_begin
 ; Input:        ctlblock      FCB*      the control block
@@ -315,8 +311,8 @@ fm_incpos:
         rts
 
 ;-----------------------------------------------------------------------------
-; fm_maperr: Translate a File Manager return code into an __oserror value. The
-; File Manager's codes are DOS 3.3's own error numbers (fm.inc), so they pass
+; Translate a File Manager return code into an __oserror value. The File
+; Manager's codes are DOS 3.3's own error numbers, so they pass
 ; through; anything else is an I/O error.
 ;
 ; Input:        A             byte      the return code, not 0

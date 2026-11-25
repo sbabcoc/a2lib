@@ -2,12 +2,9 @@
 ; Kevin Ruland
 ; Scott Babcock, 2026-11-12
 ;
-; unsigned char wherex (void);
+; wherex() for the VideoTerm library: on the card, its cursor's column. For
+; details, see section 3.4 of DESIGN.
 ;
-;
-; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/wherex.s
-; from cc65; if the card is in use, returns its cursor column (79 while a
-; wrap is pending at column 80) (DESIGN.md 3.4).
 
         .ifndef __APPLE2ENH__
         .import         machinetype
@@ -19,10 +16,10 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _wherex: The cursor's column: unsigned char wherex (void). On the card, 79
-; while a wrap is pending at column 80.
+; The cursor's column. On the card, 79 while a wrap is pending at column 80.
 ;
-; Input:        none
+; Signature:    unsigned char wherex ()
+; Overrides:    cc65's wherex()
 ; Output:       AX            unsigned char
 ;                                       the column
 ; Changes:      Flags. Y is unchanged.

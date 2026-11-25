@@ -1,11 +1,9 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; DOS 3.3 RWTS access for the cc65 apple2 target
-;
-; Reads a sector through DOS's own IOB (from $3E3), so the device
-; characteristics table and last-access fields that DOS maintains stay
-; valid ("Beneath Apple DOS" ch. 6).
+; Reading a disk sector through RWTS, with DOS's own IOB ($3E3), so that the
+; device characteristics table and last-access fields DOS keeps stay valid
+; ("Beneath Apple DOS" ch. 6). The catalog routines use it.
 ;
 
         .include        "zeropage.inc"
@@ -17,7 +15,7 @@ iob             = ptr3          ; byte*: DOS's IOB
         .code
 
 ;-----------------------------------------------------------------------------
-; rwts_read: Read one sector through RWTS.
+; Read one sector through RWTS.
 ;
 ; Input:        rwts_slot     byte      the slot (1-7)
 ;               rwts_drive    byte      the drive (1-2)
@@ -83,8 +81,8 @@ rwts_read:
         .segment        "LOWCODE"
 
 ;-----------------------------------------------------------------------------
-; call: Call RWTS. cc65 leaves Language Card bank 2 enabled for reading, so
-; ROM is switched in around the call, as fm_call does.
+; Call RWTS. cc65 leaves Language Card bank 2 enabled for reading, so ROM is
+; switched in around the call, as fm_call does.
 ;
 ; Input:        Y             byte      the IOB's low byte
 ;               A             byte      the IOB's high byte
@@ -104,8 +102,8 @@ call:   bit     LC_ROM_RO
         .code
 
 ;-----------------------------------------------------------------------------
-; rwts_maperr: Translate an RWTS return code into the DOS 3.3 error number
-; that DOS itself reports for it, as fm_maperr does for the File Manager.
+; Translate an RWTS return code into the DOS 3.3 error number that DOS itself
+; reports for it, as fm_maperr does for the File Manager.
 ;
 ; Input:        A             byte      RWTS's return code, not 0
 ; Output:       A             byte      the __oserror value: DOSERR_WPROT

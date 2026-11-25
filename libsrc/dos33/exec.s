@@ -1,22 +1,16 @@
 ;
 ; Scott Babcock, 2026-11-18
 ;
-; int __fastcall__ exec (const char* progname, const char* cmdline);
+; exec() for DOS 3.3. As cc65's does, it checks the program file, shuts the C
+; library down, and finishes in a stub at the top of page 3. In place of a
+; ProDOS loader, the stub sends DOS a command through COUT: BRUN for a B file,
+; RUN for an A file, with the slot and drive written out. A non-empty cmdline
+; follows the command in page 2, where main()'s argument parser finds it; an A
+; file takes none.
 ;
-; Replaces libsrc/apple2/exec.s from cc65 (DESIGN.md 5.10). Keeps stock
-; exec()'s structure: check the program file, shut the C library down
-; through exit_with_params, and finish in a stub at the top of page 3.
-; Instead of stock's ProDOS loader, the stub sends DOS 3.3 a command
-; through COUT: BRUN for a B file, RUN for an A file, with the name's slot
-; and drive written out. A non-empty cmdline follows the command in page 2
-; (after DOS's copy of the command at $200) as $00 $B2 cmdline $00, for
-; a2lib's mainargs.s; an A file takes no cmdline (EINVAL).
-;
-; Fails, returning -1 with errno set, before anything is shut down: EINVAL
-; for a bad path, a name with a comma (which a DOS command can't carry) or
-; an A file with a cmdline, ENOENT and the other OPEN errors, ENOEXEC for a
-; file that isn't B or A, ENOMEM if every DOS buffer is in use. After the
-; hand-off, failures are DOS's.
+; Every failure comes before the C library shuts down, so exec() returns -1
+; with errno set and the program keeps running. After the hand-off, failures
+; are DOS's. For details, see section 5.10 of DESIGN.
 ;
 
         .export         _exec
@@ -38,11 +32,13 @@ CMDMAX  = 1 + 4 + 1 + NAME_LEN + 6 + 1 ; ^D BRUN sp name ,S7,D2 CR
         .code
 
 ;-----------------------------------------------------------------------------
-; _exec: Run another program: int __fastcall__ exec (const char* progname,
-; const char* cmdline). On success, doesn't return: the C library shuts down,
+; Run another program. On success, doesn't return: the C library shuts down,
 ; as at exit, and DOS runs the program. Every check comes before that, so a
 ; failure leaves the program running.
 ;
+; Signature:    int __fastcall__ exec (const char* progname, const char*
+;               cmdline)
+; Overrides:    cc65's exec()
 ; Input:        C stack       char*     progname: the program's path, a B or A
 ;                                       file
 ;               AX            char*     cmdline: its arguments for main (B
@@ -67,7 +63,7 @@ _exec:
         sta     progname
         stx     progname+1
 
-        ; The file: name, existence and type, as sysremove.s does it
+        ; The file: name, existence and type, as remove() checks them
         jsr     fm_getfcb
         bcs     oserr
         jsr     fm_begin
@@ -93,7 +89,7 @@ free:   jsr     fm_freefcb      ; Preserves A
 oserr:  jmp     ___mappederrno
 
         ; A name with a comma can't be given to a DOS command: its parser
-        ; ends the name there. The File Manager accepts one (DESIGN.md 5.5).
+        ; ends the name there. The File Manager accepts one.
 verb:   ldx     #NAME_LEN-1
 @comma: lda     fm_namebuf,x
         cmp     #',' | $80
@@ -167,7 +163,7 @@ stub:   ldx     #code - 1
         lda     #$00
         sta     cmd_t,x
 
-        ; Point of no return. As stock exec.s: reset the stack, keep up to
+        ; Point of no return. As cc65's exec(): reset the stack, keep up to
         ; 127 bytes of cmdline (terminator included) in the stack page, and
         ; finish in the stub after the C library has shut down.
         ldx     #$FF
@@ -195,7 +191,7 @@ stub:   ldx     #code - 1
         jmp     exit_with_params
 
 ;-----------------------------------------------------------------------------
-; put: Add a byte to the stub's command.
+; Add a byte to the stub's command.
 ;
 ; Input:        A             byte      the byte
 ;               X             byte      its offset in the command
@@ -208,8 +204,8 @@ put:    sta     cmd_t,x
         rts
 
 ;-----------------------------------------------------------------------------
-; puts: Add one of the command's fixed parts to the stub's command, with the
-; high bit set.
+; Add one of the command's fixed parts to the stub's command, with the high
+; bit set.
 ;
 ; Input:        Y             byte      the part's offset from strings: run -
 ;                                       strings or suffix - strings
@@ -238,18 +234,17 @@ drivedigit:
         .rodata
 
 ;-----------------------------------------------------------------------------
-; source: The stub, which exec() copies to target and done enters when the C
-; library has shut down, with ROM banked in. Only relative branches inside it,
-; and its data is addressed at target. Read-only here, as stock exec.s's
-; loader is. It reconnects DOS, sets DOS's state to the ] prompt's, puts the
-; argument tail after where DOS will store the command, prints the command,
-; and ends in DOSWARM, where a B program that returns with RTS lands too.
+; The stub, which exec() copies to target and done enters when the C library
+; has shut down, with ROM banked in. Only relative branches inside it, and its
+; data is addressed at target. Read-only here, as cc65's loader is. It
+; reconnects DOS, sets DOS's state to the ] prompt's, puts the argument tail
+; after where DOS will store the command, prints the command, and ends in
+; DOSWARM, where a B program that returns with RTS lands too.
 ;
 ; Input:        len_t         byte      the command's length, through its CR
 ;               cmd_t         char[]    the command: $84, verb, space, name,
 ;                                       slot, drive, $8D, $00
 ;               STACK_PAGE    char[]    cmdline: up to 127 bytes with its $00
-; Output:       none
 ; Changes:      A, X and Y; CURLIN+1, PROMPT, ERRFLG and BASIC_BUF; DOS's
 ;               intercepts.
 ; Note:         It runs after the stack has been reset, with the C library
@@ -264,7 +259,7 @@ source:
         jsr     MON_COUT
 
         ; Then DOS's state as when the command is typed at the ] prompt,
-        ; so a DOS error ends there instead of in Applesoft (DESIGN.md 5.10)
+        ; so a DOS error ends there instead of in Applesoft
         lda     #$FF
         sta     CURLIN+1
         lda     #$DD            ; ']'
@@ -306,7 +301,7 @@ len_t   = target + code     ; The command's length (1 byte)
 cmd_t   = len_t + 1         ; The command and its terminator
 
         ; The stub and the tail stay out of each other's way, and the
-        ; stub fits in $300-$3CF, as stock exec.s's loader does
+        ; stub fits in $300-$3CF, as cc65's loader does
         .assert target >= $0300, error
         .assert CMDMAX + 2 + 127 <= $100, error
 

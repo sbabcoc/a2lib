@@ -4,8 +4,8 @@
 ** reflow_on makes stdio console output (printf, puts, putchar and the like)
 ** break lines between words; conio output is not affected. It can be
 ** turned on and off as a program runs, for example for documents but not
-** menus, and is linked only into programs that use it. See DESIGN.md
-** sections 3.2 and 3.7.
+** menus, and is linked only into programs that use it. For details, see
+** sections 3.2 and 3.7 of DESIGN.
 **
 ** Link lib/a2lib-reflow.o and lib/a2lib-reflow.lib ahead of
 ** lib/a2lib-dos33.lib, after a display library if there is one.

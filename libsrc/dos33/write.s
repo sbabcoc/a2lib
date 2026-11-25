@@ -2,14 +2,11 @@
 ; Oliver Schmidt, 12.01.2005
 ; Scott Babcock, 2026-11-12
 ;
-; int __fastcall__ write (int fd, const void* buf, unsigned count);
-;
-; DOS 3.3 version of libsrc/apple2/write.s from cc65. The O_APPEND path,
-; which issued ProDOS MLI calls, is gone: rwfile.s moves to the end of the
-; file (seekend.s). The device path leaves its count in rw_count
-; (rwcommon.s), not in ProDOS's parameter block, and counts its passes
-; through the low byte first: stock's loop wrote 256 characters too many
-; for a count that is a nonzero multiple of 256 (DESIGN.md 10.28).
+; write() for files and the console, as cc65's without its ProDOS O_APPEND
+; path: a file opened with O_APPEND moves to its end first. The console's loop
+; counts the low byte first, so a count that is a nonzero multiple of 256 no
+; longer writes 256 characters too many, as cc65's did. For details, see
+; record 10.28 of DESIGN.
 ;
 
         .export         _write
@@ -26,10 +23,12 @@
         .include        "filedes.inc"
 
 ;-----------------------------------------------------------------------------
-; _write: Write to a file or the console: int __fastcall__ write (int fd,
-; const void* buf, unsigned count). The console gets each byte through COUT,
-; '\n' as CR, uppercase on a II+ as stock's does (uppercasemask).
+; Write to a file or the console. The console gets each byte through COUT,
+; '\n' as CR, uppercase on a II+ (uppercasemask).
 ;
+; Signature:    int __fastcall__ write (int fd, const void* buf, unsigned
+;               count)
+; Overrides:    cc65's write()
 ; Prepare:      open(), for a file; the console's descriptors (0-2) are open
 ;               from the start
 ; Input:        C stack       int       fd: open for writing

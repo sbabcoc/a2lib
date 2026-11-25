@@ -2,15 +2,13 @@
 ; Kevin Ruland
 ; Scott Babcock, 2026-11-12
 ;
-; char cgetc (void);
+; cgetc() for the VideoTerm library. With the cursor on, it shows the card's
+; cursor while waiting, in place of the caret on the stock screen.
 ;
 ; If open_apple key is pressed then the high-bit of the key is set.
 ;
+; For details, see section 3.4 of DESIGN.
 ;
-; VideoTerm backend (a2lib-vt.lib): modified copy of
-; libsrc/apple2/cgetc.s from cc65; if the card is in use and the cursor is
-; on, shows the card's cursor while waiting, instead of drawing a caret on
-; the 40-column screen (DESIGN.md 3.4).
 
         .export         _cgetc
 
@@ -25,10 +23,11 @@
         .include        "timer.inc"
 
 ;-----------------------------------------------------------------------------
-; _cgetc: Wait for a key and return it: char cgetc (void). If the cursor is
-; on, shows the card's cursor while waiting, or on the 40-column screen a
-; caret. Ticks the timer while waiting.
+; Wait for a key. If the cursor is on, shows the card's cursor while waiting,
+; or on the 40-column screen a caret. Ticks the timer.
 ;
+; Signature:    char cgetc ()
+; Overrides:    cc65's cgetc()
 ; Input:        cursor        byte      nonzero: show the cursor
 ; Output:       AX            char      the key, with the high bit set if Open
 ;                                       Apple is down on a IIe or later
@@ -58,7 +57,7 @@ put_caret:
 :       inc     RNDL            ; Increment random counter low
         bne     :+
         inc     RNDH            ; Increment random counter high
-        jsr     a2_tickhook     ; One tick (DESIGN.md 6.3)
+        jsr     a2_tickhook     ; One tick
 :       lda     KBD
         bpl     :--             ; If < 128, no key pressed
 
@@ -94,7 +93,7 @@ vt:     lda     cursor          ; Cursor on? Show the card's
 vtwait: inc     RNDL            ; Increment random counter low
         bne     :+
         inc     RNDH            ; Increment random counter high
-        jsr     a2_tickhook     ; One tick (DESIGN.md 6.3)
+        jsr     a2_tickhook     ; One tick
 :       lda     KBD
         bpl     vtwait          ; If < 128, no key pressed
         pha

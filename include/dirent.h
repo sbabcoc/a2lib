@@ -10,12 +10,12 @@
 ** exist only in a2lib-dos33.lib (_opendir_a2lib and the like), whose
 ** directory modules take the place of cc65's. This struct dirent isn't
 ** cc65's, so neither can be used with the other's: this header without
-** the library, or the library with cc65's header, fails to link (DESIGN.md
-** section 2).
+** the library, or the library with cc65's header, fails to link. For
+** details, see section 2 of DESIGN.
 **
 ** opendir() takes a directory path: "/6/2" (slot 6, drive 2), "2" (drive
 ** 2 in the current slot), "." or "" (the current directory). DOS 3.3 has
-** no subdirectories. See DESIGN.md 5.5.
+** no subdirectories. For details, see section 5.5 of DESIGN.
 **
 ** Copyright (c) 2026 Scott Babcock. zlib license; see LICENSE.
 */
@@ -34,7 +34,7 @@ typedef struct DIR DIR;
 /* Fields DOS 3.3 can't supply from the catalog (byte size, dates, aux
 ** type) are left out, so code that relies on them fails to compile
 ** instead of reading zeros. Use stat() for a file's exact size and load
-** address. See DESIGN.md section 5.9.
+** address. For details, see section 5.9 of DESIGN.
 */
 struct dirent {
     char            d_name[31]; /* Up to 30 characters; trailing blanks

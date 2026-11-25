@@ -2,12 +2,8 @@
 ; 2020-07-12, Oliver Schmidt
 ; Scott Babcock, 2026-11-12
 ;
-; char cpeekc (void);
-;
-; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
-; libsrc/apple2/cpeekc.s. The character at the cursor: from VRAM on the
-; VideoTerm, as a2lib-vt.lib's cpeekc.s; from the model's buffer otherwise
-; (S80_PEEK, display.inc). A pending wrap reads column 79.
+; cpeekc() for the Soft-70 library: from the VideoTerm's screen memory, or
+; from the 80 x 24 model's buffer. For details, see section 3.8 of DESIGN.
 ;
 
         .export         _cpeekc
@@ -18,11 +14,11 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _cpeekc: The character at the cursor: char cpeekc (void). From the model's
-; buffer, through S80_PEEK; on the VideoTerm, from VRAM as a2lib-vt.lib's
-; cpeekc. A pending wrap reads column 79.
+; The character at the cursor: from the model's buffer, through S80_PEEK; on
+; the VideoTerm, from VRAM. A pending wrap reads column 79.
 ;
-; Input:        none
+; Signature:    char cpeekc ()
+; Overrides:    cc65's cpeekc()
 ; Output:       AX            char      the character
 ; Changes:      Y and flags; BAS2L. On the VideoTerm: the card's VRAM page and
 ;               $C800 space.
@@ -43,10 +39,9 @@ _cpeekc:
         rts
 
 ;-----------------------------------------------------------------------------
-; vt: cpeekc on the VideoTerm, as a2lib-vt.lib's cpeekc.s: the cursor line's
-; VRAM address plus the column, modulo 2048, through the $CC00-$CDFF window.
+; cpeekc on the VideoTerm, as the VideoTerm library's: the cursor line's VRAM
+; address plus the column, modulo 2048, through the $CC00-$CDFF window.
 ;
-; Input:        none
 ; Output:       AX            char      the character, bit 7 clear
 ; Changes:      Y and flags; the card's VRAM page and $C800 space.
 

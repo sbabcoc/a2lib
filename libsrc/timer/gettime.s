@@ -1,13 +1,10 @@
 ;
 ; Scott Babcock, 2026-11-13
 ;
-; int __fastcall__ clock_gettime (clockid_t clk_id, struct timespec *tp);
-;
-; Software clock for DOS 3.3 (DESIGN.md 6.3). Replaces
-; libsrc/apple2/gettime.s from cc65, which reads the ProDOS clock. DOS 3.3
-; has no clock: the time is the software clock's offset (0 until
-; clock_settime) plus the seconds counted by the cooperative timer, so
-; before the clock is set it returns the up-time.
+; clock_gettime() from the software clock. DOS 3.3 has no clock: the time is
+; the offset clock_settime() sets, 0 until then, plus the seconds the
+; cooperative timer has counted, so before the clock is set it gives the
+; up-time. For details, see section 6.3 of DESIGN.
 ;
 
         .import         incsp1, return0
@@ -21,10 +18,11 @@
 tp              = ptr1          ; struct timespec*: the caller's time
 
 ;-----------------------------------------------------------------------------
-; _clock_gettime: Read the software clock: int __fastcall__ clock_gettime
-; (clockid_t clk_id, struct timespec* tp). Before clock_settime, the time is
-; the up-time.
+; Read the software clock. Before clock_settime, the time is the up-time.
 ;
+; Signature:    int __fastcall__ clock_gettime (clockid_t clk_id, struct
+;               timespec* tp)
+; Overrides:    cc65's clock_gettime()
 ; Input:        C stack       clockid_t clk_id: ignored
 ;               AX            struct timespec*
 ;                                       tp: where to store the time

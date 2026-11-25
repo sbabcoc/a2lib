@@ -1,12 +1,12 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; int __fastcall__ clock_settime (clockid_t clk_id, const struct timespec *tp);
-;
-; Link-time guard (DESIGN.md 4.2): DOS 3.3 has no clock; the software clock
-; is in a2lib-timer.lib (DESIGN.md 6.3). Replaces cc65's ProDOS module of
-; the same name in a2lib-dos33.lib, so a program that calls clock_settime
-; without the timer fails to link instead, naming the symbol below.
+; A link-time guard for clock_settime(), in place of cc65's ProDOS version.
+; DOS 3.3 has no clock; the software clock is in the timer library. A program
+; that calls clock_settime() without the timer library fails to link instead,
+; naming the symbol below. With the timer's selector and library ahead of the
+; DOS 3.3 library, the timer's clock_settime() is linked instead. For details,
+; see sections 4.2 and 6.3 of DESIGN.
 ;
 
         .export         _clock_settime

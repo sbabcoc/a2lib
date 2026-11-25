@@ -2,12 +2,9 @@
 ; Kevin Ruland
 ; Scott Babcock, 2026-11-12
 ;
-; char cgetc (void);
-;
-; Soft-70 backend (a2lib-soft70.lib), based on cc65's
-; libsrc/apple2/cgetc.s (Kevin Ruland). With the cursor on, shows the
-; VideoTerm's cursor, or Soft-70's blinking inverse cell at the cursor of
-; the 80 x 24 model (s80.s; panning to it if following), while waiting.
+; cgetc() for the Soft-70 library. With the cursor on, it shows the
+; VideoTerm's cursor, or Soft-70's blinking inverse cell at the model's
+; cursor, panning to it if following. For details, see section 3.8 of DESIGN.
 ;
 
         .export         _cgetc
@@ -19,10 +16,12 @@
         .include        "timer.inc"
 
 ;-----------------------------------------------------------------------------
-; _cgetc: Wait for a key and return it: char cgetc (void). If the cursor is
-; on, shows the VideoTerm's cursor, or Soft-70's blinking cursor at the
-; model's, panning to it if following. Ticks the timer while waiting.
+; Wait for a key. If the cursor is on, shows the VideoTerm's cursor, or
+; Soft-70's blinking cursor at the model's, panning to it if following. Ticks
+; the timer.
 ;
+; Signature:    char cgetc ()
+; Overrides:    cc65's cgetc()
 ; Input:        cursor        byte      nonzero: show the cursor
 ; Output:       AX            char      the key, high bit clear (no Open Apple
 ;                                       on a II+)
@@ -43,7 +42,7 @@ _cgetc:
 wait:   inc     RNDL            ; Increment random counter low
         bne     :+
         inc     RNDH            ; Increment random counter high
-        jsr     a2_tickhook     ; One tick (DESIGN.md 6.3)
+        jsr     a2_tickhook     ; One tick
 :       lda     KBD
         bpl     wait            ; If < 128, no key pressed
         pha

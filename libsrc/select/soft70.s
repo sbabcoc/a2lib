@@ -1,27 +1,27 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; Selector for a2lib-soft70.lib, the Soft-70 backend (DESIGN.md 2): linked
-; as lib/a2lib-soft70.o, ahead of a2lib-soft70.lib and a2lib-dos33.lib.
+; The Soft-70 library's selector, linked as lib/a2lib-soft70.o, ahead of
+; a2lib-soft70.lib and a2lib-dos33.lib.
 ;
-; ld65 scans each library once. A stock module that calls into the backend
-; resolves its calls in the library it comes from: from the core, stock
-; cputs would call stock cputc. So a2lib-soft70.lib holds copies of the
-; core's modules that do (tools/stockcopy.py: cputs, cprintf, cgets, cscanf
-; and the like), taken, with the backend's, when ld65 scans it. That leaves
-; the backend's modules that a module linked after the library may import
-; and that can't be copied: the core's write and read (all of stdio reaches
-; them) and reflow.s, in a2lib-reflow.lib. This object pulls those in:
+; ld65 scans each library once. A stock module that calls into the display
+; resolves its calls in the library it comes from: from cc65's library,
+; cputs() would call cc65's cputc(). So the display library holds copies of
+; cc65's modules that do, such as cputs(), cprintf(), cgets() and cscanf(),
+; taken with the display's own when ld65 scans it. That leaves the display's
+; modules that a module linked after the library may import, and that can't be
+; copied: cc65's write() and read(), which all of stdio reaches, and the
+; reflow library. This object pulls those in:
 ;
-;   COUT            write; with it, a2_coutvec and a2_rawcout, for reflow_on
-;   RDKEY           read
-;   _wherex         reflow_on, for the cursor's column
-;   a2_viewport     reflow_on, for the visible width
+;   COUT            write(); with it, a2_coutvec and a2_rawcout, for
+;                   reflow_on()
+;   RDKEY           read()
+;   _wherex         reflow_on(), for the cursor's column
+;   a2_viewport     reflow_on(), for the visible width
 ;
-; It also defines the symbol vt.s requires, so that the display library
-; without its selector fails to link, and two display libraries fail with
-; a duplicate symbol. test/linktest.sh checks this list against the
-; libraries (test/selcheck.py).
+; It also defines the symbol the display requires, so that the display library
+; without its selector fails to link, and two display libraries together fail
+; with a duplicate symbol. For details, see section 2 of DESIGN.
 ;
 
         .forceimport    COUT, RDKEY, _wherex, a2_viewport

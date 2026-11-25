@@ -2,12 +2,10 @@
 ; 2020-07-12, Oliver Schmidt
 ; Scott Babcock, 2026-11-12
 ;
-; char cpeekc (void);
+; cpeekc() for the VideoTerm library: on the card, from its screen memory,
+; found as the firmware finds the cursor. For details, see section 3.4 of
+; DESIGN.
 ;
-;
-; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/cpeekc.s
-; from cc65; if the card is in use, reads the character at its cursor from
-; VRAM, locating it as the firmware's $CA59 does (DESIGN.md 3.4).
 
         .ifndef __APPLE2ENH__
         .import         machinetype
@@ -19,11 +17,11 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _cpeekc: The character at the cursor: char cpeekc (void). On the card, read
-; from VRAM where the firmware's $CA59 finds it, using the last column while a
-; wrap is pending.
+; The character at the cursor. On the card, read from VRAM where the
+; firmware's $CA59 finds it, using the last column while a wrap is pending.
 ;
-; Input:        none
+; Signature:    char cpeekc ()
+; Overrides:    cc65's cpeekc()
 ; Output:       AX            char      the character
 ; Changes:      Y and flags. On the card: the card's VRAM page and $C800
 ;               space.
@@ -60,7 +58,7 @@ peek:   lda     (BASL),Y        ; Get character
         rts
 
 ;-----------------------------------------------------------------------------
-; vt: cpeekc on the card. The VRAM address is the cursor line's base
+; cpeekc on the card. The VRAM address is the cursor line's base
 ; (VT_BASEH/VT_BASEL, kept by the firmware) plus the column, modulo 2048: bits
 ; 1-2 of its high byte select one of four 512-byte pages, and bit 0 the half
 ; of the $CC00-$CDFF window.

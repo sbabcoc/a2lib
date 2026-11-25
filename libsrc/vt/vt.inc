@@ -1,9 +1,8 @@
 ;
-; Videx VideoTerm backend for the cc65 apple2 target (DESIGN.md 3.4)
-;
-; Firmware 2.4 facts are from the ROM (CRC32 4DDBE669, identical in code to
-; BBE3BB28) and ReplicApple2Plus's HARDWARE-REFERENCE.md section 3. The
-; card must be in slot 3 (firmware 2.4).
+; The Videx VideoTerm's firmware entry points, registers and screen memory,
+; from firmware 2.4's ROM (CRC32 4DDBE669, identical in code to BBE3BB28) and
+; ReplicApple2Plus's hardware reference. The card must be in slot 3. For
+; details, see section 3.4 of DESIGN.
 ;
 
 ; Slot 3 ROM page: Pascal 1.1 signature and entry points

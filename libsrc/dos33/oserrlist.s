@@ -2,11 +2,10 @@
 ; Stefan Haubenthal, 2003-12-24
 ; Scott Babcock, 2026-11-19
 ;
-; Defines the platform specific error list: replaces
-; libsrc/apple2/oserrlist.s from cc65 (DESIGN.md 5.6). DOS 3.3's own
-; messages for its error numbers ("Beneath Apple DOS" ch. 8, $A971), in
-; the sentence case of cc65's other lists; then the library's own codes
-; (fm.inc).
+; The messages for __oserror values: DOS 3.3's own messages for its error
+; numbers ("Beneath Apple DOS" ch. 8, $A971), in the sentence case of cc65's
+; other lists, then the library's own codes. For details, see section 5.6 of
+; DESIGN.
 ;
 ; The table is built as a list of entries
 ;
@@ -46,9 +45,11 @@ End:
 
 .rodata
 
-; __sys_oserrlist: The messages for __oserror values, which cc65's
-; common/stroserr.s searches for _stroserror(). Entries as described above,
-; ending with the sentinel's "Unknown error".
+;-----------------------------------------------------------------------------
+; The messages for __oserror values, which cc65's _stroserror() searches.
+; Entries as described above, ending with the sentinel's "Unknown error".
+;
+; Overrides:    cc65's __sys_oserrlist
 
 __sys_oserrlist:
         sys_oserr_entry         DOSERR_LANG,      "Language not available"

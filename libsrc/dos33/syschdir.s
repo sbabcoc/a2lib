@@ -1,17 +1,12 @@
 ;
 ; Scott Babcock, 2026-11-19
 ;
-; unsigned char __fastcall__ _syschdir (const char* name);
-;
-; Replaces libsrc/apple2/syschdir.s from cc65. chdir() passes the result to
-; ___mappederrno, so it returns 0 or an __oserror value (DESIGN.md 5.6).
-;
-; The current directory is DOS's last-used slot and drive (DESIGN.md 5.5):
-; chdir() sets them, so they stay set after the program exits, as
-; ProDOS's prefix does. name is a directory as for opendir(): "/6/2",
-; "2", "." (each optionally ending in "/"). "/" and "/6" aren't
-; directories, and fail with EINVAL like any other path. As with DOS's
-; own ",D2", the drive isn't read until a file on it is.
+; chdir() for DOS 3.3. The current directory is DOS's last-used slot and
+; drive: chdir() sets them, so they stay set after the program exits, as
+; ProDOS's prefix does. A directory is "/6/2", "2" or ".", each optionally
+; ending in "/". "/" and "/6" aren't directories, and fail with EINVAL like
+; any other path. As with DOS's own ",D2", the drive isn't read until a file
+; on it is. For details, see section 5.5 of DESIGN.
 ;
 
         .export         __syschdir
@@ -22,16 +17,17 @@
         .code
 
 ;-----------------------------------------------------------------------------
-; __syschdir: Change the current directory, for chdir(): unsigned char
-; __fastcall__ _syschdir (const char* name).
+; Change the current directory, for chdir().
 ;
+; Signature:    unsigned char __fastcall__ _syschdir (const char* name)
+; Overrides:    cc65's _syschdir()
 ; Input:        AX            char*     name: "/S/D", "D" or ".", each
 ;                                       optionally ending in "/"
 ; Output:       A             byte      0, or DOSERR_SYNTAX (EINVAL) for any
 ;                                       other path
 ; Changes:      Y and ptr1 (fm_location). On success: DOS_SLOT and DOS_DRIVE,
 ;               which outlast the program, and __cwd (initcwd).
-; Note:         X isn't set: the only caller, cc65's common/chdir.s,
+; Note:         X isn't set: the only caller, cc65's chdir(),
 ;               ends in ___mappederrno, which sets it.
 
 __syschdir:

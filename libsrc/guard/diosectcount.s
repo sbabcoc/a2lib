@@ -1,11 +1,10 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; unsigned __fastcall__ dio_query_sectcount (dhandle_t handle);
-;
-; Link-time guard (DESIGN.md 4.2): replaces cc65's ProDOS module of the
-; same name, which fails at run time under DOS 3.3. A program that calls
-; dio_query_sectcount fails to link instead, naming the symbol below.
+; A link-time guard for dio_query_sectcount(), in place of cc65's ProDOS
+; version, which fails at run time under DOS 3.3. A program that calls
+; dio_query_sectcount() fails to link instead, naming the symbol below. For
+; details, see section 4.2 of DESIGN.
 ;
 
         .export         _dio_query_sectcount

@@ -1,5 +1,8 @@
 ;
-; Cooperative timer for the cc65 apple2 target (DESIGN.md 6.3)
+; The cooperative timer's shared definitions: the tick length, the timer
+; slots' flags, the input hooks the timer replaces, and the symbols that the
+; timer, the software clock and the display libraries share. For details, see
+; section 6.3 of DESIGN.
 ;
 
 ; Tick length. A tick is one increment of RNDH by a 15-cycle wait loop:
@@ -8,7 +11,7 @@
 ; 1,020,484 Hz (NTSC), a tick is TICK_MS + TICK_NUM / TICK_DEN ms. The
 ; Bresenham-style error term in a2_tick distributes the fraction.
 TICK_MS         = 3
-TICK_NUM        = 160           ; 3,934.6 cycles = 3.855602 ms (DESIGN.md 6.3)
+TICK_NUM        = 160           ; 3,934.6 cycles = 3.855602 ms
 TICK_DEN        = 187
 TICK_MSDEN      = TICK_MS * TICK_DEN + TICK_NUM ; ms per tick * TICK_DEN
 

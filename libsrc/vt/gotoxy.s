@@ -2,13 +2,9 @@
 ; Ullrich von Bassewitz, 06.08.1998
 ; Scott Babcock, 2026-11-12
 ;
-; void __fastcall__ gotoxy (unsigned char x, unsigned char y);
-; void __fastcall__ gotox (unsigned char x);
+; gotoxy() and gotox() for the VideoTerm library: on the card, with the
+; firmware's GOTOXY. For details, see section 3.4 of DESIGN.
 ;
-;
-; VideoTerm backend (a2lib-vt.lib): modified copy of libsrc/apple2/gotoxy.s
-; from cc65; if the card is in use, moves its cursor with the firmware's
-; GOTOXY instead (DESIGN.md 3.4).
 
         .export         gotoxy, _gotoxy, _gotox
         .import         popa, VTABZ
@@ -21,28 +17,28 @@
         .include        "apple2.inc"
 
 ;-----------------------------------------------------------------------------
-; gotoxy: gotoxy for other library modules, such as cputcxy: both coordinates
-; on the C stack.
+; gotoxy for other library modules, such as cputcxy: both coordinates on the C
+; stack.
 ;
+; Overrides:    cc65's gotoxy
 ; Input:        C stack       unsigned char
 ;                                       x
 ;               C stack       unsigned char
 ;                                       y, pushed last
-; Output:       none
 ; Changes:      As _gotoxy. Pops x and y.
 
 gotoxy:
         jsr     popa            ; Get Y
 
 ;-----------------------------------------------------------------------------
-; _gotoxy: Move the cursor: void __fastcall__ gotoxy (unsigned char x,
-; unsigned char y). On the card, with the firmware's GOTOXY.
+; Move the cursor: on the card, with the firmware's GOTOXY.
 ;
+; Signature:    void __fastcall__ gotoxy (unsigned char x, unsigned char y)
+; Overrides:    cc65's gotoxy()
 ; Input:        C stack       unsigned char
 ;                                       x: the column
 ;               A             unsigned char
 ;                                       y: the row, from the top of the window
-; Output:       none
 ; Changes:      A, X, Y and flags; the cursor; on the 40-column screen, CV and
 ;               BASL/BASH (VTABZ). Pops x.
 
@@ -56,12 +52,12 @@ _gotoxy:
         jsr     popa            ; Get X
 
 ;-----------------------------------------------------------------------------
-; _gotox: Move the cursor to a column of its row: void __fastcall__ gotox
-; (unsigned char x).
+; Move the cursor to a column of its row.
 ;
+; Signature:    void __fastcall__ gotox (unsigned char x)
+; Overrides:    cc65's gotox()
 ; Input:        A             unsigned char
 ;                                       x: the column
-; Output:       none
 ; Changes:      Flags; the cursor. On the card: A and X.
 
 _gotox:

@@ -1,8 +1,9 @@
 ;
-; DOS 3.3 File Manager interface for the cc65 apple2 target
-;
-; Parameter list layout and call codes are from "Beneath Apple DOS",
-; chapter 6 ("Calling the DOS File Manager"). See DESIGN.md, section 4.4.
+; The DOS 3.3 File Manager's interface: the parameter list's layout and call
+; codes, from "Beneath Apple DOS" ch. 6, "Calling the DOS File Manager"; DOS
+; 3.3's error numbers and the library's own codes; the control block's layout;
+; and names for the zero-page cells every file module uses. For details, see
+; section 4.4 of DESIGN.
 ;
 
         .include        "machine.inc"
@@ -96,11 +97,12 @@ FMS_POSRANGE    = $04           ; POSITION, then range
 ; adjustment can be changed if testing on real DOS shows otherwise.
 FM_WRITE_ADJUST = 1
 
-; __oserror values (DESIGN.md 5.6): DOS 3.3's own error numbers, as ONERR
+; __oserror values: DOS 3.3's own error numbers, as ONERR
 ; reports them and DOS's message table orders them ("Beneath Apple DOS"
 ; ch. 8, $A971); the File Manager's return codes are the first ten. The
 ; library's own codes follow, for conditions DOS 3.3 has no number for,
-; as Atari's oserror.s does with code 183. oserror.s maps them all.
+; as cc65's Atari library does with code 183. For details, see section 5.6
+; of DESIGN.
 DOSERR_LANG     = $01           ; Language not available
 DOSERR_RANGE    = $02           ; Range error (bad call type)
 DOSERR_SUBRANGE = $03           ; Range error (bad sub-call type)
@@ -123,8 +125,8 @@ LIBERR_POSITION = $13           ; Position out of range (lseek)
 LIBERR_NOEND    = $14           ; File has no recorded end (O_APPEND)
 
 ; File types, as OPEN takes and returns them and the catalog stores them:
-; one coding (DESIGN.md 4.4), DOS 3.3's own, which C programs see too
-; (include/dos33_filetype.h). OPEN copies the type between the parameter
+; one coding, DOS 3.3's own, which C programs see too (dos33_filetype.h).
+; OPEN copies the type between the parameter
 ; list and the directory entry unchanged ("Beneath Apple DOS" ch. 8, $ABA6).
 FMT_TEXT        = $00
 FMT_INTEGER     = $01
@@ -140,12 +142,12 @@ FMT_TYPE_MASK   = $7F           ; AND mask: the type without the lock bit
 NAME_LEN        = 30
 
 ; ------------------------------------------------------------------------
-; Per-file control block: one of DOS's file buffers (fmbuf.s, DESIGN.md
-; 4.4), addressed at its File Manager work area and kept in
-; fdtab[fd].BUFFER. The 30-byte name field follows the work area: its first
-; byte is nonzero while the buffer is in use, and the library keeps its
-; own fields in the rest. The T/S list and data sector buffers are 256 and
-; 512 bytes below the work area.
+; Per-file control block: one of DOS's file buffers, addressed at its File
+; Manager work area and kept in fdtab[fd].BUFFER. The 30-byte name field
+; follows the work area: its first byte is nonzero while the buffer is in use,
+; and the library keeps its own fields in the rest. The T/S list and data
+; sector buffers are 256 and 512 bytes below the work area. For details, see
+; section 4.4 of DESIGN.
 
 .struct FCB
         WORK    .res 45         ; File Manager work area
@@ -173,7 +175,7 @@ FCBS_DIRTY      = $40           ; Header file: length changed, rewrite on close
 FCB_TEXT        = $80           ; FCB::KIND value for T files
 
 ; ------------------------------------------------------------------------
-; Shared routines (fm.s, fmname.s)
+; Shared routines
 
         .global         fm_fdfcb, fm_fdbegin, fm_begin, fm_call, fm_simple, fm_op, fm_open, fm_maperr
         .global         fm_position, fm_readbyte, fm_writebyte

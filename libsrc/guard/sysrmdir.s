@@ -1,13 +1,12 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; unsigned char __fastcall__ _sysrmdir (const char* name);
-;
-; Link-time guard (DESIGN.md 4.2): replaces cc65's module of the same
-; name, which makes _sysrmdir an alias of _sysremove. ProDOS's DESTROY
-; removes files and directories alike, but with a2lib's _sysremove,
-; rmdir would delete the file it names; DOS 3.3 has no directories. A
-; program that calls rmdir fails to link instead, naming the symbol below.
+; A link-time guard for rmdir(), in place of cc65's version, which makes
+; _sysrmdir an alias of _sysremove. ProDOS's DESTROY removes files and
+; directories alike, but with a2lib's _sysremove, rmdir() would delete the
+; file it names; DOS 3.3 has no directories. A program that calls rmdir()
+; fails to link instead, naming the symbol below. For details, see section 4.2
+; of DESIGN.
 ;
 
         .export         __sysrmdir

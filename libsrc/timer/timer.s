@@ -1,35 +1,21 @@
 ;
 ; Scott Babcock, 2026-11-13
 ;
-; Cooperative timer for the cc65 apple2 target (DESIGN.md 6.3)
+; The cooperative timer: milliseconds since startup, a wait of one tick, and
+; timers whose callbacks run when they expire. Linked only when a program uses
+; it, the software clock, or Soft-70's position gauge and cursor.
 ;
-; unsigned long a2_millis (void);
-; void a2_idle (void);
-; unsigned char __fastcall__ a2_timer_start (unsigned ms, void (*fn) (void),
-;                                           unsigned char periodic);
-; void __fastcall__ a2_timer_stop (unsigned char handle);
+; Time advances only while the program waits in the library: the 15-cycle wait
+; loops of cgetc(), kbhit(), a2_idle() and the input routine here, which takes
+; the place of the monitor's, tick it each time they increment RNDH. Callbacks
+; run inside those loops, never during other library code. The C runtime's
+; zero page and the monitor's cursor are saved around them, and no callback
+; starts while another runs.
 ;
-; Time advances only while the program waits in the library: the 15-cycle
-; wait loops of cgetc, kbhit, a2_idle and the replacement KSW input routine
-; below call a2_tick each time they increment RNDH. Linked only when a
-; program uses the timer (or the software clock, or Soft-70's position
-; gauge and cursor); the constructor then installs a2_tick in the hook
-; vector (tick.s) and the input routine in KSW.
-;
-; Callbacks run inside those wait loops, never during other library code.
-; The dispatcher saves and restores the C runtime's zero page (cgetc keeps
-; the character under its caret in tmp3, read.s its buffer in ptr1-ptr3)
-; and the monitor's cursor (CH, CV, BASL, INVFLG), and doesn't dispatch
-; again while a callback runs.
-;
-; Internal interface (for s80.s, which must not disturb the C zero page
-; while it runs inside cputc): a2_timer_arm takes the interval in ticks in
-; tmr_ticks, the callback in tmr_fn and the periodic flag in tmr_per, and
-; returns the handle in A ($FF if no slot is free); a2_timer_restart
-; restarts the timer in slot X. Neither uses the zero page.
-;
-; Everything is in DATA: crt0 clears BSS after the constructors run
-; (DESIGN.md 6.1).
+; Soft-70 starts and restarts timers through an interface that leaves the zero
+; page alone, since it runs inside cputc(). Everything the constructor sets is
+; in DATA, as the startup code clears BSS after the constructors run. For
+; details, see section 6.3 of DESIGN.
 ;
 
         .export         _a2_millis, _a2_idle, _a2_timer_start, _a2_timer_stop
@@ -48,9 +34,9 @@ ZPLEN = 18                      ; sreg, regsave, ptr1-ptr4, tmp1-tmp4
         .segment        "ONCE"
 
 ;-----------------------------------------------------------------------------
-; timerinit: The module constructor: point a2_tickhook at a2_tick, set
-; a2_tickon, and install keyin as the input routine: as DOS's true input
-; routine when DOS's intercept is in KSW, else in KSW itself.
+; The module constructor: point a2_tickhook at a2_tick, set a2_tickon, and
+; install keyin as the input routine: as DOS's true input routine when DOS's
+; intercept is in KSW, else in KSW itself.
 ;
 ; Input:        KSWL          word      the input hook
 ;               DOS_KSW       word      DOS's saved true input hook
@@ -111,15 +97,13 @@ direct: lda     #<keyin
         .code
 
 ;-----------------------------------------------------------------------------
-; timerdone: The module destructor: put back the input hooks timerinit
-; replaced, including a DOS_KSW that DOS's reconnect routine copied keyin
-; into.
+; The module destructor: put back the input hooks timerinit replaced,
+; including a DOS_KSW that DOS's reconnect routine copied keyin into.
 ;
 ; Input:        viados        byte      bit 7: keyin is DOS's true input
 ;                                       routine
 ;               savek         word      KSW, as at entry
 ;               savedos       word      DOS_KSW, as at entry
-; Output:       none
 ; Changes:      A and flags; KSWL and DOS_KSW.
 
 timerdone:
@@ -151,9 +135,9 @@ timerdone:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; a2_tick: One tick: advance the clocks, count down the active timers, and run
-; the due timers' callbacks unless a callback is already running. Called
-; through a2_tickhook from the wait loops, with LC bank 2 enabled for reading.
+; One tick: advance the clocks, count down the active timers, and run the due
+; timers' callbacks unless a callback is already running. Called through
+; a2_tickhook from the wait loops, with LC bank 2 enabled for reading.
 ;
 ; Input:        t_err         byte      the Bresenham error term
 ;               s_flag        byte[4]   each slot's TF_* flags
@@ -266,8 +250,7 @@ check:  lda     anydue
 done:   rts
 
 ;-----------------------------------------------------------------------------
-; dispatch: Run the callbacks of the due timers, freeing each due one-shot's
-; slot.
+; Run the callbacks of the due timers, freeing each due one-shot's slot.
 ;
 ; Input:        s_flag        byte[4]   TF_DUE marks a due timer
 ;               s_fnlo        byte[4]   each slot's callback, low byte (high
@@ -343,8 +326,9 @@ dn:     inx
         rts
 
 ;-----------------------------------------------------------------------------
-; _a2_millis: The milliseconds since startup: unsigned long a2_millis (void).
+; The milliseconds since startup.
 ;
+; Signature:    unsigned long a2_millis ()
 ; Input:        t_ms          long      milliseconds since startup
 ; Output:       AX, sreg      long      t_ms
 ; Changes:      Flags. Y is unchanged.
@@ -359,11 +343,9 @@ _a2_millis:
         rts
 
 ;-----------------------------------------------------------------------------
-; _a2_idle: Wait one tick, with the same 15-cycle loop as cgetc, leaving keys
-; alone: void a2_idle (void).
+; Wait one tick, with the same 15-cycle loop as cgetc, leaving keys alone.
 ;
-; Input:        none
-; Output:       none
+; Signature:    void a2_idle ()
 ; Changes:      A, X and Y; RNDL and RNDH; what a2_tick changes.
 ; Note:         The BIT KBD, whose result is unused, keeps the loop at cgetc's
 ;               timing.
@@ -377,10 +359,11 @@ _a2_idle:
         jmp     @wait
 
 ;-----------------------------------------------------------------------------
-; _a2_timer_start: Start a timer: unsigned char __fastcall__ a2_timer_start
-; (unsigned ms, void (*fn) (void), unsigned char periodic). Converts ms to
-; ticks, rounded and at least one, and falls into a2_timer_arm.
+; Start a timer. Converts ms to ticks, rounded and at least one, and falls
+; into a2_timer_arm.
 ;
+; Signature:    unsigned char __fastcall__ a2_timer_start (unsigned ms, void
+;               (*fn) (), unsigned char periodic)
 ; Input:        C stack       unsigned  ms: the interval in milliseconds
 ;               C stack       void (*)()
 ;                                       fn: the callback
@@ -472,8 +455,8 @@ dv:     asl     prod
         ; Fall through
 
 ;-----------------------------------------------------------------------------
-; a2_timer_arm: Start a timer, for s80.s, which must leave the C zero page
-; alone: find a free slot and fill it.
+; Start a timer, for Soft-70's model, which must leave the C zero page alone:
+; find a free slot and fill it.
 ;
 ; Input:        tmr_ticks     word      the interval in ticks, at least 1
 ;               tmr_fn        void (*)()
@@ -515,11 +498,10 @@ found:  lda     tmr_ticks
         rts
 
 ;-----------------------------------------------------------------------------
-; a2_timer_restart: Restart a timer from its full interval, for s80.s.
+; Restart a timer from its full interval, for Soft-70's model.
 ;
 ; Prepare:      a2_timer_arm
 ; Input:        X             byte      the handle (the slot)
-; Output:       none
 ; Changes:      A and flags; the slot, and nact if it wasn't counting. X and Y
 ;               are unchanged.
 
@@ -539,14 +521,13 @@ a2_timer_restart:
         rts
 
 ;-----------------------------------------------------------------------------
-; _a2_timer_stop: Stop a timer and free its slot: void __fastcall__
-; a2_timer_stop (unsigned char handle). A handle that isn't a slot, such as
+; Stop a timer and free its slot. A handle that isn't a slot, such as
 ; A2_TIMER_NONE, is ignored.
 ;
+; Signature:    void __fastcall__ a2_timer_stop (unsigned char handle)
 ; Prepare:      a2_timer_start()
 ; Input:        A             unsigned char
 ;                                       handle
-; Output:       none
 ; Changes:      A, X and flags; the slot, and nact if it was counting.
 
 _a2_timer_stop:
@@ -566,9 +547,8 @@ _a2_timer_stop:
         .segment        "LOWCODE"       ; keyin runs with ROM enabled
 
 ;-----------------------------------------------------------------------------
-; keyin: The input routine, as the Autostart ROM's KEYIN ($FD1B) but ticking
-; while it waits. Entered from RDKEY, or from DOS's intercept, with ROM
-; enabled.
+; The input routine, as the Autostart ROM's KEYIN ($FD1B) but ticking while it
+; waits. Entered from RDKEY, or from DOS's intercept, with ROM enabled.
 ;
 ; Input:        A             char      the character under the cursor
 ;               Y             byte      CH
@@ -591,11 +571,9 @@ keyin:
         rts
 
 ;-----------------------------------------------------------------------------
-; kswtick: Run a2_tick from keyin with cc65's banking, LC bank 2 for reading,
-; so callbacks run as the program does; then ROM again.
+; Run a2_tick from keyin with cc65's banking, LC bank 2 for reading, so
+; callbacks run as the program does; then ROM again.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      What a2_tick changes, but A, X and Y are unchanged.
 
 kswtick:

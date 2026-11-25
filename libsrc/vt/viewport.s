@@ -1,9 +1,9 @@
 ;
 ; Scott Babcock, 2026-11-13
 ;
-; a2_viewport: the visible width of the text screen, in A (DESIGN.md 3.7)
-;
-; VideoTerm library: 80 on the card, otherwise the stock 40-column screen.
+; The visible width of the text screen, for reflow_on()'s default: 80 on the
+; card, else the stock screen's window width. For details, see section 3.7 of
+; DESIGN.
 ;
 
         .export         a2_viewport
@@ -12,10 +12,9 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; a2_viewport: The visible width of the text screen, for reflow.s (DESIGN.md
-; 3.7): 80 on the card, else the window's width.
+; The visible width of the text screen, for reflow_on: 80 on
+; the card, else the window's width.
 ;
-; Input:        none
 ; Output:       A             byte      the width in columns
 ; Changes:      Flags. X and Y are unchanged.
 

@@ -1,11 +1,9 @@
 ;
 ; Scott Babcock, 2026-11-20
 ;
-; struct dirent* __fastcall__ _readdir_a2lib (DIR* dir);
-;
-; DOS 3.3 directories (DESIGN.md 5.9; opendir.s). As in DOS's own search
-; ("Beneath Apple DOS" ch. 8, B1C9), deleted entries ($FF) are skipped and
-; the first never-used entry ($00) ends the catalog.
+; readdir() for DOS 3.3 disks. As in DOS's own search ("Beneath Apple DOS" ch.
+; 8, $B1C9), deleted entries ($FF) are skipped, and the first never-used entry
+; ($00) ends the catalog. For details, see section 5.9 of DESIGN.
 ;
 
         .export         __readdir_a2lib
@@ -28,9 +26,10 @@ sectors_high    = tmp2          ; sectors, then in blocks
         .code
 
 ;-----------------------------------------------------------------------------
-; __readdir_a2lib: Read the next file's entry: struct dirent* __fastcall__
-; _readdir_a2lib (DIR* dir), which dirent.h names readdir().
+; Read the next file's entry.
 ;
+; Signature:    struct dirent* __fastcall__ _readdir_a2lib (DIR* dir)
+; Overrides:    readdir(), as a2lib's dirent.h defines it
 ; Prepare:      opendir()
 ; Input:        AX            DIR*      dir: the directory
 ; Output:       AX            struct dirent*

@@ -99,24 +99,34 @@ follows them, so the code stays as readable as they left it.
   `LCBANK2`, `KBD`), else `libsrc/dos33/machine.inc` (`LC_ROM_RO`,
   `LC_BANK2_RO`, `MON_COUT`, `MON_RDKEY`), vendored modules included. The
   exception is `$0103,x` after `tsx`, an offset into the stack frame.
-- **Routine headers (10.40).** Every exported routine, and each internal
-  one worth a name, has a header after a 78-column rule: the name and
-  what it does, then `Prepare:`, `Input:` and `Output:` (one line per
-  value: where it is, its type, what it means), `Changes:` (registers,
-  flags and storage changed besides the outputs, and other effects) and
-  `Note:`, each only where it applies. `Prepare:` names what the caller
-  must have called first for the inputs to be valid: C functions with
-  `()` (`open()`, `opendir()`, `a2_timer_start()`), routines without
+- **File headers.** Each file opens with its authors, then a summary of
+  what it holds, in sentences, ending with a pointer to the design: "For
+  details, see section 5.9 of DESIGN." File headers name no other source
+  file and repeat no C signature; the generated font names its generator,
+  where it is edited.
+- **Routine headers (10.40, 10.49).** Every exported routine, and each
+  internal one worth a name, has a header after a 78-column rule: what it
+  does, without its name (the label follows), then `Signature:` (the C
+  declaration, for a function C calls; no `void` in an empty argument
+  list), `Overrides:` (the cc65 function or symbol it takes the place of,
+  or the C name a2lib's headers map to it), `Prepare:`, `Input:` and
+  `Output:` (one line per value: where it is, its type, what it means),
+  `Changes:` (registers, flags and storage changed besides the outputs,
+  and other effects) and `Note:`, each only where it applies: no `Input:
+  none` or `Output: none`. `Prepare:` names what the caller must have
+  called first for the inputs to be valid: C functions with `()`
+  (`open()`, `opendir()`, `a2_timer_start()`), routines without
   (`fm_begin`), in order. It names no helper's own caller, which sets up
   the helper's inputs as part of its work, and nothing that runs by
-  itself, such as a constructor. Inputs then describe values, not where
-  they came from. Types are C's where C sees the value (`int`, `char*`,
-  `unsigned`), else `byte`, `word`, `flag` or `T*`. A module's storage
-  is given by its name; another module's cells as `ptr1 (fm_name)`. The
-  stack is mentioned only where its use is out of the ordinary, such as
-  exec()'s reset. Vendored modules get headers too, as comments that
-  leave stock's code as it is. The guards and selectors define no
-  routine, so their file headers are all they have.
+  itself, such as a constructor. Inputs describe values, not where they
+  came from. What a C programmer already knows is left out. Types are C's
+  where C sees the value (`int`, `char*`, `unsigned`), else `byte`,
+  `word`, `flag` or `T*`. A module's storage is given by its name; another
+  module's cells as `ptr1 (fm_name)`. The stack is mentioned only where
+  its use is out of the ordinary, such as exec()'s reset. Vendored modules
+  get headers too, as comments that leave stock's code as it is. The
+  guards and selectors define no routine, so their file headers are all
+  they have.
 - **Labels.** An anonymous label is only for a jump to the nearest one
   (`:+`, `:-`). A jump past another label (`:++`, `:--`), including the
   outer loop of a nested pair, gets a named label (`@row`, `@col`).
@@ -3452,6 +3462,21 @@ IDENTICAL, every module and program.
 Comments only.
 
 Verified: `tools/samebytes.sh` against `961733c` reports the tree
+IDENTICAL, every module and program.
+
+### 10.49 Headers: summaries, signatures and overrides
+
+| File | Change |
+|---|---|
+| Every module and include file in `libsrc/`, but the unmodified `filedes.inc` and `mli.inc` | File headers rewritten as summaries of what each file holds, keeping the authors; no C signatures, no other source files named; the design pointed to as "For details, see section N of DESIGN." |
+| Every routine header | No name line; `Signature:` and `Overrides:` fields in place of signatures and "which dirent.h names ..." in the description; no `void` in empty argument lists; no `Input: none` or `Output: none`; references to other source files and to DESIGN.md sections in comments reworded the same way |
+| `tools/s70font.py`, `libsrc/s70/font.s` | The generated header in the same form |
+| `include/*.h` | Design pointers in the same form |
+| `DESIGN.md` | The header conventions |
+
+Comments only.
+
+Verified: `tools/samebytes.sh` against `5e31003` reports the tree
 IDENTICAL, every module and program.
 
 ## 11. Sources

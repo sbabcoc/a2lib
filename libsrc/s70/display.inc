@@ -1,10 +1,8 @@
 ;
-; Soft-70: parameters of the shared 80 x 24 model (s80.inc)
-;
-; Soft-70 shows 70 of the 80 columns on hi-res page 1, panning between
-; columns 0-69 and 10-79 (DESIGN.md 3.8). The model's buffer is in
-; LOWBSS, below the hi-res page, so that it doesn't take space from the
-; program.
+; Soft-70's parameters for the 80 x 24 model: 70 of the 80 columns shown on
+; hi-res page 1, panning between columns 0-69 and 10-79. The model's buffer is
+; in LOWBSS, below the hi-res page, so that it doesn't take space from the
+; program. For details, see section 3.8 of DESIGN.
 ;
 
 S80_VIEW        = 70
@@ -29,6 +27,6 @@ normal:
         and     #$7F
 .endmacro
 
-; Encoding of the buffer for the text marker (DESIGN.md 3.9): bytes XOR
-; $A0 give these screen codes
+; Encoding of the buffer for the text marker: bytes XOR $A0 give these
+; screen codes. For details, see section 3.9 of DESIGN.
 S80_TEXTENC     = 1

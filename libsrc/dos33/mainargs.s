@@ -7,18 +7,20 @@
 ; Oliver Schmidt, 2005-04-05
 ; Scott Babcock, 2026-11-18
 ;
-; DOS 3.3 version of libsrc/apple2/mainargs.s from cc65 (DESIGN.md 5.10).
-; argv[0] is "": DOS 3.3 doesn't keep the program's name. Arguments come
-; from the REM on the command line, or from the tail exec() leaves after
-; its command in page 2: exec()'s stub prints the command, which DOS
-; stores at $200 from its Ctrl-D through its CR, and puts
-; "$00 REM cmdline $00" right after the CR. A typed line has the high
-; bit set and doesn't begin with Ctrl-D, so it can't match; the $00 is
-; cleared once the arguments are taken.
+; argc and argv for main(), from the REM on the command line, as cc65's, or
+; from the arguments exec() leaves after its command in page 2. argv[0] is "":
+; DOS 3.3 doesn't keep the program's name.
+;
+; exec()'s stub prints the command, which DOS stores at $200 from its Ctrl-D
+; through its CR, and puts "$00 REM cmdline $00" right after the CR. A typed
+; line has the high bit set and doesn't begin with Ctrl-D, so it can't match,
+; and the $00 is cleared once the arguments are taken. For details, see
+; section 5.10 of DESIGN.
 ;
 ; Scan a group of arguments that are in BASIC's input-buffer.
 ; Build an array that points to the beginning of each argument.
 ; Send, to main(), that array and the count of the arguments.
+;
 
 ; Command-lines look like these lines:
 ;
@@ -58,9 +60,10 @@ REM       = $B2                 ; BASIC token-code
         .segment        "ONCE"
 
 ;-----------------------------------------------------------------------------
-; initmainargs: Set argc and argv for main(): a module constructor, run by
-; crt0 before main().
+; Set argc and argv for main(): a module constructor, run by crt0 before
+; main().
 ;
+; Overrides:    cc65's initmainargs
 ; Input:        BASIC_BUF     char[]    the line that ran the program, or
 ;                                       exec()'s command and tail
 ; Output:       __argc        int       1 plus the arguments found, at most
@@ -171,7 +174,7 @@ done:   lda     #<argv
         rts
 
 ;-----------------------------------------------------------------------------
-; execargs: Find the arguments exec() left in BASIC_BUF, after its command.
+; Find the arguments exec() left in BASIC_BUF, after its command.
 ;
 ; Input:        BASIC_BUF     char[]    $84, the command, $8D, then $00, REM
 ;                                       and the arguments if exec() left them

@@ -2,12 +2,10 @@
 ; Oliver Schmidt, 2009-09-15
 ; Scott Babcock, 2026-11-12
 ;
-; Startup code for cc65 (Apple2 version)
-;
-; DOS 3.3 version of libsrc/apple2/crt0.s from cc65. The ProDOS paths
-; are removed. The 6502 RESET and IRQ vectors in Language Card RAM are
-; patched before the module constructors run, so irq.s's initirq can
-; replace the IRQ vector and chain to irq_6502.
+; Startup code for DOS 3.3 programs, as cc65's without the ProDOS paths. The
+; 6502 RESET and IRQ vectors in Language Card RAM are patched before the
+; module constructors run, so that the interrupt handlers can replace the IRQ
+; vector and chain to it. For details, see sections 6.1 and 7 of DESIGN.
 ;
 
         .export         done, return
@@ -46,10 +44,10 @@
         .segment        "ONCE"
 
 ;-----------------------------------------------------------------------------
-; init: Start-up work done once, in the ONCE segment: save the zero page and
-; the RESET vector, set up the C stack below HIMEM, point RESET at exit(),
-; patch the RESET and IRQ vectors in LC RAM, run the module constructors, and
-; copy the LC segment into LC RAM.
+; Start-up work done once, in the ONCE segment: save the zero page and the
+; RESET vector, set up the C stack below HIMEM, point RESET at exit(), patch
+; the RESET and IRQ vectors in LC RAM, run the module constructors, and copy
+; the LC segment into LC RAM.
 ;
 ; Input:        HIMEM         word      BASIC's top of memory: the C stack's
 ;                                       top
@@ -61,8 +59,8 @@
 ;               and the LC segment; HIGHDS, HIGHTR and LOWTR (bltu2); what the
 ;               constructors change. Leaves LC bank 2 read-only.
 ; Note:         The vectors are patched before the constructors run, so
-;               irq.s's initirq replaces this IRQ vector and chains to
-;               irq_6502. Stock crt0 patches them afterward.
+;               initirq replaces this IRQ vector and chains to irq_6502.
+;               cc65's startup code patches them afterward.
 
         ; Save the zero-page locations that we need.
 init:   ldx     #zpspace-1
@@ -148,14 +146,14 @@ init:   ldx     #zpspace-1
         .code
 
 ;-----------------------------------------------------------------------------
-; reset: Point the RESET vector at a routine, and set its check byte.
+; Point the RESET vector at a routine, and set its check byte.
 ;
 ; Input:        X             byte      the routine's address, low byte
 ;               A             byte      the routine's address, high byte
 ; Output:       SOFTEV        word      the routine
 ;               PWREDUP       byte      A EOR $A5
 ; Changes:      A and flags. X and Y are unchanged.
-; Note:         Also called by cc65's callmain.s, at exit. The rts is return,
+; Note:         Also called by cc65's callmain, at exit. The rts is return,
 ;               which rebootafterexit() puts in done.
 
 reset:  stx     SOFTEV
@@ -165,11 +163,8 @@ reset:  stx     SOFTEV
 return: rts
 
 ;-----------------------------------------------------------------------------
-; reset_6502: LC RAM's RESET vector: switch to ROM and take ROM's RESET
-; vector.
+; LC RAM's RESET vector: switch to ROM and take ROM's RESET vector.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      Banks in ROM.
 
 reset_6502:
@@ -177,12 +172,10 @@ reset_6502:
         jmp     (ROM_RST)       ; Jump to ROM's RESET vector
 
 ;-----------------------------------------------------------------------------
-; irq_6502: LC RAM's IRQ/BRK vector, as crt0 leaves it: switch to ROM and take
-; ROM's IRQ/BRK vector. irq.s's lcirq chains here for a BRK, or an interrupt
-; no interruptor handles.
+; LC RAM's IRQ/BRK vector, as crt0 leaves it: switch to ROM and take ROM's
+; IRQ/BRK vector. lcirq chains here for a BRK, or an interrupt no
+; interruptor handles.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      Banks in ROM, and leaves it in.
 
 irq_6502:

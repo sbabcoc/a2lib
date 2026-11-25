@@ -1,27 +1,22 @@
 ;
 ; Scott Babcock, 2026-11-12
 ;
-; Videx VideoTerm backend for the cc65 apple2 target (DESIGN.md 3.4)
+; The Videx VideoTerm display: finding the card, setting it up, and the
+; firmware calls the conio routines use. While the card is in use, vt_active's
+; bit 7 is set, and the library's conio routines drive the card in place of
+; the stock 40-column screen. The output hook routines serve this display and
+; Soft-70's model: only one is in use, so they share them and the hooks they
+; save.
 ;
-; vt_active is bit 7 set if the card was found and is in use: the conio
-; modules of a2lib-vt.lib test it and either drive the card or run the
-; stock 40-column code. The output hook routines serve this backend and the
-; 80 x 24 model's (s80.s): only one is in use, so they share them and the
-; hooks they save.
+; At startup, the card is initialized with its cursor hidden, since conio
+; shows it only while waiting for a key, and lowercase allowed. At exit, the
+; output hooks and the display mode are put back. Everything the constructor
+; sets is in DATA, as the startup code clears BSS after the constructors run.
 ;
-; vtinit (constructor) detects the card, initializes it, hides the cursor
-; (conio shows it only while waiting for a key), allows lowercase, and
-; hooks COUT. vtdone (destructor) restores the output hooks and the display
-; mode at exit.
-;
-; Everything the constructor sets is in DATA: crt0 clears BSS after the
-; constructors run (DESIGN.md 6.1).
-;
-; Every module of the display libraries imports vt_active, so this module
-; is linked whenever one of them is. It requires the display library's
-; selector (DESIGN.md 2), which defines a2lib_display_needs_selector_object:
-; without the selector, the link fails naming that symbol, instead of the
-; program's printf silently writing to the stock 40-column screen.
+; Every module of the display libraries imports vt_active, so this module is
+; linked whenever one of them is. It requires the library's selector: without
+; it, the link fails, instead of printf() writing to the stock screen without
+; a word. For details, see sections 2 and 3.4 of DESIGN.
 ;
 
         .constructor    vtinit
@@ -36,7 +31,7 @@
         .segment        "ONCE"
 
 ;-----------------------------------------------------------------------------
-; vtinit: The module constructor: if the VideoTerm's signature is in slot 3,
+; The module constructor: if the VideoTerm's signature is in slot 3,
 ; initialize the card, hide its cursor (conio shows it only while waiting for
 ; a key), allow lowercase, and hook COUT to vt_write.
 ;
@@ -79,7 +74,7 @@ was80:  lda     #$80
 :       jsr     a2_savehooks
 
         ; Full INIT: clear the power-on marker, which about one power-on in
-        ; 32 leaves set, making INIT skip the CRTC setup (DESIGN.md 3.4)
+        ; 32 leaves set, making INIT skip the CRTC setup
         lda     #$00
         sta     VT_POFF
         bit     CLRROM
@@ -106,8 +101,8 @@ none:   bit     CLRROM          ; Release the card's $C800 space
         rts
 
 ;-----------------------------------------------------------------------------
-; a2_savehooks: Keep CSW and DOS's saved true output hook, for a2_unhookout to
-; restore at exit.
+; Keep CSW and DOS's saved true output hook, for a2_unhookout to restore at
+; exit.
 ;
 ; Input:        CSWL          word      the output hook
 ;               DOS_CSW       word      DOS's saved true output hook
@@ -127,12 +122,12 @@ a2_savehooks:
         rts
 
 ;-----------------------------------------------------------------------------
-; a2_hookout: Install a routine as the output hook. Under DOS 3.3 with DOS's
-; video intercept in CSW, it becomes DOS's true output routine instead: on
-; every character through its intercepts (stdio input included), DOS copies
-; the true handlers into CSW and KSW and reinstalls its intercepts on the way
-; out ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a routine
-; stored in CSW directly (DESIGN.md 3.5, 3.6).
+; Install a routine as the output hook. Under DOS 3.3 with DOS's video
+; intercept in CSW, it becomes DOS's true output routine instead: on every
+; character through its intercepts (stdio input included), DOS copies the true
+; handlers into CSW and KSW and reinstalls its intercepts on the way out
+; ("Beneath Apple DOS" ch. 8, $9ED1 and $A851), which drops a routine stored
+; in CSW directly. For details, see section 3.5 of DESIGN.
 ;
 ; Prepare:      a2_savehooks
 ; Input:        AX            void (*)()
@@ -163,9 +158,9 @@ direct: sta     CSWL
         .code
 
 ;-----------------------------------------------------------------------------
-; a2_unhookout: Put back the hooks a2_savehooks kept: DOS's saved true hook if
-; a2_hookout installed the routine there; otherwise CSW, and DOS's saved hook
-; too if DOS's reconnect routine ($A851) moved the routine into it.
+; Put back the hooks a2_savehooks kept: DOS's saved true hook if a2_hookout
+; installed the routine there; otherwise CSW, and DOS's saved hook too if
+; DOS's reconnect routine ($A851) moved the routine into it.
 ;
 ; Prepare:      a2_savehooks, then a2_hookout
 ; Input:        viados        byte      bit 7: installed as DOS's true output
@@ -173,7 +168,6 @@ direct: sta     CSWL
 ;               savecsw       word      CSW, as kept
 ;               savedos       word      DOS_CSW, as kept
 ;               hooked        word      the routine installed
-; Output:       none
 ; Changes:      A and flags; CSWL and DOS_CSW. X and Y are unchanged.
 
 a2_unhookout:
@@ -201,13 +195,11 @@ a2_unhookout:
 :       rts
 
 ;-----------------------------------------------------------------------------
-; vtdone: The module destructor: put back the output hooks, and the 40-column
-; display, or the card's blinking cursor if output went to the card before the
-; program.
+; The module destructor: put back the output hooks, and the 40-column display,
+; or the card's blinking cursor if output went to the card before the program.
 ;
 ; Input:        vt_active     byte      bit 7: the card is in use
 ;               prior80       byte      bit 7: output went to the card before
-; Output:       none
 ; Changes:      A, X and flags; the output hooks; the display mode or the
 ;               card's R10.
 
@@ -226,7 +218,7 @@ mode:   bit     prior80
 done:   rts
 
 ;-----------------------------------------------------------------------------
-; vt_r10: Set the CRTC's R10, the cursor's start line and mode.
+; Set the CRTC's R10, the cursor's start line and mode.
 ;
 ; Input:        A             byte      the value: R10_HIDDEN, R10_BLINK
 ; Output:       X             byte      10
@@ -238,11 +230,10 @@ vt_r10: ldx     #10
         rts
 
 ;-----------------------------------------------------------------------------
-; vt_goto: Move the card's cursor, with the firmware's GOTOXY ($1E).
+; Move the card's cursor, with the firmware's GOTOXY ($1E).
 ;
 ; Input:        X             byte      the column, 0-79
 ;               A             byte      the row, 0-23
-; Output:       none
 ; Changes:      A and flags; the cursor. X and Y are unchanged.
 
 vt_goto:
@@ -261,8 +252,8 @@ vt_goto:
         jmp     vt_write
 
 ;-----------------------------------------------------------------------------
-; vt_screen: Convert an Apple screen code to the character the card shows for
-; it: bit 7 clear, and controls as @, A-Z, [ \ ] ^ _.
+; Convert an Apple screen code to the character the card shows for it: bit 7
+; clear, and controls as @, A-Z, [ \ ] ^ _.
 ;
 ; Input:        A             byte      the screen code
 ; Output:       A             char      the character
@@ -279,13 +270,11 @@ vt_screen:
         .segment        "LOWCODE"
 
 ;-----------------------------------------------------------------------------
-; vt_write: Write a character through the firmware's Pascal 1.1 WRITE entry.
-; Also the COUT hook, so it keeps every register. Called with ROM switched in
-; (as the COUT hook) or LC RAM enabled (from conio); the firmware uses
-; neither.
+; Write a character through the firmware's Pascal 1.1 WRITE entry. Also the
+; COUT hook, so it keeps every register. Called with ROM switched in (as the
+; COUT hook) or LC RAM enabled (from conio); the firmware uses neither.
 ;
 ; Input:        A             char      the character
-; Output:       none
 ; Changes:      Flags; the screen and the cursor. A, X and Y are unchanged.
 ;               Turns off other cards' $C800 ROMs.
 

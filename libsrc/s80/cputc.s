@@ -2,18 +2,14 @@
 ; Ullrich von Bassewitz, 06.08.1998
 ; Scott Babcock, 2026-11-12
 ;
-; void __fastcall__ cputcxy (unsigned char x, unsigned char y, char c);
-; void __fastcall__ cputc (char c);
+; cputc(), cputcxy() and the routines other conio functions write with, for
+; the Soft-70 library: to the VideoTerm, as in the VideoTerm library, or into
+; the 80 x 24 model. Characters are handled as cc65's are: uppercase unless
+; the display shows lowercase, INVFLG applied, and controls shown as their
+; letters.
 ;
-; Soft-70 (a2lib-soft70.lib), with the VideoTerm; based on cc65's
-; libsrc/apple2/cputc.s (Ullrich von Bassewitz). With a VideoTerm, as in
-; a2lib-vt.lib; otherwise the model (s80.s). Character handling follows the
-; stock module: uppercase unless the display shows lowercase
-; (uppercasemask), INVFLG (revers) applied by S80_ATTR (display.inc),
-; controls shown as their letters (screen codes $80-$9F).
-;
-; The implementation of cputs() relies on cputc() not clobbering ptr1;
-; chline relies on cputdirect() not clobbering tmp1 and tmp2.
+; cputs() relies on cputc() not changing ptr1, and chline() on cputdirect()
+; not changing tmp1 and tmp2. For details, see section 3.8 of DESIGN.
 ;
 
         .export         _cputcxy, _cputc
@@ -26,15 +22,16 @@
         .include        "vt.inc"
 
 ;-----------------------------------------------------------------------------
-; _cputcxy: Move the cursor, then write a character: void __fastcall__ cputcxy
-; (unsigned char x, unsigned char y, char c).
+; Move the cursor, then write a character.
 ;
+; Signature:    void __fastcall__ cputcxy (unsigned char x, unsigned char y,
+;               char c)
+; Overrides:    cc65's cputcxy()
 ; Input:        C stack       unsigned char
 ;                                       x
 ;               C stack       unsigned char
 ;                                       y
 ;               A             char      c
-; Output:       none
 ; Changes:      As gotoxy and _cputc. Pops x and y.
 
 _cputcxy:
@@ -43,12 +40,12 @@ _cputcxy:
         pla                     ; Restore C and run into _cputc
 
 ;-----------------------------------------------------------------------------
-; _cputc: Write a character at the cursor and advance: void __fastcall__ cputc
-; (char c). '\r' goes to column 0 and '\n' down a line, in the same column;
-; other controls show as their letters.
+; Write a character at the cursor and advance. '\r' goes to column 0 and '\n'
+; down a line, in the same column; other controls show as their letters.
 ;
+; Signature:    void __fastcall__ cputc (char c)
+; Overrides:    cc65's cputc()
 ; Input:        A             char      c
-; Output:       none
 ; Changes:      A, X, Y and flags; the screen and the cursor; in the model,
 ;               BASL and BAS2L. Not ptr1, tmp1 or tmp2.
 
@@ -66,11 +63,10 @@ _cputc:
         and     uppercasemask
 
 ;-----------------------------------------------------------------------------
-; cputdirect: Write a screen code at the cursor and advance, as INVFLG shows
-; it.
+; Write a screen code at the cursor and advance, as INVFLG shows it.
 ;
+; Overrides:    cc65's cputdirect
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      As _cputc. chline keeps counters in tmp1 and tmp2 across it.
 
 cputdirect:
@@ -80,11 +76,9 @@ cputdirect:
         jmp     s80_put
 
 ;-----------------------------------------------------------------------------
-; newline: Move the cursor down a line, in the same column, scrolling at the
-; bottom.
+; Move the cursor down a line, in the same column, scrolling at the bottom.
 ;
-; Input:        none
-; Output:       none
+; Overrides:    cc65's newline
 ; Changes:      A and flags; the cursor. In the model, on a scroll: X, Y,
 ;               BASL, BAS2L, the buffer and the display.
 
@@ -94,11 +88,10 @@ newline:
         jmp     s80_lf
 
 ;-----------------------------------------------------------------------------
-; putchar: Store a screen code at the cursor, without advancing, as INVFLG
-; shows it.
+; Store a screen code at the cursor, without advancing, as INVFLG shows it.
 ;
+; Overrides:    cc65's putchar
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      As putchardirect.
 
 putchar:
@@ -108,11 +101,11 @@ putchar:
         jmp     s80_putnoadv
 
 ;-----------------------------------------------------------------------------
-; putchardirect: Store a screen code at the cursor, without advancing. On the
-; VideoTerm: write it, then backspace.
+; Store a screen code at the cursor, without advancing. On the VideoTerm:
+; write it, then backspace.
 ;
+; Overrides:    cc65's putchardirect
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      A, X, Y and flags; the screen; in the model, BASL and BAS2L.
 
 putchardirect:
@@ -121,14 +114,13 @@ putchardirect:
         jmp     s80_putnoadv
 
 ; ------------------------------------------------------------------------
-; VideoTerm, as in a2lib-vt.lib's cputc.s
+; VideoTerm, as in the VideoTerm library
 
 
 ;-----------------------------------------------------------------------------
-; vtcputc: _cputc on the VideoTerm.
+; _cputc on the VideoTerm.
 ;
 ; Input:        A             char      c
-; Output:       none
 ; Changes:      A and flags; the screen and the cursor.
 
 vtcputc:
@@ -143,10 +135,9 @@ vtcputc:
 vtw:    jmp     vt_write
 
 ;-----------------------------------------------------------------------------
-; vtdirect: cputdirect on the VideoTerm.
+; cputdirect on the VideoTerm.
 ;
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      A and flags; the screen and the cursor.
 
 vtdirect:
@@ -154,10 +145,8 @@ vtdirect:
         jmp     vt_write
 
 ;-----------------------------------------------------------------------------
-; vtnewline: newline on the VideoTerm: a line feed.
+; newline on the VideoTerm: a line feed.
 ;
-; Input:        none
-; Output:       none
 ; Changes:      A and flags; the cursor.
 
 vtnewline:
@@ -165,10 +154,9 @@ vtnewline:
         jmp     vt_write
 
 ;-----------------------------------------------------------------------------
-; vtput: putchar and putchardirect on the VideoTerm.
+; putchar and putchardirect on the VideoTerm.
 ;
 ; Input:        A             byte      the screen code
-; Output:       none
 ; Changes:      A and flags; the screen.
 
 vtput:  jsr     vt_screen

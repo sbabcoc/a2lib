@@ -1,14 +1,9 @@
 ;
 ; Scott Babcock, 2026-11-13
 ;
-; int __fastcall__ clock_settime (clockid_t clk_id, const struct timespec *tp);
-; unsigned long a2_clock_age (void);
-;
-; Software clock for DOS 3.3 (DESIGN.md 6.3). Replaces
-; libsrc/apple2/settime.s from cc65, which sets the ProDOS clock.
-; clock_settime sets the software clock read by clock_gettime (tv_nsec is
-; ignored); a2_clock_age returns the seconds since then, or
-; A2_CLOCK_UNSET ($FFFFFFFF) if the clock was never set.
+; clock_settime(), which sets the software clock that clock_gettime() reads,
+; and a2_clock_age(), the seconds since then, or A2_CLOCK_UNSET if the clock
+; was never set. For details, see section 6.3 of DESIGN.
 ;
 
         .export         _a2_clock_age, clk_offset
@@ -22,9 +17,11 @@
 tp              = ptr1          ; struct timespec*: the caller's time
 
 ;-----------------------------------------------------------------------------
-; _clock_settime: Set the software clock: int __fastcall__ clock_settime
-; (clockid_t clk_id, const struct timespec* tp). tv_nsec is ignored.
+; Set the software clock. tv_nsec is ignored.
 ;
+; Signature:    int __fastcall__ clock_settime (clockid_t clk_id, const struct
+;               timespec* tp)
+; Overrides:    cc65's clock_settime()
 ; Input:        C stack       clockid_t clk_id: ignored
 ;               AX            struct timespec*
 ;                                       tp: the time
@@ -58,9 +55,9 @@ _clock_settime:
         jmp     return0
 
 ;-----------------------------------------------------------------------------
-; _a2_clock_age: The seconds since clock_settime: unsigned long a2_clock_age
-; (void).
+; The seconds since clock_settime.
 ;
+; Signature:    unsigned long a2_clock_age ()
 ; Input:        clk_isset     byte      bit 7: the clock was set
 ;               clk_setat     long      t_sec when it was
 ; Output:       AX, sreg      long      t_sec - clk_setat, or A2_CLOCK_UNSET

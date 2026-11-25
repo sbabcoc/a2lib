@@ -1,10 +1,6 @@
 ;
-; 80 x 24 screen model (DESIGN.md 3.1, 3.8)
-;
-; The screen a program sees when no VideoTerm is found, in a library whose
-; fallback shows part of an 80 x 24 screen: Soft-70 (libsrc/s70). This
-; directory's modules are assembled with the backend's directory first on
-; the include path for display.inc, which defines:
+; The interface between the 80 x 24 model and the display that shows part of
+; it, Soft-70's. The display's own include file defines:
 ;
 ;   S80_VIEW        visible columns (70)
 ;   S80_STEP        panning step: the display shows columns left to
@@ -13,7 +9,8 @@
 ;   S80_ATTR        macro: apply INVFLG to the screen code in A
 ;   S80_PEEK        macro: the character for the screen code in A
 ;
-; and the display: the routines below, called by the model.
+; and the display's routines, which the model calls. For details, see section
+; 3.8 of DESIGN.
 ;
 
 S80_COLS        = 80
