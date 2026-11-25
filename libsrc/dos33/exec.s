@@ -39,9 +39,9 @@ CMDMAX  = 1 + 4 + 1 + NAME_LEN + 6 + 1 ; ^D BRUN sp name ,S7,D2 CR
 ; Signature:    int __fastcall__ exec (const char* progname, const char*
 ;               cmdline)
 ; Overrides:    cc65's exec()
-; Input:        C stack       char*     path of the program, a B or A file
-;               X:A           char*     arguments for its main() (B files), or
-;                                       NULL or ""
+; Input:        C stack       char*     path to the program (B file or A file)
+;               X:A           char*     for B files, arguments for main();
+;                                       otherwise NULL or ""
 ; Output:       X:A           int       -1, if it returns
 ;               errno         int       EINVAL (a bad path, a name with a
 ;                                       comma, or an A file with a cmdline),
@@ -53,6 +53,10 @@ CMDMAX  = 1 + 4 + 1 + NAME_LEN + 6 + 1 ; ^D BRUN sp name ,S7,D2 CR
 ; Changes:      Y; args, name_end, fm_parmlist and ctlblock. Pops progname. If
 ;               it doesn't return: the stub's page-3 area (target), the stack
 ;               page (cmdline), BASIC's input buffer, and what exit() changes.
+; Note:         cmdline is parsed as main() parses a typed command line:
+;               arguments separated by spaces, "..." around one that holds
+;               spaces, "" for an empty one; at most 9 arguments and 126
+;               characters. For details, see section 5.10 of DESIGN.
 
 _exec:
         ; Store cmdline; get progname
