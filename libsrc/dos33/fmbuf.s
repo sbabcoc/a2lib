@@ -115,7 +115,7 @@ fm_freefcb:
 ;               (fm_begin, fm_name) before the next call.
 
 fm_isopen:
-        ldx     #$01            ; Don't allocate
+        ldx     #FMX_NOALLOC
         jsr     fm_open
         bcc     :+
         jsr     fm_maperr

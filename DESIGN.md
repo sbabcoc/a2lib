@@ -3546,6 +3546,16 @@ IDENTICAL, every module and program.
 Verified: `tools/samebytes.sh` against `c7f6911` reports the tree
 IDENTICAL, every module and program.
 
+### 10.55 The File Manager's allocation flag by name
+
+| File | Change |
+|---|---|
+| `libsrc/dos33/fm.inc` | `FMX_ALLOC` ($00) and `FMX_NOALLOC` ($01), the X register for `FM_ENTRY` ("Beneath Apple DOS" ch. 6): whether OPEN creates a file that isn't found. Every other call takes `FMX_NOALLOC` |
+| `libsrc/dos33/fm.s`, `fmbuf.s`, `open.s`, `exec.s`, `sysrename.s` | The names in place of `ldx #$00` and `ldx #$01`; `open.s` asserts `FMX_ALLOC = 0`, which its `beq` (branch always) after `ldx #FMX_ALLOC` relies on |
+
+Verified: `tools/samebytes.sh` against `ea0fb3a` reports the tree
+IDENTICAL, every module and program.
+
 ## 11. Sources
 
 - cc65, commit `eebf54a`: `libsrc/apple2/` (`filedes.*`, `open.s`,

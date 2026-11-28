@@ -93,10 +93,10 @@ fm_begin:
 ;               fm_parmlist   byte*     the parameter list
 ; Output:       C             flag      as fm_call
 ;               A             byte      as fm_call
-; Changes:      X (1) and Y.
+; Changes:      X (FMX_NOALLOC) and Y.
 
 fm_simple:
-        ldx     #$01            ; Falls into fm_op
+        ldx     #FMX_NOALLOC    ; Falls into fm_op
 
 ;-----------------------------------------------------------------------------
 ; Make a File Manager call of the given type, its other parameters already
@@ -148,8 +148,8 @@ fm_open:
 ; monitor's.
 ;
 ; Prepare:      fm_begin
-; Input:        X             byte      OPEN only: 0 creates the file if it
-;                                       isn't found; else it doesn't
+; Input:        X             byte      FMX_ALLOC or FMX_NOALLOC, for OPEN;
+;                                       FMX_NOALLOC for every other call
 ;               fm_parmlist   byte*     the parameter list, with the call's
 ;                                       fields set
 ; Output:       C             flag      clear: the call succeeded; set: it
@@ -212,7 +212,7 @@ fm_readbyte:
         iny
         lda     #FMS_ONE
         sta     (fm_parmlist),y
-        ldx     #$01
+        ldx     #FMX_NOALLOC
         jsr     fm_call
         bcs     :+
         ldy     #FMPARMS::BYTE
@@ -239,7 +239,7 @@ fm_writebyte:
         iny
         lda     #FMS_ONE
         sta     (fm_parmlist),y
-        ldx     #$01
+        ldx     #FMX_NOALLOC
         jmp     fm_call
 
 ;-----------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fm_rangeio:
         lda     fm_rio_addr+1
         sta     (fm_parmlist),y
 
-        ldx     #$01
+        ldx     #FMX_NOALLOC
         jmp     fm_call
 
 ;-----------------------------------------------------------------------------

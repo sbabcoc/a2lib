@@ -74,7 +74,7 @@ _exec:
         ldx     progname+1
         jsr     fm_name
         bcs     free
-        ldx     #$01            ; Don't allocate
+        ldx     #FMX_NOALLOC
         jsr     fm_open
         bcs     fail
         ldy     #FMPARMS::TYPE

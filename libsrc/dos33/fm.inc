@@ -20,7 +20,7 @@
 ; Page 3 vectors
 
 FM_LOCATE       := $03DC        ; Returns the parameter list's address in A:Y
-FM_ENTRY        := $03D6        ; File Manager entry; X=0 allocates on OPEN
+FM_ENTRY        := $03D6        ; File Manager entry; X: FMX_ALLOC or FMX_NOALLOC
 
 ; Last-used slot and drive kept by 48K DOS 3.3 ("Beneath Apple DOS" ch. 8,
 ; keyword value table at $AA66). S and D persist between commands; V is
@@ -108,6 +108,11 @@ RWTS_VOLUME     = $20           ; IOB::RC: volume mismatch (others: drive or
 .assert FMPARMS::NAME = $08, error, "FMPARMS::NAME is at $08"
 .assert FMPARMS::RC = $0A, error, "FMPARMS::RC is at $0A"
 
+; X for FM_ENTRY ("Beneath Apple DOS" ch. 6): whether OPEN creates a file
+; that isn't found. Every other call takes FMX_NOALLOC.
+FMX_ALLOC       = $00           ; OPEN creates the file if it isn't found
+FMX_NOALLOC     = $01           ; OPEN fails with DOSERR_NOTFOUND instead
+
 ; Call types
 FMC_OPEN        = $01
 FMC_CLOSE       = $02
@@ -138,7 +143,7 @@ DOSERR_RANGE    = $02           ; Range error (bad call type)
 DOSERR_SUBRANGE = $03           ; Range error (bad sub-call type)
 DOSERR_WPROT    = $04           ; Write protected
 DOSERR_ENDDATA  = $05           ; End of data (a read past the end)
-DOSERR_NOTFOUND = $06           ; File not found (OPEN with X = 0: allocated)
+DOSERR_NOTFOUND = $06           ; File not found (FMX_ALLOC: allocated)
 DOSERR_VOLUME   = $07           ; Volume mismatch
 DOSERR_IO       = $08           ; I/O error
 DOSERR_FULL     = $09           ; Disk full

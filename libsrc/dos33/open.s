@@ -127,7 +127,7 @@ found:  sty     slot
         bpl     :-
         ; Not a type the File Manager creates: open the file only if it
         ; exists, since O_CREAT matters only when it doesn't (POSIX)
-        ldx     #$01            ; Don't allocate
+        ldx     #FMX_NOALLOC
         jsr     fmopen
         bcc     exists
         cmp     #DOSERR_NOTFOUND
@@ -135,13 +135,14 @@ found:  sty     slot
         lda     #EINVAL         ; Can't create it
         jmp     errfreedirect
 :       sta     type
-        ldx     #$00            ; Allocate the file if it isn't found
+        ldx     #FMX_ALLOC
+        .assert FMX_ALLOC = 0, error
         beq     doopen          ; Branch always
-old:    ldx     #$01
+old:    ldx     #FMX_NOALLOC
 doopen: jsr     fmopen
         bcc     exists
 
-        ; "File not found" with X=0 means DOS allocated it, and it's open
+        ; "File not found" with FMX_ALLOC means DOS allocated it, and it's open
         cmp     #DOSERR_NOTFOUND
         bne     jerrfreefm
         lda     flags
@@ -314,7 +315,7 @@ truncate:
         bcs     tfreefm
 
         ; Allocate a new file of the same type
-        ldx     #$00
+        ldx     #FMX_ALLOC
         jsr     fmopen
         bcc     :+
         cmp     #DOSERR_NOTFOUND ; Allocated

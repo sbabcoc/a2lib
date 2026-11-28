@@ -117,7 +117,7 @@ __sysrename:
         lda     #<newbuf
         ldx     #>newbuf
         jsr     setname
-        ldx     #$01            ; Don't allocate
+        ldx     #FMX_NOALLOC
         jsr     fm_open
         bcs     :+
         lda     #FMC_CLOSE      ; It exists
