@@ -83,11 +83,9 @@ _open:
         ldy     #$00
 :       lda     fdtab + FD::REF_NUM,y
         beq     found
-        .assert .sizeof(FD) = 4, error
-        iny                     ; Next descriptor: 4 bytes on
+        .repeat .sizeof(FD)     ; Next descriptor
         iny
-        iny
-        iny
+        .endrepeat
         cpy     #MAX_FDS * .sizeof(FD)
         bcc     :-
         lda     #EMFILE

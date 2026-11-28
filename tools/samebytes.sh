@@ -9,7 +9,7 @@
 # Builds REV in a temporary worktree and the working tree as it is, and
 # compares what each generates, without the source text:
 #
-#   - every module's addresses and bytes, from ca65's listing, assembled
+#   - every module's bytes and their addresses, from ca65's listing, assembled
 #     with each set of flags the Makefile uses, and for sim6502 where the
 #     simulator tests build it
 #   - every module's imports, exports and segment sizes (od65)
@@ -89,7 +89,12 @@ for key in os.listdir(src):
     with open(os.path.join(dst, key + '.bytes'), 'w') as f:
         for line in open(os.path.join(src, key), errors='replace'):
             m = pat.match(line)
-            if m: print(m.group(1) + m.group(2), m.group(3).strip(), file=f)
+            if not m: continue
+            # One line per byte, so that how the listing groups bytes on
+            # lines (.repeat puts them all on one) doesn't matter
+            addr = int(m.group(1), 16)
+            for i, b in enumerate(m.group(3).split()):
+                print('%06X%s %s' % (addr + i, m.group(2), b), file=f)
 PY
         rm -rf build lib
         make -s -j"$JOBS" all test simtest > "$out/make.log" 2>&1 || { tail "$out/make.log" >&2; exit 1; }

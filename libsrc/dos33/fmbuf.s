@@ -149,11 +149,9 @@ file:   lda     fdtab + FD::REF_NUM,x
         lda     #LIBERR_OPEN    ; -> EINVAL
         sec
         rts
-        .assert .sizeof(FD) = 4, error
-next:   inx                     ; Next descriptor: 4 bytes on
+next:   .repeat .sizeof(FD)     ; Next descriptor
         inx
-        inx
-        inx
+        .endrepeat
         cpx     #MAX_FDS * .sizeof(FD)
         bcc     file
         clc
