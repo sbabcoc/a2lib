@@ -150,7 +150,7 @@ file:   lda     fdtab + FD::REF_NUM,x
         sec
         rts
         .assert .sizeof(FD) = 4, error
-next:   inx
+next:   inx                     ; Next descriptor: 4 bytes on
         inx
         inx
         inx

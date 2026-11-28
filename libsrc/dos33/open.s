@@ -84,7 +84,7 @@ _open:
 :       lda     fdtab + FD::REF_NUM,y
         beq     found
         .assert .sizeof(FD) = 4, error
-        iny
+        iny                     ; Next descriptor: 4 bytes on
         iny
         iny
         iny
